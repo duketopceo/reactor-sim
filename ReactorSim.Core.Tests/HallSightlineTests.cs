@@ -24,6 +24,15 @@ namespace ReactorSim.Core.Tests
         }
 
         [Fact]
+        public void RimHiddenBelowMatchesAHandCalculationAndMovesTheRightWay()
+        {
+            // eye 25.05 m over the floor (22 + 3.0 - 1.6 + 1.65), rim 22.15 m, rim 8.0 m from the stand eye, axis 16.5 m: 22.15 - 2.9 * 9 / 7.5
+            Assert.Equal(22.15 - 2.9 * 9.0 / 7.5, HallSightline.RimHiddenBelow(HallSightline.Stand()), 2);
+            // farther back from the wall means a shallower line over the rim, so the rim hides more of the module
+            Assert.True(HallSightline.RimHiddenBelow(HallSightline.Seat()) > HallSightline.RimHiddenBelow(HallSightline.Stand()));
+        }
+
+        [Fact]
         public void ThePr4PoolAndGalleryNumbersLeftTheHeadBehindTheRim()
         {
             // PR4: rim 0.3 m over the water, pool radius 6.5 m, eye 2.2 m over the water, head top 21.2 m over the floor. Same maths, old inputs.

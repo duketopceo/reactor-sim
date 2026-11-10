@@ -8,9 +8,9 @@ physics is built from published reactor engineering, but it is a game, not a lic
 
 | Observation window, from the standing position | Observation window, from the seat position |
 |---|---|
-| ![Through the observation window: the containment head of the reactor module just under the pool water, the pool rim, a steam stub and the parked overhead crane](docs/media/hall-window-standing.png) | ![The same window from the seat position at standing eye height: the module head over the pool rim and the hall wall behind](docs/media/hall-window-seated.png) |
+| ![Through the observation window: the domed containment head of the reactor module just under the pool water at the lower left, a steam stub, the gallery railing and the parked overhead crane](docs/media/hall-window-standing.png) | ![The same window from the seat position at standing eye height: the top of the module head and a steam stub past the gallery railing, the hall wall behind](docs/media/hall-window-seated.png) |
 
-![Top-down view of the control room: the console arc and the operator position markers](docs/media/control-room-top.png)
+![Top-down view of the control room: the console arc and the coloured section markers on the floor](docs/media/control-room-top.png)
 
 ## What is in it
 
