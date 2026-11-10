@@ -81,7 +81,7 @@ namespace ReactorSim.Core.Tests
             var row = Inventory().Find("boron_ppm");
             var snap = new PlantSnapshot { BoronPpm = 1480.4 };
             var tip = ControlTooltipModel.ForIndicator(row, "BoronPpm", -1, snap, "", "");
-            Assert.Equal("now 1480.4 ppm", tip.Value);
+            Assert.Equal("now 1480 ppm", tip.Value);
             Assert.Equal("range 0 - 2500 ppm", tip.Limits);
             var rod = ControlTooltipModel.ForIndicator(Inventory().Find("rod_bank_1_pos"), "BankInsertion", 1, new PlantSnapshot { BankInsertion = new double[] { 1, 0.25, 1, 1 } }, "", "");
             Assert.Equal("now 0.25 frac", rod.Value);

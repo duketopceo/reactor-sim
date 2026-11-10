@@ -60,6 +60,19 @@ namespace ReactorSim.Ui
             return IsAllZero(s) ? s.TrimStart('-') : s;
         }
 
+        /// <summary>A live value whose unit has no fixed precision (tooltip, drag readout): 0 decimals from 1000 up, 1 from 10,
+        /// 2 below, trailing zeros dropped, never "-0"; exponent form beyond 1e6 and below 1e-3. Non-finite gives the dash.</summary>
+        public static string Adaptive(double v)
+        {
+            if (!IsFinite(v)) return Dash;
+            double a = Math.Abs(v);
+            if (a != 0.0 && (a >= 1e6 || a < 1e-3)) return v.ToString("0.##e+0", CultureInfo.InvariantCulture);
+            int decimals = a >= 1000.0 ? 0 : (a >= 10.0 ? 1 : 2);
+            string s = Number(v, decimals);
+            if (s.IndexOf('.') >= 0) s = s.TrimEnd('0').TrimEnd('.');
+            return s.Length == 0 || s == "-" ? "0" : s;
+        }
+
         /// <summary>"12.3 bar". Non-finite gives just the dash (no unit, nothing to attach it to).</summary>
         public static string Value(double v, int decimals, string unit)
         {

@@ -106,7 +106,7 @@ namespace ReactorSim
         /// <summary>Poses the capture run can show, in the default order. "crt" expands to every CRT screen.</summary>
         public static readonly string[] KnownPoses =
         {
-            "menu", "seat", "stand", "crt", "tooltip", "rejected", "drag", "checklist", "pause", "tablet", "clipboard", "gallery", "away", "hall", "glowoff", "glowidle", "glowmid", "glowfull"
+            "menu", "seat", "stand", "crt", "tooltip", "rejected", "drag", "checklist", "pause", "tablet", "clipboard", "bar", "dial", "gallery", "away", "hall", "glowoff", "glowidle", "glowmid", "glowfull"
         };
 
         /// <summary>Parses "1600x900". Throws FormatException with the offending text on anything else.</summary>

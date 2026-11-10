@@ -147,7 +147,7 @@ namespace ReactorSim.Controls
         {
             double delta = value - startValue;
             string sign = delta > 0.0 ? "+" : "";
-            return (label ?? "") + "\n" + Fmt(value, units, integer) + "   (" + sign + Num(integer ? Math.Round(delta) : delta) + ")";
+            return (label ?? "") + "\n" + Fmt(value, units, integer) + "   (" + sign + (integer ? Num(Math.Round(delta)) : ReactorSim.Ui.ReadoutFormat.Adaptive(delta)) + ")";
         }
 
         /// <summary>A placed but unbound row.</summary>
@@ -182,7 +182,7 @@ namespace ReactorSim.Controls
 
         private static string Fmt(double v, string units, bool integer)
         {
-            return Num(integer ? Math.Round(v) : v) + UnitSuffix(units);
+            return (integer ? Num(Math.Round(v)) : ReactorSim.Ui.ReadoutFormat.Adaptive(v)) + UnitSuffix(units);
         }
 
         // Up to 2 decimals, or 3 significant digits in exponent form for very large and very small values.
