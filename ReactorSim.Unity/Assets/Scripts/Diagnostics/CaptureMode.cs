@@ -217,9 +217,9 @@ public class CaptureMode : MonoBehaviour
                 yield return Frames(30);
                 Vector3 eye = Camera.main != null ? Camera.main.transform.position : window;
                 Vector3 away = new Vector3(eye.x - window.x, 0f, eye.z - window.z).normalized;
-                // turned about and down at the floor: the window is behind the camera and the view holds almost nothing, the same
+                // turned about and up at the ceiling: the window is behind the camera and the view holds almost nothing, the same
                 // in every run, so the difference between two runs is the cost of the hall while it cannot be seen
-                op.CaptureAt(new Vector3(eye.x, 0f, eye.z), eye + away * 1.0f + Vector3.down * 4f, 60f);
+                op.CaptureAt(new Vector3(eye.x, 0f, eye.z), eye + away * 1.0f + Vector3.up * 4f, 60f);
                 yield return Frames(30);
                 yield return Shot("away", "gallery-away", 30, 0.6f, null);
                 break;

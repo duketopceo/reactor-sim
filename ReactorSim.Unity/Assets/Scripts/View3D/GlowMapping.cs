@@ -15,13 +15,13 @@ namespace ReactorSim.Instruments
         public const double Max = 1.0;
 
         /// <summary>Rack emission multiplier at zero power (a visible, dim cue).</summary>
-        public const double RackEmissionFloor = 0.6;
+        public const double RackEmissionFloor = 0.25;
         /// <summary>Rack emission multiplier at rated power and above.</summary>
-        public const double RackEmissionMax = 3.6;
+        public const double RackEmissionMax = 2.6;
         /// <summary>Haze cone opacity at zero power.</summary>
-        public const double HazeFloor = 0.03;
+        public const double HazeFloor = 0.02;
         /// <summary>Haze cone opacity at rated power and above.</summary>
-        public const double HazeMax = 0.30;
+        public const double HazeMax = 0.22;
 
         /// <summary>Power is normalised (1.0 = rated). Result is always finite and within [Floor, Max].</summary>
         public static double Glow(double power)
