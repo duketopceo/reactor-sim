@@ -45,7 +45,7 @@ public class CaptureMode : MonoBehaviour
             string poseArg = ArgValue(args, "-poses");
             List<string> list = poseArg != null
                 ? CaptureMath.ParsePoses(poseArg)
-                : CaptureMath.ParsePoses("menu,seat,stand,crt,tooltip,rejected,drag,checklist,pause,tablet,clipboard");
+                : CaptureMath.ParsePoses("menu,seat,stand,crt,tooltip,rejected,drag,checklist,pause,tablet,clipboard,gallery,away");
             var go = new GameObject("CaptureMode");
             DontDestroyOnLoad(go);
             var c = go.AddComponent<CaptureMode>();
@@ -191,12 +191,36 @@ public class CaptureMode : MonoBehaviour
                 yield return Panel("clipboard", FindAnyObjectByType<ProcedureClipboard>(), "Open", "Close");
                 break;
             case "gallery":
-                var hall = GameObject.Find("ReactorHall");
+                var hall = HallVisibility.FindHall();
                 if (hall == null) { Skip(pose, "no ReactorHall object in the scene"); break; }
-                op.CaptureLookAt(hall.transform.position, 60f);
+                op.CaptureLookAt(HallFocus(hall), 60f);
                 yield return Shot("gallery", "gallery", 30, 0.6f, null);
                 break;
+            case "away":
+                // Same stand as the gallery pose but looking the other way, so the window is out of the frustum: the frame time
+                // here against the same pose on a baseline run is what the hall costs while it cannot be seen.
+                var hallAway = HallVisibility.FindHall();
+                if (hallAway == null) { Skip(pose, "no ReactorHall object in the scene"); break; }
+                Vector3 focus = HallFocus(hallAway);
+                op.CaptureLookAt(focus, 60f);
+                yield return Frames(5);
+                Vector3 eye = Camera.main != null ? Camera.main.transform.position : focus;
+                op.CaptureLookAt(eye + new Vector3(eye.x - focus.x, 0f, eye.z - focus.z), 60f);
+                yield return Shot("away", "gallery-away", 30, 0.6f, null);
+                break;
         }
+    }
+
+    // The point the gallery pose looks at: the hall's GalleryFocus marker when it has one, else the middle of its renderers.
+    private static Vector3 HallFocus(GameObject hall)
+    {
+        Transform marker = hall.transform.Find("GalleryFocus");
+        if (marker != null) return marker.position;
+        var rs = hall.GetComponentsInChildren<Renderer>(true);
+        if (rs.Length == 0) return hall.transform.position;
+        Bounds b = rs[0].bounds;
+        foreach (var r in rs) b.Encapsulate(r.bounds);
+        return b.center;
     }
 
     // A panel is opened through its own method (they are private on some), captured, then closed again.
