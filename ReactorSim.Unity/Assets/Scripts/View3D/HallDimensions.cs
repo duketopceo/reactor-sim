@@ -20,7 +20,7 @@ namespace ReactorSim
         /// <summary>Control-room floor above the pool floor.</summary>
         public static readonly float RoomFloorAbovePoolFloor = WaterDepth + GalleryEyeAboveWater - EyeAboveRoomFloor;
         /// <summary>Horizontal distance from the window wall to the pool axis.</summary>
-        public static readonly float PoolAxisFromWall = 8.5f;
+        public static readonly float PoolAxisFromWall = 10.0f;
 
         // ---- observation window (south wall) and the control-room anchors that look through it ----
         public static readonly float WindowWidth = 4.0f;
@@ -28,7 +28,7 @@ namespace ReactorSim
         public static readonly float WindowHeight = 2.3f;
         public static readonly float WindowOffsetFromDoor = 3.0f;    // opening centre, along the wall from the door centre
         public static readonly float HeaderMinWall = 0.3f;           // wall the builder keeps above the opening
-        public static readonly float VesselShiftX = 0.9f;            // pool axis, from the window centre along the wall (towards the seat side)
+        public static readonly float VesselShiftX = 1.2f;            // pool axis, from the window centre along the wall (towards the seat side)
         public static readonly float StandEyeHeight = 1.65f;         // OperatorMath.StandingEyeHeight
         public static readonly float StandBackFromWall = 4.5f;       // STAND_Center distance from the window wall
         public static readonly float SeatBackFromWall = 6.1f;        // seat distance from the window wall (the seat view uses the standing eye height)
@@ -52,8 +52,6 @@ namespace ReactorSim
         public static float PipeRunHeight { get { return WaterDepth - 0.45f; } }
         /// <summary>The point the stand's sight line aims at: the top of the module, just under the water surface.</summary>
         public static float SightTargetHeight { get { return ContainmentTop; } }
-        /// <summary>Top of the observation-window opening above the room floor.</summary>
-        public static float WindowTop { get { return WindowSill + WindowHeight; } }
         /// <summary>Eye height over the pool floor for a viewpoint at the given eye height over the room floor.</summary>
         public static float EyeAbovePoolFloor(float eyeAboveRoomFloor) { return RoomFloorAbovePoolFloor + eyeAboveRoomFloor; }
 

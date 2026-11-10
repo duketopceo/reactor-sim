@@ -387,12 +387,11 @@ public static class ControlRoomSceneBuilder
                               MakeMaterial("M_WindowGlass", new Color(0.75f, 0.88f, 1f, 0.05f), true, false), true);
         glass.GetComponent<BoxCollider>().size = new Vector3(1f, 1f, 1.5f); // a little thicker than the pane so nothing slips past
 
-        // Gallery rail on the hall side of the glass: a top rail and a mid rail with posts (visual only).
+        // Gallery rail on the hall side of the glass: one top rail with posts (visual only; a mid rail cut across the view of the module).
         float zRail = zOuter - inward * 0.35f;
         Material railMat = MakeMaterial("M_GalleryRail", new Color(0.62f, 0.65f, 0.7f), false, false);
         WindowBox(win.transform, "Rail_Top", xl, xr, y0 + 1.0f, y0 + 1.05f, zRail, 0.05f, railMat, false);
-        WindowBox(win.transform, "Rail_Mid", xl, xr, y0 + 0.62f, y0 + 0.66f, zRail, 0.04f, railMat, false);
-        int posts = Mathf.CeilToInt((xr - xl) / 0.8f);
+        int posts = Mathf.CeilToInt((xr - xl) / 1.3f);
         for (int i = 0; i <= posts; i++)
         {
             float px = Mathf.Lerp(xl + 0.03f, xr - 0.03f, (float)i / posts);

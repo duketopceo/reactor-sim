@@ -67,7 +67,7 @@ public static class FuelRackMesh
         l.type = LightType.Point;
         l.color = new Color(0.30f, 0.58f, 1f);
         l.range = 11f;
-        l.intensity = 2.4f;
+        l.intensity = 3.2f;
         l.shadows = LightShadows.None;
     }
 

@@ -43,15 +43,6 @@ namespace ReactorSim
             return (1.0 / (1.0 + 25.0 * x * x)) * (1.0 - x * x);
         }
 
-        /// <summary>
-        /// Estimated display value (sRGB, 0..1, clamped) of a surface of the given sRGB albedo luminance, lit face-on by one point
-        /// light, plus a constant emission (linear). Several lights are summed by passing their linear contributions to Total.
-        /// </summary>
-        public static double LinearLit(double albedoLuminance, double intensity, double distance, double range)
-        {
-            return albedoLuminance * intensity * PointFalloff(distance, range);
-        }
-
         /// <summary>Display value (sRGB, 0..1) of a linear total, clamped the way an 8-bit target without tone mapping clamps it.</summary>
         public static double Display(double linearTotal)
         {
