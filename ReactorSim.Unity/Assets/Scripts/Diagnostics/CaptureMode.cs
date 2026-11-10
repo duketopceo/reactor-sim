@@ -45,7 +45,7 @@ public class CaptureMode : MonoBehaviour
             string poseArg = ArgValue(args, "-poses");
             List<string> list = poseArg != null
                 ? CaptureMath.ParsePoses(poseArg)
-                : CaptureMath.ParsePoses("menu,seat,stand,crt,tooltip,rejected,drag,checklist,pause,tablet,clipboard,gallery,away");
+                : CaptureMath.ParsePoses("menu,seat,stand,crt,tooltip,rejected,drag,checklist,pause,tablet,clipboard,gallery,away,hall");
             var go = new GameObject("CaptureMode");
             DontDestroyOnLoad(go);
             var c = go.AddComponent<CaptureMode>();
@@ -195,6 +195,13 @@ public class CaptureMode : MonoBehaviour
                 if (hall == null) { Skip(pose, "no ReactorHall object in the scene"); break; }
                 op.CaptureLookAt(HallFocus(hall), 60f);
                 yield return Shot("gallery", "gallery", 30, 0.6f, null);
+                break;
+            case "hall":
+                // Close view of the module for the owner to judge (not graded): narrow field of view, same stand as the gallery pose.
+                var hallNear = HallVisibility.FindHall();
+                if (hallNear == null) { Skip(pose, "no ReactorHall object in the scene"); break; }
+                op.CaptureLookAt(HallFocus(hallNear), 30f);
+                yield return Shot("hall", "hall-close", 30, 0.6f, null);
                 break;
             case "away":
                 // Same stand as the gallery pose but looking the other way, so the window is out of the frustum: the frame time

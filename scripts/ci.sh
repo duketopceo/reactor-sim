@@ -80,6 +80,8 @@ if [ -n "${UNITY_EXE:-}" ]; then
   unity ControlMapCheck.Run
   say "Unity: instruments"
   unity InstrumentCheck.Run
+  say "Unity: reactor hall (module scale, layers, budgets, rebuild)"
+  unity HallCheck.Run
   say "Unity: layout (reach, view angle, occlusion)"
   unity LayoutCheck.Run
   say "Unity: round trip (every bound control, play mode)"
