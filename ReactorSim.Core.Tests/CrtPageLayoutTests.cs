@@ -43,6 +43,20 @@ namespace ReactorSim.Tests
         }
 
         [Fact]
+        public void StandbyPage_ForAnUnassignedScreen_ShowsNoSignalWithinTheBudget()
+        {
+            foreach (var s in States())
+            {
+                var p = Build("STANDBY", s);
+                Assert.Contains("STANDBY", p.Lines[1].Text);
+                Assert.Contains("NO SIGNAL", p.ToText());
+                Assert.DoesNotContain("SCREEN", p.ToText());
+                Assert.True(p.RowCost <= CrtPages.RowBudget);
+                Assert.True(p.MaxCellWidth <= CrtPages.Columns);
+            }
+        }
+
+        [Fact]
         public void EveryPage_StartsWithHeaderTitleAndStatus_InThatOrder()
         {
             foreach (var name in CrtPages.KnownPages)

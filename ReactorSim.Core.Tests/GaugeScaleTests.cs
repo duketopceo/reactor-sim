@@ -7,6 +7,24 @@ namespace ReactorSim.Core.Tests
     public class GaugeScaleTests
     {
         [Fact]
+        public void EndNumerals_SitPastTheSweepEnds_SoTheNeedleNeverCoversThem()
+        {
+            float a, r;
+            GaugeScale.NumeralSpot(0f, -135f, 135f, out a, out r);
+            Assert.Equal(-157f, a);
+            Assert.Equal(0.30f, r);
+            float lo = a;
+            GaugeScale.NumeralSpot(1f, -135f, 135f, out a, out r);
+            Assert.True(a > 135f + 20f);
+            Assert.Equal(-lo, a);
+            GaugeScale.NumeralSpot(0.5f, -135f, 135f, out a, out r);
+            Assert.Equal(0f, a);
+            Assert.Equal(0.235f, r);
+            GaugeScale.NumeralSpot(0.25f, -135f, 135f, out a, out r);
+            Assert.Equal(-67.5f, a);
+        }
+
+        [Fact]
         public void Marks_AreMinMiddleMax_AlongTheSweep()
         {
             var m = GaugeScale.Marks(0.0, 200.0, "MWt");

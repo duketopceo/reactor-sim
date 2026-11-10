@@ -152,6 +152,7 @@ public static class ControlRoomSceneBuilder
             oos++;
         }
         DarkenGlowingScreens(crRoot);
+        AttachStandbyScreens(crRoot, bridge);
         ApplyRoomLooks(crRoot);
         Debug.Log("[Phase2SceneBuilder] " + collisionBoxes + " collision proxies, " + oos + " out-of-service rows tagged.");
 
@@ -480,6 +481,25 @@ public static class ControlRoomSceneBuilder
     // surface out to white. Ceiling fixtures get a fixed indoor-office level instead.
     public const float RoomLightIntensity = RoomLighting.KeyIntensity;
     public const float RoomLightRange = RoomLighting.KeyRange;
+
+    // A monitor face that no CRT_ page owns (kit mesh "Screen") would be an empty dark pane: it gets a renderer on the
+    // standby page instead, so every screen in the room shows something deliberate.
+    public const string StandbyScreenName = "STANDBY";
+    private static void AttachStandbyScreens(GameObject root, PlantBridge bridge)
+    {
+        int n = 0;
+        foreach (var r in root.GetComponentsInChildren<MeshRenderer>(true))
+        {
+            string nm = r.gameObject.name;
+            if (nm != "Screen" && !nm.StartsWith("Screen.")) continue;
+            if (r.GetComponentInParent<CrtScreenRenderer>() != null) continue;
+            var crt = r.gameObject.AddComponent<CrtScreenRenderer>();
+            crt.bridge = bridge;
+            crt.screenName = StandbyScreenName;
+            n++;
+        }
+        Debug.Log("[Phase2SceneBuilder] " + n + " unassigned monitor faces set to the standby page.");
+    }
 
     // Cool, dim ambient under the warm ceiling key (RoomLighting). The hall keeps its own layer-masked lights.
     // Any mesh still carrying the exported glowing screen material (a monitor face that is not a CRT_ page, a counter window)

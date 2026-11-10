@@ -293,7 +293,9 @@ namespace ReactorSim.Instruments
                     break;
                 default:
                     p = Begin("STANDBY", s, clock);
-                    Body(p, "NO SIGNAL");
+                    Key(p, "NO SIGNAL");
+                    Body(p, "NOT ASSIGNED");
+                    Body(p, "SEE CORE, PRIMARY, STATUS");
                     break;
             }
             return p;

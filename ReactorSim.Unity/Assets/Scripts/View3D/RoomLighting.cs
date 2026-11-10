@@ -27,9 +27,9 @@ namespace ReactorSim.View3D
 
         // Surface value steps (albedo multipliers) that separate the room: the consoles and bench tops keep full value, the
         // walls step down and cool, the ceiling and the floor go darker still.
-        public static readonly Rgba WallTint = new Rgba(0.70, 0.76, 0.86);
-        public static readonly Rgba CeilingTint = new Rgba(0.45, 0.48, 0.55);
-        public static readonly Rgba FloorTint = new Rgba(0.50, 0.50, 0.52);
+        public static readonly Rgba WallTint = new Rgba(0.56, 0.64, 0.78);
+        public static readonly Rgba CeilingTint = new Rgba(0.36, 0.40, 0.48);
+        public static readonly Rgba FloorTint = new Rgba(0.34, 0.35, 0.38);
 
         // Emission ladder for self-lit surfaces: panel surfaces take no emission, screens carry a dark glow, lamps a bright one.
         public const double ScreenEmission = 1.0;
