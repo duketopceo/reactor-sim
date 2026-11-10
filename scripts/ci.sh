@@ -37,6 +37,9 @@ dotnet build reactor-sim.sln -c Release -warnaserror
 say "unit tests (xUnit)"
 dotnet test ReactorSim.Core.Tests -c Release --no-build --nologo
 
+say "hall budget gate self-test (an over-budget run must fail)"
+bash scripts/test-check-captures.sh
+
 say "scenario suite (U1-U10)"
 runner --scenario all
 
@@ -77,6 +80,8 @@ if [ -n "${UNITY_EXE:-}" ]; then
   unity ControlMapCheck.Run
   say "Unity: instruments"
   unity InstrumentCheck.Run
+  say "Unity: reactor hall (module scale, layers, budgets, rebuild)"
+  unity HallCheck.Run
   say "Unity: layout (reach, view angle, occlusion)"
   unity LayoutCheck.Run
   say "Unity: round trip (every bound control, play mode)"

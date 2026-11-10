@@ -10,7 +10,7 @@ using System.Collections.Generic;
 // Bootstrap.unity. Run from menu:  ReactorSim > Build Phase-2 Scene
 // KTD12: every build deletes and re-instances the ControlRoom (and any old PlantEquipment) so a regenerated room
 // always replaces the previous one. PlantEquipment is not part of this scene any more; the only plant geometry is the
-// primitive-built "ReactorHall" seen through the south-wall window (U6), a separate scene root so it never joins the
+// procedural "ReactorHall" (HallBuilder: an integral SMR module in a deep pool) seen through the south-wall window, a separate scene root so it never joins the
 // room's bounds, lights or colliders.
 //   - OperatorController + CameraShake on the main camera (tagged MainCamera), AlarmFeedback on the room
 //   - a CrtScreenRenderer on every CRT_* screen mesh (not the *_Glow strip)
@@ -50,7 +50,7 @@ public static class ControlRoomSceneBuilder
 
         // KTD12: replace, never reuse. (Old PlantEquipment instances go too; the room has no plant geometry.)
         foreach (var root in scene.GetRootGameObjects())
-            if (root.name == "ControlRoom" || root.name == "PlantEquipment" || root.name == "ReactorHall")
+            if (root.name == "ControlRoom" || root.name == "PlantEquipment" || root.name == HallBuilder.RootName || root.name == HallBuilder.GateName)
                 Object.DestroyImmediate(root);
         RemoveMissingScripts(scene);
         ApplyRoomAmbient();
@@ -304,11 +304,11 @@ public static class ControlRoomSceneBuilder
     // (door frame +-0.6 m), so the opening is offset 3.0 m toward the longer side of the wall, leaving 1.4 m of wall
     // between the door frame and the opening. Pieces are children of the ControlRoom root so LayoutCheck sees their
     // colliders; the hall itself is a separate root with no colliders at all.
-    private const float WindowWidth = 2.5f, WindowSill = 0.6f, WindowHeight = 1.6f, WindowOffsetFromDoor = 2.2f;
+    private const float WindowWidth = 3.2f, WindowSill = 0.35f, WindowHeight = 1.9f, WindowOffsetFromDoor = 2.6f;
     // The standing viewpoint (STAND_Center) and the seat sit 3.5 m apart along the wall, so a pool straight behind the
     // window looks well off to one side from the stand. The pool is moved toward the stand sightline (VesselShiftX, from the
     // window centre) and pulled close to the wall (PoolDepth) so one position reads reasonably centred from both.
-    private const float VesselShiftX = 0.25f, PoolDepth = 1.6f;
+    private const float VesselShiftX = 0.25f;
     private const int IgnoreRaycastLayer = 2;
     // Unnamed user layer for the reactor hall (culling only; no TagManager change). Hall lights light only this layer,
     // room lights skip it.
@@ -340,6 +340,11 @@ public static class ControlRoomSceneBuilder
         float doorX = doorR != null ? doorR.bounds.center.x : wb.center.x;
         float wx = doorX + (wb.max.x - doorX >= doorX - wb.min.x ? WindowOffsetFromDoor : -WindowOffsetFromDoor);
         float xl = wx - WindowWidth * 0.5f, xr = wx + WindowWidth * 0.5f;
+        // keep the wider opening inside the wall, with a little masonry left at the corner
+        if (xr > wb.max.x - 0.25f) { float d = xr - (wb.max.x - 0.25f); wx -= d; xl -= d; xr -= d; }
+        if (xl < wb.min.x + 0.25f) { float d = (wb.min.x + 0.25f) - xl; wx += d; xl += d; xr += d; }
+        if (Mathf.Abs(wx - doorX) - WindowWidth * 0.5f < 0.9f)
+            Debug.LogWarning($"[Phase2SceneBuilder] the window edge is {Mathf.Abs(wx - doorX) - WindowWidth * 0.5f:0.00} m from the door centre (door frame is 0.6 m).");
         float ySill = y0 + WindowSill, yHead = ySill + WindowHeight;
 
         // The old wall box and its collision proxy go dark; they belong to the FBX instance so they are hidden, not destroyed.
@@ -375,7 +380,21 @@ public static class ControlRoomSceneBuilder
                               MakeMaterial("M_WindowGlass", new Color(0.75f, 0.88f, 1f, 0.10f), true, false), true);
         glass.GetComponent<BoxCollider>().size = new Vector3(1f, 1f, 1.5f); // a little thicker than the pane so nothing slips past
 
-        BuildReactorHall(wx + VesselShiftX, y0, zOuter, -inward);
+        // Gallery rail on the hall side of the glass: a top rail and a mid rail with posts (visual only).
+        float zRail = zOuter - inward * 0.35f;
+        Material railMat = MakeMaterial("M_GalleryRail", new Color(0.62f, 0.65f, 0.7f), false, false);
+        WindowBox(win.transform, "Rail_Top", xl, xr, y0 + 1.0f, y0 + 1.05f, zRail, 0.05f, railMat, false);
+        WindowBox(win.transform, "Rail_Mid", xl, xr, y0 + 0.62f, y0 + 0.66f, zRail, 0.04f, railMat, false);
+        int posts = Mathf.CeilToInt((xr - xl) / 0.8f);
+        for (int i = 0; i <= posts; i++)
+        {
+            float px = Mathf.Lerp(xl + 0.03f, xr - 0.03f, (float)i / posts);
+            WindowBox(win.transform, "Rail_Post_" + i, px - 0.025f, px + 0.025f, ySill, y0 + 1.05f, zRail, 0.05f, railMat, false);
+        }
+
+        // The hall is only seen through this opening, so the frustum gate tests the opening (padded a little).
+        var gateBounds = new Bounds(new Vector3(wx, 0.5f * (ySill + yHead), zMid), new Vector3(WindowWidth + 0.6f, WindowHeight + 0.6f, 1.2f));
+        HallBuilder.Build(wx + VesselShiftX, y0, zOuter, -inward, gateBounds, MakeMaterial);
         Debug.Log($"[Phase2SceneBuilder] reactor window built: opening x {xl:0.00}..{xr:0.00} (door x {doorX:0.00}), sill {WindowSill:0.00} m, "
                   + $"{WindowWidth:0.00} x {WindowHeight:0.00} m, wall z {zInner:0.00}/{zOuter:0.00}; hall built.");
     }
@@ -396,132 +415,8 @@ public static class ControlRoomSceneBuilder
         return go;
     }
 
-    // Hall beyond the wall. Depth axis: z = zOuter + dir * d (dir points away from the room). All hall pieces are
-    // collider-free primitives under one root so the room's reach and occlusion checks never see them.
-    private static void BuildReactorHall(float cx, float y0, float zOuter, float dir)
-    {
-        var root = new GameObject("ReactorHall");
-        const float hallHalfW = 6f, hallDepth = 11f, hallHeight = 6f;
-
-        Material concrete = MakeMaterial("M_HallConcrete", new Color(0.38f, 0.40f, 0.43f), false, false);
-        Material deck = MakeMaterial("M_HallDeck", new Color(0.26f, 0.28f, 0.30f), false, false);
-        Material steel = MakeMaterial("M_HallSteel", new Color(0.58f, 0.62f, 0.68f), false, false);
-        if (steel.HasProperty("_Metallic")) steel.SetFloat("_Metallic", 0.9f);
-        if (steel.HasProperty("_Glossiness")) steel.SetFloat("_Glossiness", 0.68f);
-        Material tile = MakeMaterial("M_PoolTile", new Color(0.12f, 0.30f, 0.42f), false, false);
-        Material glow = MakeMaterial("M_CherenkovGlow", new Color(0.30f, 0.60f, 1f, 0.45f), true, true);
-
-        // The hall deck is level with the control-room floor. The pool is a raised basin whose water surface sits just
-        // under the window's eye line (a distant viewer sees nothing below the sill's sight line), so the window looks
-        // slightly DOWN onto the water and the vessel standing in it.
-        float deckY = y0;
-        Material water = MakeMaterial("M_PoolWater", new Color(0.08f, 0.40f, 0.78f, 0.62f), true, false);
-        // Emissive baseline: the water reads blue at zero power and under any lighting (the Cherenkov disc adds the rest).
-        water.EnableKeyword("_EMISSION");
-        water.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
-        if (water.HasProperty("_EmissionColor")) water.SetColor("_EmissionColor", new Color(0.03f, 0.18f, 0.42f));
-
-        // Shell: deck, near wall below the window, back wall, side walls, ceiling. The room's own wall is the fourth side above y0.
-        HallBox(root.transform, "Hall_Deck", cx - hallHalfW, cx + hallHalfW, deckY - 0.1f, deckY, zOuter, dir, 0f, hallDepth, deck);
-        HallBox(root.transform, "Hall_BackWall", cx - hallHalfW, cx + hallHalfW, deckY, y0 + hallHeight, zOuter, dir, hallDepth, hallDepth + 0.2f, concrete);
-        HallBox(root.transform, "Hall_WallL", cx - hallHalfW - 0.2f, cx - hallHalfW, deckY, y0 + hallHeight, zOuter, dir, 0f, hallDepth + 0.2f, concrete);
-        HallBox(root.transform, "Hall_WallR", cx + hallHalfW, cx + hallHalfW + 0.2f, deckY, y0 + hallHeight, zOuter, dir, 0f, hallDepth + 0.2f, concrete);
-        HallBox(root.transform, "Hall_Ceiling", cx - hallHalfW, cx + hallHalfW, y0 + hallHeight, y0 + hallHeight + 0.2f, zOuter, dir, 0f, hallDepth, concrete);
-
-        // Pool: a 2.3 m square basin, floor tile, translucent water up to 0.8 m. The rim is only 4 cm above the water so
-        // it does not hide the surface from the window. Centred PoolDepth beyond the wall.
-        const float half = 1.15f, rimT = 0.2f, rimTop = 0.84f, floorTop = 0.05f, surface = 0.8f, poolD = PoolDepth, d0 = poolD - half, d1 = poolD + half;
-        HallBox(root.transform, "Pool_Floor", cx - half, cx + half, deckY, deckY + floorTop, zOuter, dir, d0, d1, tile);
-        HallBox(root.transform, "Pool_RimNear", cx - half - rimT, cx + half + rimT, deckY, deckY + rimTop, zOuter, dir, d0 - rimT, d0, concrete);
-        HallBox(root.transform, "Pool_RimFar", cx - half - rimT, cx + half + rimT, deckY, deckY + rimTop, zOuter, dir, d1, d1 + rimT, concrete);
-        HallBox(root.transform, "Pool_RimL", cx - half - rimT, cx - half, deckY, deckY + rimTop, zOuter, dir, d0, d1, concrete);
-        HallBox(root.transform, "Pool_RimR", cx + half, cx + half + rimT, deckY, deckY + rimTop, zOuter, dir, d0, d1, concrete);
-        HallBox(root.transform, "Pool_Water", cx - half, cx + half, deckY + floorTop, deckY + surface, zOuter, dir, d0, d1, water);
-
-        float poolZ = zOuter + dir * poolD;
-
-        // Vessel: procedural PWR pressure vessel (shell, flange with stud ring, dome, CRDM housings, nozzles); see
-        // ReactorVesselMesh. The flange straddles the water line so the head reads from the window.
-        Material crdm = MakeMaterial("M_HallSteelDark", new Color(0.30f, 0.32f, 0.36f), false, false);
-        if (crdm.HasProperty("_Metallic")) crdm.SetFloat("_Metallic", 0.75f);
-        if (crdm.HasProperty("_Glossiness")) crdm.SetFloat("_Glossiness", 0.5f);
-        ReactorVesselMesh.Build(root.transform, new Vector3(cx, deckY, poolZ), steel, crdm);
-
-        // Core glow: a flat disc around the vessel foot, below the water line, so it shows through the water. The name
-        // CoreGlow_Mesh is what PlantEquipmentBinder drives (alpha, emission, scale, and the child light below). Unity's
-        // cylinder primitive is 2 m tall with radius 0.5, so scale (2.1, 0.12, 2.1) gives r 1.05 and 0.24 m tall.
-        var glowGo = HallCylinder(root.transform, "CoreGlow_Mesh", new Vector3(cx, deckY + 0.18f, poolZ), 1.05f, 0.12f, glow);
-        var glowLightGo = new GameObject("CoreGlow_Light");
-        glowLightGo.transform.SetParent(glowGo.transform, false);
-        glowLightGo.transform.localPosition = new Vector3(0f, 4f, 0f);   // parent y scale is 0.12, so about 0.5 m above the disc
-        var glowLight = glowLightGo.AddComponent<Light>();
-        glowLight.type = LightType.Point;
-        glowLight.color = new Color(0.30f, 0.58f, 1f);
-        glowLight.range = 4f;       // stays mostly inside the hall; the binder scales intensity by power
-        glowLight.intensity = 1.6f;
-        glowLight.shadows = LightShadows.None;
-
-        // Hall lights: cool, above the pool, wide enough to light the deck and vessel; hall layer only (see HallLayer).
-        Vector3[] lightAt =
-        {
-            new Vector3(cx - 2.0f, y0 + 3.2f, zOuter + dir * 1.8f),
-            new Vector3(cx + 2.0f, y0 + 3.2f, zOuter + dir * 1.8f),
-            new Vector3(cx,        y0 + 3.2f, zOuter + dir * 5.5f),
-        };
-        for (int i = 0; i < lightAt.Length; i++)
-        {
-            var lg = new GameObject("HallLight_" + i);
-            lg.transform.SetParent(root.transform, false);
-            lg.transform.position = lightAt[i];
-            var l = lg.AddComponent<Light>();
-            l.type = LightType.Point;
-            l.color = new Color(0.70f, 0.82f, 1f);
-            l.range = 9f;
-            l.intensity = 1.6f;
-            l.shadows = LightShadows.None;
-        }
-
-        // Culling layers keep the two lighting setups apart: every hall object (and light) sits on HallLayer, the hall
-        // lights only light that layer, and NormaliseRoomLight excludes it from the room lights.
-        foreach (var t in root.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = HallLayer;
-        foreach (var l in root.GetComponentsInChildren<Light>(true)) l.cullingMask = 1 << HallLayer;
-
-        var binder = root.AddComponent<PlantEquipmentBinder>();
-        var bridgeGo = GameObject.Find("PlantSim");
-        if (bridgeGo != null) binder.bridge = bridgeGo.GetComponent<PlantBridge>();
-    }
-
-    // Collider-free hall box spanning x0..x1, y0..y1 and depth d0..d1 beyond the wall (dir = +-1 along z).
-    private static GameObject HallBox(Transform parent, string name, float x0, float x1, float y0, float y1,
-                                      float zOuter, float dir, float d0, float d1, Material mat)
-    {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        go.name = name;
-        go.transform.SetParent(parent, true);
-        float zc = zOuter + dir * 0.5f * (d0 + d1);
-        go.transform.position = new Vector3(0.5f * (x0 + x1), 0.5f * (y0 + y1), zc);
-        go.transform.localScale = new Vector3(Mathf.Max(0.001f, x1 - x0), Mathf.Max(0.001f, y1 - y0), Mathf.Max(0.001f, d1 - d0));
-        go.GetComponent<MeshRenderer>().sharedMaterial = mat;
-        Object.DestroyImmediate(go.GetComponent<Collider>());
-        return go;
-    }
-
-    // Collider-free upright cylinder: radius r, half-height hh (Unity's primitive is radius 0.5 and 2 m tall,
-    // so scale (2r, hh, 2r) gives radius r and half-height hh).
-    private static GameObject HallCylinder(Transform parent, string name, Vector3 centre, float r, float hh, Material mat)
-    {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        go.name = name;
-        go.transform.SetParent(parent, true);
-        go.transform.position = centre;
-        go.transform.localScale = new Vector3(r * 2f, hh, r * 2f);
-        go.GetComponent<MeshRenderer>().sharedMaterial = mat;
-        Object.DestroyImmediate(go.GetComponent<Collider>());
-        return go;
-    }
-
     // Built-in pipeline Standard material (the clipboard falls back the same way). Transparent ones use the Fade setup.
-    private static Material MakeMaterial(string name, Color colour, bool fade, bool emissive)
+    internal static Material MakeMaterial(string name, Color colour, bool fade, bool emissive)
     {
         Shader sh = Shader.Find("Standard");
         if (sh == null) sh = Shader.Find("Universal Render Pipeline/Lit");

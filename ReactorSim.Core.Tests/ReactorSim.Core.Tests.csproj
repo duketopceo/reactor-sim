@@ -36,6 +36,8 @@
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\Missions\MissionHudModel.cs" Link="Unity\MissionHudModel.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\UI\ReadoutFormat.cs" Link="Unity\ReadoutFormat.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\PixelBudget.cs" Link="Unity\PixelBudget.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\HallVisibilityMath.cs" Link="Unity\HallVisibilityMath.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\HallDimensions.cs" Link="Unity\HallDimensions.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\SandboxStart.cs" Link="Unity\SandboxStart.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\Diagnostics\SessionRecorder.cs" Link="Unity\SessionRecorder.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\Diagnostics\CaptureMath.cs" Link="Unity\CaptureMath.cs" />

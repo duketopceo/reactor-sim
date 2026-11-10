@@ -72,6 +72,22 @@ namespace ReactorSim
             return (hi + 0.05) / (lo + 0.05);
         }
 
+        /// <summary>Mean luminance (0..1, linear) of all the pixels in a crop of an RGBA32 image; 0 for a bad crop.</summary>
+        public static double CropMeanLuminance(byte[] rgba, int imageWidth, int x, int y, int w, int h)
+        {
+            if (rgba == null || imageWidth <= 0 || w <= 0 || h <= 0 || x < 0 || y < 0 || x + w > imageWidth) return 0.0;
+            int rows = rgba.Length / 4 / imageWidth;
+            if (y + h > rows) return 0.0;
+            double sum = 0.0;
+            for (int j = y; j < y + h; j++)
+                for (int i = x; i < x + w; i++)
+                {
+                    int p = (j * imageWidth + i) * 4;
+                    sum += Luminance(rgba[p], rgba[p + 1], rgba[p + 2]);
+                }
+            return sum / (w * h);
+        }
+
         // ---- frame-time percentiles ----
 
         /// <summary>Nearest-rank percentile (p in 0..100) of the values; 0 for an empty set.</summary>
@@ -90,7 +106,7 @@ namespace ReactorSim
         /// <summary>Poses the capture run can show, in the default order. "crt" expands to every CRT screen.</summary>
         public static readonly string[] KnownPoses =
         {
-            "menu", "seat", "stand", "crt", "tooltip", "rejected", "drag", "checklist", "pause", "tablet", "clipboard", "gallery"
+            "menu", "seat", "stand", "crt", "tooltip", "rejected", "drag", "checklist", "pause", "tablet", "clipboard", "gallery", "away", "hall", "glowoff", "glowidle", "glowmid", "glowfull"
         };
 
         /// <summary>Parses "1600x900". Throws FormatException with the offending text on anything else.</summary>
