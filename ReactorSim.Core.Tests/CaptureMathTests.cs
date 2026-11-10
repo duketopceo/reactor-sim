@@ -262,5 +262,41 @@ namespace ReactorSim.Core.Tests
             c.NumberFormat.NumberGroupSeparator = ".";
             return c;
         }
+
+        // ---- mean luminance (rack glow check) ----
+
+        [Fact]
+        public void CropMeanLuminance_AllWhiteIsOneAndAllBlackIsZero()
+        {
+            var white = new byte[20 * 20 * 4];
+            for (int i = 0; i < white.Length; i++) white[i] = 255;
+            Assert.Equal(1.0, CaptureMath.CropMeanLuminance(white, 20, 0, 0, 20, 20), 6);
+            Assert.Equal(0.0, CaptureMath.CropMeanLuminance(new byte[20 * 20 * 4], 20, 0, 0, 20, 20), 6);
+        }
+
+        [Fact]
+        public void CropMeanLuminance_HalfWhiteIsHalf()
+        {
+            var img = new byte[10 * 10 * 4];
+            for (int p = 0; p < 50; p++) { int o = p * 4; img[o] = img[o + 1] = img[o + 2] = 255; }
+            Assert.Equal(0.5, CaptureMath.CropMeanLuminance(img, 10, 0, 0, 10, 10), 6);
+        }
+
+        [Fact]
+        public void CropMeanLuminance_BrighterEmissionGivesAHigherValue()
+        {
+            var dim = new byte[10 * 10 * 4];
+            var bright = new byte[10 * 10 * 4];
+            for (int p = 0; p < 100; p++) { int o = p * 4; dim[o + 2] = 90; bright[o + 2] = 220; }
+            Assert.True(CaptureMath.CropMeanLuminance(bright, 10, 0, 0, 10, 10) > CaptureMath.CropMeanLuminance(dim, 10, 0, 0, 10, 10));
+        }
+
+        [Fact]
+        public void CropMeanLuminance_BadCropsAreZero()
+        {
+            Assert.Equal(0.0, CaptureMath.CropMeanLuminance(null, 10, 0, 0, 5, 5));
+            Assert.Equal(0.0, CaptureMath.CropMeanLuminance(new byte[400], 10, 8, 0, 5, 5));
+            Assert.Equal(0.0, CaptureMath.CropMeanLuminance(new byte[400], 10, 0, 8, 5, 5));
+        }
     }
 }

@@ -20,7 +20,7 @@ Note the real time you start and anything that feels confusing, fun or broken as
 
 The startup order is the checklist in [STARTUP.md](STARTUP.md). In the sandbox the checklist panel is on screen
 top-left from the start and shows the current step; press **P** to expand the full list, and stand up from the
-seat to see the reactor window in the south wall. Follow the panel and note where its wording or targets mislead you.
+seat and walk to the reactor window in the south wall (see "Reactor hall" below). Follow the panel and note where its wording or targets mislead you.
 
 1. Start Sandbox. Confirm the plant is cold and quiet and the panel shows step 1 of 13 (start the primary pumps).
 2. Lineup: start the primary pumps (flow 80 % or more), heaters on (60 bar or more), cooling water and vacuum
@@ -102,6 +102,42 @@ runs the sandbox for 30 real seconds and quits normally, which writes a session 
 
 Files land in `out/playtest/<timestamp>/`. The script exits 1 and names what is missing when a folder or log does
 not exist, and exits 2 when the host is unreachable. It only reads from the Windows box.
+
+## Reactor hall (the window in the south wall)
+
+The window looks down from a gallery about 9 m over the water into a circular hall with a 22 m deep pool. Walk up to the
+rail (within about a metre) to see the pool; from across the room the window shows the far wall and the crane.
+
+- **The module.** A small modular reactor of the pumped integral type: a 2.7 m wide, 18.8 m tall reactor vessel standing in
+  a 4.5 m wide containment shell, in the pool with the containment head just under the water. The steam generators and the
+  pressurizer are inside the vessel, so there is no external primary loop. What you see outside the vessel is what such a
+  design has: canned recirculation pump motors on the vessel shoulder, chemical-and-volume-control, safety-injection and vent
+  penetrations through the containment wall, and the steam and feedwater lines that leave through the containment head and run
+  to the pool wall.
+- **Cutaway.** The containment is drawn as a cutaway: an opaque steel shell with a vertical slot facing the window, closed in
+  its upper part by a translucent skin, so you can see the vessel and pump housings. This is a depiction choice; a real
+  containment is an opaque shell.
+- **The glow is a cue.** The blue glow over the spent-fuel racks on the pool ledge follows reactor power (dim at shutdown, bright
+  at rated power). Real spent-fuel Cherenkov light comes from the fuel's own decay, not from current reactor power, so this
+  scaling is a visual cue for the player, not a physics claim.
+- **Performance.** The hall switches itself off when the window is out of view. Its budget (checked against a baseline run, see
+  below, for every captured size) is at most 4 ms of added frame time at p95, at most 120 added draw calls, a p99 of 12 ms or
+  less in the gallery pose, and at most 1 ms of added p95 while the window is out of view.
+
+### Capturing the hall
+
+On the Windows machine (graphics session):
+
+```
+bash scripts/capture-playtest.sh --sizes 1920x1080 --poses gallery,away,hall,glowoff,glowidle,glowmid,glowfull
+bash scripts/check-captures.sh <dir> --only glowoff,glowidle,glowmid,glowfull --allow-skip gallery,away,hall   # rack glow rises with power
+bash scripts/check-captures.sh <dir> --baseline <baseline dir> --budget-only                                   # runtime budget
+```
+
+The baseline is a run of the same poses on a build with the old hall: the commit before the hall build, with the capture poses
+(`gallery`, `away`) added to it, because those poses do not exist in older builds. Frame time on a shared machine is noisy (the
+same build has measured between 5.7 and 15.6 ms at p95 in different runs), so run the budget check on a quiet machine, and
+compare runs made back to back.
 
 ## Not in this build
 
