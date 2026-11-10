@@ -6,9 +6,9 @@ physics is built from published reactor engineering, but it is a game, not a lic
 
 ![Standing in the control room: hanging section signs, gauges, CRT pages and switch gear on the curved panel wall](docs/media/control-room-standing.png)
 
-| Observation window, from the standing position | Observation window, from the seat position |
+| Observation window, from the standing position | Observation window, from the seat (seated eye height) |
 |---|---|
-| ![Through the observation window: the domed containment head of the reactor module just under the pool water at the lower left, a steam stub, the gallery railing and the parked overhead crane](docs/media/hall-window-standing.png) | ![The same window from the seat position at standing eye height: the top of the module head and a steam stub past the gallery railing, the hall wall behind](docs/media/hall-window-seated.png) |
+| ![Through the observation window: the domed containment head and upper shoulder of the reactor module just under the pool water at the lower left, a steam stub, the gallery railing and the parked overhead crane](docs/media/hall-window-standing.png) | ![The same window from a camera at the seat position at seated eye height: the whole dome of the module head and a steam stub past the gallery railing, with the crane and hall wall behind](docs/media/hall-window-seated.png) |
 
 ![Top-down view of the control room: the console arc and the coloured section markers on the floor](docs/media/control-room-top.png)
 
@@ -27,7 +27,7 @@ physics is built from published reactor engineering, but it is a game, not a lic
   plant state ([docs/STARTUP.md](docs/STARTUP.md)).
 - **Control room.** Diegetic switches, gauges, annunciators and CRT pages, with an observation window onto a
   true-scale small-modular-reactor module in a 22 m deep refuelling pool (its head is checked to show over the pool
-  rim from both the standing and the seat position in `HallSightline`); procedural audio; LAN co-op over TCP.
+  rim from both the standing and the seated eye in `HallSightline`); procedural audio; LAN co-op over TCP.
 - **Tooling.** JSON snapshots, an intent pipeline, an HTTP API, an stdio MCP bridge, JSONL logging and golden
   replay.
 
