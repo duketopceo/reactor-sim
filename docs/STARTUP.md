@@ -14,9 +14,13 @@ A SCRAM from power therefore sends you back to the rod step; the lineup steps (1
   the action, the control, the target and the live value. It is off in missions. Press **P** to expand it to the
   full list with ticks, and use "Show me" on a step to outline the controls involved. The panel hides while the
   tablet or the Escape menu is open, and it shows a caution line naming the step that unticked after a SCRAM or trip.
-- **Reactor window.** The control room has a window in the south wall beside the door, looking at the vessel in
-  its pool. It is behind the seated operator, so stand up (leave the seat) to see it. The pool glow follows
-  core power, so you can watch the approach to criticality from the window as well as on the flux instruments.
+- **Reactor window.** The control room has a wide, low window in the south wall beside the door. It is a gallery
+  about 9 m over the water of a deep, circular reactor pool, looking down at a small modular reactor module (see
+  "Reactor hall" in [PLAYTEST.md](PLAYTEST.md)). It is behind the seated operator, so stand up and walk to the window:
+  from a standing spot across the room you see the hall wall and crane, and you have to be within about a metre of
+  the rail to look down onto the pool. The blue glow comes from the spent-fuel racks on the pool ledge and follows
+  core power (a visual cue), so you can watch the approach to criticality from the window as well as on the flux
+  instruments.
 
 ## Phase table
 
