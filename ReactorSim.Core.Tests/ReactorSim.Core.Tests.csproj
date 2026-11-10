@@ -32,6 +32,8 @@
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\UI\TabletPages.cs" Link="Unity\TabletPages.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\UI\ClipboardView.cs" Link="Unity\ClipboardView.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\UI\Theme.cs" Link="Unity\Theme.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\RoomLighting.cs" Link="Unity\RoomLighting.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\Missions\MissionHudModel.cs" Link="Unity\MissionHudModel.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\UI\ReadoutFormat.cs" Link="Unity\ReadoutFormat.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\PixelBudget.cs" Link="Unity\PixelBudget.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\SandboxStart.cs" Link="Unity\SandboxStart.cs" />

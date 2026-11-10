@@ -48,7 +48,7 @@ public class StartupChecklistHud : MonoBehaviour
     private Image panelImage;
     private ThemedPanelWidth panelWidth;
     private GameObject compactBox, fullBox;
-    private TMP_Text cPhase, cStep, cAction, cControl, cReading, cCaution, cHint;
+    private TMP_Text cPhase, cStep, cAction, cControl, cReading, cNext, cCaution, cHint;
     private TMP_Text fHeader, fCaution;
     private RectTransform fContent;
     private readonly List<TMP_Text> fRows = new List<TMP_Text>();
@@ -170,10 +170,10 @@ public class StartupChecklistHud : MonoBehaviour
         if (canvas != null) return;
         RuntimeUi.EnsureEventSystem();
         canvas = RuntimeUi.CreateCanvas("ChecklistCanvas", 40, transform);
-        // Top left, clear of the tooltip and hint regions and below MissionHud's band.
+        // Top left, clear of the tooltip and hint regions and below the mission panel.
         var panel = RuntimeUi.Panel(canvas.transform, "Panel", CompactWidth, ThemeColors.SurfaceTooltip, new Vector2(0f, 1f),
             new Vector2(0f, 1f), new RectOffset(Theme.Space3, Theme.Space3, Theme.Space3, Theme.Space3), Theme.Space1);
-        panel.anchoredPosition = new Vector2(10f, -196f);
+        panel.anchoredPosition = new Vector2(10f, -10f);
         panelImage = panel.GetComponent<Image>();
         panelWidth = panel.GetComponent<ThemedPanelWidth>();
 
@@ -184,7 +184,8 @@ public class StartupChecklistHud : MonoBehaviour
         cAction = RuntimeUi.MakeLabel(compactBox.transform, "", TextRole.Body, TextAnchor.MiddleLeft, ThemeColors.TextBody);
         cAction.fontStyle = FontStyles.Bold;
         cControl = RuntimeUi.MakeLabel(compactBox.transform, "", TextRole.Caption, TextAnchor.MiddleLeft, ThemeColors.TextBody);
-        cReading = RuntimeUi.MakeLabel(compactBox.transform, "", TextRole.Numeric, TextAnchor.MiddleLeft, ThemeColors.TextBody);
+        cReading = RuntimeUi.MakeLabel(compactBox.transform, "", TextRole.Body, TextAnchor.MiddleLeft, ThemeColors.TextBody);
+        cNext = RuntimeUi.MakeLabel(compactBox.transform, "", TextRole.Caption, TextAnchor.MiddleLeft, ThemeColors.TextDim);
         cCaution = RuntimeUi.MakeLabel(compactBox.transform, "", TextRole.Caption, TextAnchor.MiddleLeft, ThemeColors.StatusCaution);
         cCaution.fontStyle = FontStyles.Bold;
         cHint = RuntimeUi.MakeLabel(compactBox.transform, "P - full list", TextRole.Caption, TextAnchor.MiddleLeft, ThemeColors.TextDim);
@@ -261,15 +262,17 @@ public class StartupChecklistHud : MonoBehaviour
             cAction.color = ThemeColors.StatusOk;
             Set(cControl, "");
             Set(cReading, "");
+            Set(cNext, "");
         }
         else
         {
             Set(cPhase, model.Phase);
-            Set(cStep, model.Mark + " Step " + model.StepNumber + " of " + model.StepCount);
+            Set(cStep, model.Mark + " Step " + model.StepNumber + " of " + model.StepCount + "  -  " + model.Progress);
             Set(cAction, model.Action);
             cAction.color = ThemeColors.TextBody;
             Set(cControl, model.Control.Length > 0 ? "Control: " + model.Control : "");
             Set(cReading, model.Reading);
+            Set(cNext, model.Next.Length > 0 ? "Next: " + model.Next : "Last step");
         }
         Set(cCaution, CautionActive() ? cautionNote : "");
         Set(cHint, "P - full list");

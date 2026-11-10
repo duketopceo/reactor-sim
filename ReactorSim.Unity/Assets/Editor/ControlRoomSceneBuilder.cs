@@ -3,6 +3,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using ReactorSim.Controls;
 using ReactorSim.Instruments;
+using ReactorSim.View3D;
 using System.Collections.Generic;
 
 // Control-room scene builder: installs the Blender FBX, camera, audio and CRT renderer components into
@@ -52,6 +53,7 @@ public static class ControlRoomSceneBuilder
             if (root.name == "ControlRoom" || root.name == "PlantEquipment" || root.name == "ReactorHall")
                 Object.DestroyImmediate(root);
         RemoveMissingScripts(scene);
+        ApplyRoomAmbient();
 
         GameObject bridgeGo = GameObject.Find("PlantSim");
         if (bridgeGo == null)
@@ -573,13 +575,24 @@ public static class ControlRoomSceneBuilder
     // Blender point lights are authored in watts (350 W per ceiling fixture so the Blender render reads well). The FBX
     // carries that number into Unity's built-in pipeline as a unitless intensity of hundreds, which blows every lit
     // surface out to white. Ceiling fixtures get a fixed indoor-office level instead.
-    public const float RoomLightIntensity = 1.1f;
-    public const float RoomLightRange = 9f;
+    public const float RoomLightIntensity = RoomLighting.KeyIntensity;
+    public const float RoomLightRange = RoomLighting.KeyRange;
+
+    // Cool, dim ambient under the warm ceiling key (RoomLighting). The hall keeps its own layer-masked lights.
+    private static void ApplyRoomAmbient()
+    {
+        RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+        RenderSettings.ambientSkyColor = ThemeColors.ToColor(RoomLighting.AmbientSky);
+        RenderSettings.ambientEquatorColor = ThemeColors.ToColor(RoomLighting.AmbientEquator);
+        RenderSettings.ambientGroundColor = ThemeColors.ToColor(RoomLighting.AmbientGround);
+        RenderSettings.ambientIntensity = RoomLighting.AmbientIntensity;
+    }
 
     private static void NormaliseRoomLight(Light light)
     {
         Debug.Log($"[Phase2SceneBuilder] light {light.name}: imported {light.type} intensity={light.intensity:0.###} range={light.range:0.##} -> {RoomLightIntensity} / {RoomLightRange}");
         light.intensity = RoomLightIntensity;
+        light.color = ThemeColors.ToColor(RoomLighting.KeyColor);
         if (light.type == LightType.Point || light.type == LightType.Spot) light.range = RoomLightRange;
         light.shadows = LightShadows.None;
         light.cullingMask = ~(1 << HallLayer);
