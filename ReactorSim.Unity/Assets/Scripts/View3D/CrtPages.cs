@@ -275,8 +275,16 @@ namespace ReactorSim.Instruments
                     if (terminalLines == null || terminalLines.Count == 0)
                         Body(p, "- ALL QUIET");
                     else
+                    {
+                        // A repeated advisory prints once: the screen shows what changed, not how often it was said.
+                        string previous = null;
                         for (int i = Math.Max(0, terminalLines.Count - 5); i < terminalLines.Count; i++)
+                        {
+                            if (terminalLines[i] == previous) continue;
+                            previous = terminalLines[i];
                             Body(p, "- " + terminalLines[i]);
+                        }
+                    }
                     break;
                 case "CRT_MimicStatusBoard":
                     p = Begin("STATUS", s, clock);

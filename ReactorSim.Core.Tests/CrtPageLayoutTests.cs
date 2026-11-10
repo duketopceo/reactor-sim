@@ -117,5 +117,13 @@ namespace ReactorSim.Tests
             Assert.DoesNotContain("TIER", text);
             Assert.DoesNotContain("MISSION ", text);
         }
+
+        [Fact]
+        public void AssistantPage_PrintsARepeatedAdvisoryOnce()
+        {
+            var page = CrtPages.BuildPage("CRT_AssistantTerminal", Running(), new ClockState { Scale = 1.0 }, new TrendBuffer(10),
+                new[] { "Start pumps", "Start pumps", "Raise heaters", "Start pumps" });
+            Assert.Equal(3, page.Lines.Count(l => l.Text.StartsWith("- ")));
+        }
     }
 }
