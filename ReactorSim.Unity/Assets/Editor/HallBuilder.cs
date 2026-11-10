@@ -49,7 +49,7 @@ public static class HallBuilder
         Material skin = makeMaterial("M_ContainmentSkin", new Color(0.62f, 0.78f, 0.88f, 0.22f), true, false);
         Tune(steel, 0.55f, 0.65f);
         Tune(dark, 0.45f, 0.45f);
-        Tune(paint, 0.0f, 0.35f);
+        Tune(paint, 0.0f, 0.2f);
         Tune(cranePaint, 0.1f, 0.4f);
         // Water: the surface carries an emissive baseline so the pool reads blue at zero power and under any lighting; the
         // volume is two tints (teal near the surface, deep blue below) so depth shows as a colour change, not only as darkness.

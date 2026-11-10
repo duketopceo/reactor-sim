@@ -76,11 +76,11 @@ namespace ReactorSim
         public static readonly float[] Deck = { 0.36f, 0.35f, 0.34f };
         public static readonly float[] PoolTile = { 0.42f, 0.60f, 0.64f };
         public static readonly float[] Stainless = { 0.80f, 0.82f, 0.84f };
-        public static readonly float[] ContainmentPaint = { 0.82f, 0.80f, 0.74f };
+        public static readonly float[] ContainmentPaint = { 0.66f, 0.64f, 0.58f };
         public static readonly float[] CranePaint = { 0.86f, 0.62f, 0.10f };
         public static readonly float[] DarkSteel = { 0.26f, 0.28f, 0.31f };
         public static readonly float[] HighBayColour = { 1.00f, 0.88f, 0.72f };
-        public const float HighBayIntensity = 1.8f;
+        public const float HighBayIntensity = 1.1f;
         public const float HighBayRange = 34f;
         public const float HighBayHeightAboveDeck = 6.0f;
         /// <summary>Linear emission added to concrete so a far wall never goes black under a falling-off light.</summary>
