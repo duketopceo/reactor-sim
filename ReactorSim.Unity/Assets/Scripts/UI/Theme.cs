@@ -31,6 +31,9 @@ namespace ReactorSim.Ui
         public bool OverScene;     // drawn over the 3D scene, so Bg must be a backing token
     }
 
+    /// <summary>The type ramp roles. Numeric is the monospace face for values with units.</summary>
+    public enum TextRole { Display, Title, Heading, Body, Caption, Numeric }
+
     public static class Theme
     {
         // ---- surfaces ----
@@ -39,6 +42,7 @@ namespace ReactorSim.Ui
         public static readonly Rgba SurfaceRow = new Rgba(0.09, 0.15, 0.19);
         public static readonly Rgba SurfacePaper = new Rgba(0.93, 0.92, 0.86);
         public static readonly Rgba SurfaceTooltip = new Rgba(0.02, 0.04, 0.06, 0.94);
+        public static readonly Rgba SurfaceHeader = new Rgba(0.11, 0.19, 0.25);      // header band of a panel
 
         // ---- text roles ----
         public static readonly Rgba TextBody = new Rgba(0.90, 0.96, 1.00);
@@ -61,6 +65,8 @@ namespace ReactorSim.Ui
         public static readonly Rgba FillCritical = new Rgba(0.55, 0.14, 0.14);       // progress fill that is behind target; text sits on it
         public static readonly Rgba ButtonHover = new Rgba(0.22, 0.38, 0.50);
         public static readonly Rgba ButtonPressed = new Rgba(0.14, 0.30, 0.40);
+        public static readonly Rgba FocusRing = new Rgba(0.95, 0.85, 0.45);          // keyboard/gamepad focus outline on a control
+        public static readonly Rgba Divider = new Rgba(0.30, 0.42, 0.50);            // hairline between panel sections; decorative
 
         // ---- scene-level (not text surfaces) ----
         public static readonly Rgba ScrimDim = new Rgba(0.0, 0.0, 0.0, 0.6);          // dims the scene behind a menu panel
@@ -75,20 +81,83 @@ namespace ReactorSim.Ui
         public const int FontCaption = 16;
         public const int FontBody = 20;
         public const int FontHeading = 26;
+        public const int FontNumeric = 28;         // monospace readouts (values with units)
+        public const int FontTitle = 36;           // panel and page titles
+        public const int FontDisplay = 56;         // main-menu wordmark, pause banner
         public const int LargeTextMin = 18;        // WCAG large: 18 pt or more
         public const int LargeBoldTextMin = 14;    // or 14 pt bold or more
         public const int MinSceneFontSize = 16;    // smallest text drawn over the 3D scene
 
+        // ---- type ramp (display, title, heading, body, caption, numeric), ascending by role ----
+        public static readonly IReadOnlyList<int> TypeRamp = new[] { FontCaption, FontBody, FontHeading, FontNumeric, FontTitle, FontDisplay };
+
+        public static int RampSize(TextRole role)
+        {
+            switch (role)
+            {
+                case TextRole.Display: return FontDisplay;
+                case TextRole.Title: return FontTitle;
+                case TextRole.Heading: return FontHeading;
+                case TextRole.Numeric: return FontNumeric;
+                case TextRole.Caption: return FontCaption;
+                default: return FontBody;
+            }
+        }
+
+        // ---- spacing scale (reference pixels): 4-8-12-16-24 ----
+        public const int Space1 = 4;
+        public const int Space2 = 8;
+        public const int Space3 = 12;
+        public const int Space4 = 16;
+        public const int Space5 = 24;
+        public static readonly IReadOnlyList<int> SpacingScale = new[] { Space1, Space2, Space3, Space4, Space5 };
+
+        // ---- uGUI canvas: scales with screen HEIGHT from this reference; text scale multiplies the ramp, clamped ----
+        public const int ReferenceWidth = 1920;
+        public const int ReferenceHeight = 1080;
+        public const double TextScaleFloor = 0.75;
+        public const double TextScaleCeiling = 1.5;
+        public const double PanelMaxWidthFraction = 0.94;   // a panel never exceeds this share of the canvas width
+        public const double PanelMaxHeightFraction = 0.96;  // nor this share of the canvas height (it shrinks to fit)
+
+        /// <summary>Uniform scale (at most 1) that keeps content of the given height inside the canvas height.</summary>
+        public static double FitScale(double contentHeight)
+        {
+            double limit = ReferenceHeight * PanelMaxHeightFraction;
+            return contentHeight <= limit || contentHeight <= 0.0 ? 1.0 : limit / contentHeight;
+        }
+
+        /// <summary>A ramp size (reference px) times the user text scale, scale clamped, at least 8.</summary>
+        public static int ScaledFont(int size, double textScale)
+        {
+            double k = Math.Max(TextScaleFloor, Math.Min(TextScaleCeiling, double.IsNaN(textScale) ? 1.0 : textScale));
+            return Math.Max(8, (int)Math.Round(size * k));
+        }
+
+        /// <summary>Panel width in reference px: the design width grown with text scale, kept on screen.</summary>
+        public static double PanelWidth(double designWidth, double textScale, double canvasWidth)
+        {
+            double k = Math.Max(TextScaleFloor, Math.Min(TextScaleCeiling, double.IsNaN(textScale) ? 1.0 : textScale));
+            return Math.Min(designWidth * k, canvasWidth * PanelMaxWidthFraction);
+        }
+
+        /// <summary>Canvas width in reference px for a screen aspect, with the canvas scaled by height.</summary>
+        public static double CanvasWidth(double screenWidthPx, double screenHeightPx)
+        {
+            return screenHeightPx <= 0.0 ? ReferenceWidth : ReferenceHeight * (screenWidthPx / screenHeightPx);
+        }
+
         public static readonly IReadOnlyDictionary<string, Rgba> Tokens = new Dictionary<string, Rgba>
         {
             { "SurfaceScreen", SurfaceScreen }, { "SurfacePanel", SurfacePanel }, { "SurfaceRow", SurfaceRow },
-            { "SurfacePaper", SurfacePaper }, { "SurfaceTooltip", SurfaceTooltip },
+            { "SurfacePaper", SurfacePaper }, { "SurfaceTooltip", SurfaceTooltip }, { "SurfaceHeader", SurfaceHeader },
             { "TextBody", TextBody }, { "TextDim", TextDim }, { "TextHeading", TextHeading },
             { "TextInkOnPaper", TextInkOnPaper }, { "TextPaperCurrent", TextPaperCurrent }, { "TextPaperDone", TextPaperDone },
             { "StatusNormal", StatusNormal }, { "StatusOk", StatusOk },
             { "StatusCaution", StatusCaution }, { "StatusCritical", StatusCritical },
             { "ButtonOff", ButtonOff }, { "ButtonOn", ButtonOn }, { "ButtonBorder", ButtonBorder },
             { "FillCritical", FillCritical }, { "ButtonHover", ButtonHover }, { "ButtonPressed", ButtonPressed },
+            { "FocusRing", FocusRing }, { "Divider", Divider },
             { "ScrimDim", ScrimDim }, { "CameraBackground", CameraBackground }, { "HighlightPulse", HighlightPulse }, { "DeviceBezel", DeviceBezel },
             { "CrtPhosphor", CrtPhosphor },
         };
@@ -130,6 +199,16 @@ namespace ReactorSim.Ui
             l.Add(Pair("Scene body on panel", "TextBody", "SurfacePanel", PairKind.Body, FontBody, overScene: true));
             foreach (var bg in new[] { "SurfaceScreen", "SurfacePanel", "SurfaceRow", "SurfaceTooltip" })
                 l.Add(Pair("Button border on " + bg, "ButtonBorder", bg, PairKind.Boundary, 0));
+            // panel header band (uGUI panels): title, body and dim text sit on it
+            l.Add(Pair("Heading on header band", "TextHeading", "SurfaceHeader", PairKind.Large, FontTitle));
+            foreach (var fg in new[] { "TextBody", "TextDim", "StatusOk", "StatusCaution" })
+                l.Add(Pair(fg + " on header band", fg, "SurfaceHeader", PairKind.Body, FontBody));
+            // focus ring around a control, over every panel surface
+            foreach (var bg in new[] { "SurfacePanel", "SurfaceRow", "SurfaceHeader", "SurfaceTooltip", "ButtonOff" })
+                l.Add(Pair("Focus ring on " + bg, "FocusRing", bg, PairKind.Boundary, 0));
+            // big monospace numerics and the title on the tooltip/panel backings
+            l.Add(Pair("Numeric on panel", "StatusOk", "SurfacePanel", PairKind.Large, FontNumeric));
+            l.Add(Pair("Title on tooltip", "TextHeading", "SurfaceTooltip", PairKind.Large, FontTitle, overScene: true));
             return l;
         }
 

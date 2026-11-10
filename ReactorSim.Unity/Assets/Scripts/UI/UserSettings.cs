@@ -12,8 +12,11 @@ public static class UserSettings
     private const string SensKey = "reactorsim.mouseSensitivity";
 
     private const string ChecklistHiddenKey = "reactorsim.checklistHidden";
+    private const string InvertYKey = "reactorsim.invertY";
 
     private static bool loaded;
+    private static bool invertY;
+    private static ReactorSim.Controls.InputTuning tuning;
     private static bool checklistHidden;
     private static float textScale = OperatorMath.TextScaleDefault;
     private static float fov = OperatorMath.FovDefault;
@@ -40,6 +43,37 @@ public static class UserSettings
         set { Load(); sensitivity = OperatorMath.ClampSensitivity(value); Store(SensKey, sensitivity); }
     }
 
+    /// <summary>True when mouse-look pitch is inverted (default: mouse up looks up).</summary>
+    public static bool InvertY
+    {
+        get { Load(); return invertY; }
+        set { Load(); invertY = value; Store(InvertYKey, value ? 1f : 0f); }
+    }
+
+    /// <summary>Dial-drag and walking tuning from StreamingAssets/input-tuning.json; a bad or missing file logs and uses the defaults.</summary>
+    public static ReactorSim.Controls.InputTuning Tuning
+    {
+        get
+        {
+            if (tuning == null)
+            {
+                try
+                {
+                    string path = System.IO.Path.Combine(Application.streamingAssetsPath, "input-tuning.json");
+                    tuning = System.IO.File.Exists(path)
+                        ? ReactorSim.Controls.InputTuning.Parse(System.IO.File.ReadAllText(path))
+                        : new ReactorSim.Controls.InputTuning();
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError("[UserSettings] input-tuning.json rejected, using defaults: " + ex.Message);
+                    tuning = new ReactorSim.Controls.InputTuning();
+                }
+            }
+            return tuning;
+        }
+    }
+
     /// <summary>True when the player turned the startup checklist panel off (default: shown).</summary>
     public static bool ChecklistHidden
     {
@@ -61,6 +95,7 @@ public static class UserSettings
         fov = OperatorMath.ClampFov(Read(FovKey, OperatorMath.FovDefault));
         sensitivity = OperatorMath.ClampSensitivity(Read(SensKey, OperatorMath.SensitivityDefault));
         checklistHidden = Read(ChecklistHiddenKey, 0f) > 0.5f;
+        invertY = Read(InvertYKey, 0f) > 0.5f;
     }
 
     private static float Read(string key, float fallback)

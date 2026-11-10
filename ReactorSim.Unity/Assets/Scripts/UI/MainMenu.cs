@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using ReactorSim.Ui;
 
 /// <summary>
 /// U11 front door: Sandbox, Missions, Quit. The whole screen is built in code at Start, so Menu.unity holds only
@@ -33,16 +34,18 @@ public class MainMenu : MonoBehaviour
 
         var canvas = RuntimeUi.CreateCanvas("MenuCanvas", 0, transform);
         RuntimeUi.Stretch(canvas.transform, "Backdrop", ThemeColors.SurfaceScreen);
-        var col = RuntimeUi.Column(canvas.transform, "Column", 640f, ThemeColors.SurfacePanel);
+        var col = RuntimeUi.Column(canvas.transform, "Column", 700f, ThemeColors.SurfacePanel);
         var dim = ThemeColors.TextDim;
 
-        RuntimeUi.MakeLabel(col, "REACTOR SIM", 64, TextAnchor.MiddleCenter, ThemeColors.TextHeading, 90f);
-        RuntimeUi.MakeLabel(col, "Pressurized-water reactor control room", 24, TextAnchor.MiddleCenter, dim, 36f);
-        RuntimeUi.MakeButton(col, "Sandbox", () => Launch(StartMode.Sandbox), 70f);
-        RuntimeUi.MakeLabel(col, "Cold shutdown, pumps off. Take it from nothing to the grid.", 20, TextAnchor.MiddleCenter, dim, 30f);
-        RuntimeUi.MakeButton(col, "Missions", () => Launch(StartMode.Missions), 70f);
-        RuntimeUi.MakeLabel(col, "Guided missions (optional).", 20, TextAnchor.MiddleCenter, dim, 30f);
-        RuntimeUi.MakeButton(col, "Quit", Quit, 70f);
+        RuntimeUi.MakeHeader(col, "REACTOR SIM", TextRole.Display);
+        RuntimeUi.MakeLabel(col, "Pressurized-water reactor control room", TextRole.Body, TextAnchor.MiddleCenter, dim);
+        RuntimeUi.MakeDivider(col);
+        RuntimeUi.MakeButton(col, "Sandbox", () => Launch(StartMode.Sandbox), 72f);
+        RuntimeUi.MakeLabel(col, "Cold shutdown, pumps off. Take it from nothing to the grid.", TextRole.Caption, TextAnchor.MiddleCenter, dim);
+        RuntimeUi.MakeButton(col, "Missions", () => Launch(StartMode.Missions), 72f);
+        RuntimeUi.MakeLabel(col, "Guided missions (optional).", TextRole.Caption, TextAnchor.MiddleCenter, dim);
+        RuntimeUi.MakeDivider(col);
+        RuntimeUi.MakeButton(col, "Quit", Quit, 72f);
     }
 
     private static float SmokeSecondsFromArgs()

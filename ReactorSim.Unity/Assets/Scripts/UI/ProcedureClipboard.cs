@@ -1,13 +1,16 @@
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
 using ReactorSim;
 using ReactorSim.Clipboard;
+using ReactorSim.Ui;
 
 /// <summary>
 /// U16 (R16) procedure clipboard on a desk. A thin board and clip built in Awake from primitives (K18 is a furniture
 /// kit and the generated room places none). Clicking it within OperatorMath.InteractionRange opens a held-clipboard
-/// checklist (IMGUI, screen space) for one of this clipboard's procedures. Ticks and the current step come from
+/// checklist (uGUI and TextMeshPro, screen space) for one of this clipboard's procedures. Ticks and the current step come from
 /// Procedure.Evaluate over the live snapshot every frame; a click can never tick a step. "Show me" outlines the
 /// current step's CTL_ rows in screen space (works with any render pipeline, no shader needed) and stays on after
 /// the panel is closed so the player can walk to the control. Opening suspends room look and clicks the same way
@@ -43,10 +46,14 @@ public class ProcedureClipboard : MonoBehaviour
     private int bridgeLookupFrame = -1;
     private int tabletLookupFrame = -1;
 
-    private Vector2 scroll;
-    private GUIStyle titleStyle, bodyStyle, currentStyle, hintStyle, tabStyle, tabOnStyle, btnStyle;
-    private int styleSettingsVersion = -1;
-    private Texture2D white;
+    // uGUI, built on first use
+    private Canvas canvas;
+    private RectTransform panel, tabRow, content;
+    private TMP_Text title, bannerText, hoverText;
+    private GameObject bannerBox, hoverBox;
+    private Toggle showMeToggle;
+    private Button[] tabs = new Button[0];
+    private readonly List<TMP_Text> rows = new List<TMP_Text>();
 
     public static List<Procedure> Procedures
     {
@@ -156,7 +163,7 @@ public class ProcedureClipboard : MonoBehaviour
         Open();
     }
 
-    // Cached once found; while missing, look at most once per frame (OnGUI runs several times per frame).
+    // Cached once found; while missing, look at most once per frame.
     private void FindBridge()
     {
         if (bridge != null || bridgeLookupFrame == Time.frameCount) return;
@@ -211,8 +218,9 @@ public class ProcedureClipboard : MonoBehaviour
 
     private void Update()
     {
-        if (open && Input.GetKeyDown(KeyCode.Escape)) escPending = true;
+        if (open && Input.GetKeyDown(KeyCode.Escape) && !DiegeticInteractable.InputConsumedThisFrame) escPending = true;
     }
+
 
     // Esc also opens the pause menu, which suspends whatever is still enabled. Decide after both Updates have run:
     // if the pause menu took over, keep our suspended behaviours disabled until it closes (it does not know them).
@@ -224,149 +232,267 @@ public class ProcedureClipboard : MonoBehaviour
             open = false;
         }
         if (!open && inputGate.HasSuspended && !PauseMenu.IsOpen) inputGate.Restore();
+        Refresh();
     }
 
     private void OnDisable()
     {
         open = false;
         inputGate.Restore();
+        outline.Hide();
+        if (canvas != null) canvas.gameObject.SetActive(false);
     }
 
-    // ---- drawing ---------------------------------------------------------------------------------------------
+    // ---- drawing (uGUI) ---------------------------------------------------------------------------------------
 
-    private void MakeStyles()
+    private const float PanelWidth = 720f;
+
+    private void Build()
     {
-        if (titleStyle != null && styleSettingsVersion == UserSettings.Version) return;
-        styleSettingsVersion = UserSettings.Version;
-        white = Texture2D.whiteTexture;
-        titleStyle = new GUIStyle(GUI.skin.label) { fontSize = UserSettings.Scaled(26), fontStyle = FontStyle.Bold, wordWrap = true };
-        bodyStyle = new GUIStyle(GUI.skin.label) { fontSize = UserSettings.Scaled(20), wordWrap = true };
-        currentStyle = new GUIStyle(bodyStyle) { fontStyle = FontStyle.Bold };
-        hintStyle = new GUIStyle(GUI.skin.label) { fontSize = UserSettings.Scaled(16), wordWrap = true };
-        tabStyle = new GUIStyle(GUI.skin.button) { fontSize = UserSettings.Scaled(16) };
-        tabOnStyle = new GUIStyle(tabStyle) { fontStyle = FontStyle.Bold };
-        btnStyle = new GUIStyle(GUI.skin.button) { fontSize = UserSettings.Scaled(18) };
+        if (canvas != null) return;
+        RuntimeUi.EnsureEventSystem();
+        canvas = RuntimeUi.CreateCanvas("ClipboardCanvas", 60, transform);
+
+        // Click outside the panel closes it: a transparent full-screen button behind the panel.
+        var back = RuntimeUi.Stretch(canvas.transform, "Backdrop", ThemeColors.WithAlpha(ThemeColors.ScrimDim, 0f));
+        var backBtn = back.gameObject.AddComponent<Button>();
+        backBtn.transition = Selectable.Transition.None;
+        backBtn.onClick.AddListener(() => { if (Time.frameCount != openedFrame) Close(); });
+
+        panel = RuntimeUi.Panel(canvas.transform, "Paper", PanelWidth, ThemeColors.SurfacePaper, new Vector2(0.5f, 1f),
+            new Vector2(0.5f, 1f), new RectOffset(Theme.Space5, Theme.Space5, Theme.Space3, Theme.Space5), Theme.Space2);
+        panel.anchoredPosition = new Vector2(0f, -90f);
+        InkBar(panel);
+
+        var tr = new GameObject("Tabs", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        tr.transform.SetParent(panel, false);
+        tabRow = (RectTransform)tr.transform;
+        var h = tr.GetComponent<HorizontalLayoutGroup>();
+        h.spacing = Theme.Space2;
+        h.childControlWidth = true;
+        h.childControlHeight = true;
+        h.childForceExpandWidth = true;
+        h.childForceExpandHeight = false;
+
+        title = RuntimeUi.MakeLabel(panel, "", TextRole.Heading, TextAnchor.MiddleLeft, ThemeColors.TextInkOnPaper);
+        title.fontStyle = FontStyles.Bold;
+        content = RuntimeUi.MakeScrollView(panel, 680f);
+
+        var foot = new GameObject("Footer", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        foot.transform.SetParent(panel, false);
+        var fh = foot.GetComponent<HorizontalLayoutGroup>();
+        fh.spacing = Theme.Space3;
+        fh.childControlWidth = true;
+        fh.childControlHeight = true;
+        fh.childForceExpandWidth = false;
+        fh.childForceExpandHeight = false;
+        showMeToggle = RuntimeUi.MakeToggle(foot.transform, "Show me the next control", showMe, v => showMe = v, ThemeColors.TextInkOnPaper);
+        showMeToggle.GetComponent<LayoutElement>().flexibleWidth = 1f;
+        var close = RuntimeUi.MakeButton(foot.transform, "Close", Close, 48f);
+        close.GetComponent<LayoutElement>().minWidth = 140f;
+        RuntimeUi.MakeLabel(panel, "Steps tick themselves from the plant. Esc or click outside to put the clipboard down.",
+            TextRole.Caption, TextAnchor.MiddleLeft, ThemeColors.TextInkOnPaper);
+
+        // "Next:" banner while "Show me" is on and the panel is closed.
+        bannerBox = Banner(canvas.transform, "Banner", 860f, out bannerText, TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0f, -12f));
+        // Hover hint beside the cursor.
+        hoverBox = Banner(canvas.transform, "Hover", 420f, out hoverText, TextAnchor.MiddleLeft, new Vector2(0f, 0f), Vector2.zero);
+        ((RectTransform)hoverBox.transform).pivot = new Vector2(0f, 1f);
+        hoverBox.GetComponent<Image>().raycastTarget = false;
+        bannerBox.GetComponent<Image>().raycastTarget = false;
+        bannerBox.SetActive(false);
+        hoverBox.SetActive(false);
+        panel.gameObject.SetActive(false);
+        back.gameObject.SetActive(false);
+        backdrop = back.gameObject;
     }
 
-    private void OnGUI()
+    private GameObject backdrop;
+
+    private static void InkBar(RectTransform parent)
     {
-        MakeStyles();
+        var go = new GameObject("InkBar", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+        go.transform.SetParent(parent, false);
+        var img = go.GetComponent<Image>();
+        img.color = ThemeColors.TextInkOnPaper;
+        img.raycastTarget = false;
+        var le = go.GetComponent<LayoutElement>();
+        le.minHeight = 6f;
+        le.preferredHeight = 6f;
+    }
+
+    private static GameObject Banner(Transform parent, string name, float width, out TMP_Text text, TextAnchor anchor, Vector2 at, Vector2 pos)
+    {
+        var box = RuntimeUi.Panel(parent, name, width, ThemeColors.SurfaceTooltip, at, new Vector2(at.x, 1f),
+            new RectOffset(Theme.Space3, Theme.Space3, Theme.Space2, Theme.Space2), Theme.Space1);
+        box.anchoredPosition = pos;
+        text = RuntimeUi.MakeLabel(box, "", TextRole.Body, anchor, ThemeColors.TextBody);
+        return box.gameObject;
+    }
+
+    private static void Set(TMP_Text t, string text)
+    {
+        if (t.text != text) t.text = text;
+    }
+
+    // Each frame: panel, banner, hover hint and the outline follow the state. Runs after Update/LateUpdate logic.
+    private void Refresh()
+    {
         if (mine == null) mine = MyProcedures();
         var procs = mine;
         FindBridge();
-        if (procs.Count == 0) { DrawHoverHint(); return; }
+        if (procs.Count == 0) { if (canvas != null) canvas.gameObject.SetActive(false); outline.Hide(); return; }
         if (selected >= procs.Count) selected = 0;
 
-        // The state only feeds the panel and the "Show me" outline/hint; the outline and hint draw on Repaint only.
-        bool repaint = Event.current.type == EventType.Repaint;
-        ProcedureState state = (open || (showMe && repaint)) ? CurrentState(procs[selected]) : null;
+        bool needUi = open || showMe || (hovered && !Blocked);
+        if (!needUi)
+        {
+            if (canvas != null && canvas.gameObject.activeSelf) canvas.gameObject.SetActive(false);
+            outline.Hide();
+            return;
+        }
+        Build();
+        canvas.gameObject.SetActive(true);
+        ProcedureState state = (open || showMe) ? CurrentState(procs[selected]) : null;
 
-        float s = Screen.height / 1080f;
-        var saved = GUI.matrix;
-        GUI.matrix = Matrix4x4.Scale(new Vector3(s, s, 1f));
-        float vw = Screen.width / s;
-        if (showMe && state != null && repaint) outline.Draw(ClipboardView.HighlightRows(state), s);
-        if (open) DrawPanel(procs, state, vw);
-        else if (showMe && state != null && !state.Complete)
-            GUI.Label(new Rect(vw * 0.5f - 420f, 12f, 840f, 40f), "Next: " + state.Current.Text, bodyStyle);
-        GUI.matrix = saved;
+        if (showMe && state != null) outline.Show(ClipboardView.HighlightRows(state)); else outline.Hide();
 
-        if (!open) DrawHoverHint();
+        if (backdrop.activeSelf != open) backdrop.SetActive(open);
+        if (panel.gameObject.activeSelf != open)
+        {
+            panel.gameObject.SetActive(open);
+            if (open) BuildTabs(procs);
+        }
+        if (open) RefreshPanel(procs, state);
+
+        bool banner = !open && showMe && state != null && !state.Complete;
+        if (bannerBox.activeSelf != banner) bannerBox.SetActive(banner);
+        if (banner) Set(bannerText, "Next: " + state.Current.Text);
+
+        bool hover = !open && hovered && !Blocked;
+        if (hoverBox.activeSelf != hover) hoverBox.SetActive(hover);
+        if (hover)
+        {
+            Set(hoverText, label + (InRange ? " - click to read" : " - walk closer"));
+            float s = Screen.height / (float)Theme.ReferenceHeight;
+            ((RectTransform)hoverBox.transform).anchoredPosition = new Vector2((Input.mousePosition.x + 16f) / s, (Input.mousePosition.y - 8f) / s);
+        }
     }
 
-    private void DrawHoverHint()
+    private void BuildTabs(List<Procedure> procs)
     {
-        if (!hovered || Blocked) return;
-        string text = label + (InRange ? " - click to read" : " - walk closer");
-        var r = new Rect(Input.mousePosition.x + 16f, Screen.height - Input.mousePosition.y + 8f, 340f, 28f);
-        GUI.Box(r, text);
+        foreach (var t in tabs) if (t != null) Destroy(t.gameObject);
+        tabs = new Button[procs.Count > 1 ? procs.Count : 0];
+        tabRow.gameObject.SetActive(procs.Count > 1);
+        if (procs.Count <= 1) return;
+        for (int i = 0; i < procs.Count; i++)
+        {
+            int idx = i;
+            string t = string.IsNullOrEmpty(procs[i].Title) ? procs[i].Id : procs[i].Title;
+            tabs[i] = RuntimeUi.MakeButton(tabRow, t, () => { selected = idx; content.anchoredPosition = Vector2.zero; }, 40f);
+        }
     }
 
-    private void DrawPanel(List<Procedure> procs, ProcedureState state, float vw)
+    private void RefreshPanel(List<Procedure> procs, ProcedureState state)
     {
-        var panel = new Rect(vw * 0.5f - 360f, 90f, 720f, 860f);
-        if (Event.current.type == EventType.MouseDown && Time.frameCount != openedFrame)
+        if (showMeToggle.isOn != showMe) showMeToggle.SetIsOnWithoutNotify(showMe);
+        for (int i = 0; i < tabs.Length; i++)
         {
-            var screenPt = Event.current.mousePosition;
-            if (!panel.Contains(screenPt)) { Close(); Event.current.Use(); return; }
+            var lt = tabs[i].GetComponentInChildren<TMP_Text>();
+            if (lt != null) lt.fontStyle = i == selected ? FontStyles.Bold | FontStyles.Underline : FontStyles.Normal;
         }
-
-        var old = GUI.color;
-        GUI.color = ThemeColors.SurfacePaper;
-        GUI.DrawTexture(panel, white);
-        GUI.color = ThemeColors.TextInkOnPaper;
-        GUI.DrawTexture(new Rect(panel.x, panel.y, panel.width, 6f), white);
-        GUI.color = old;
-
-        var prevContent = GUI.contentColor;
-        GUI.contentColor = ThemeColors.TextInkOnPaper;
-        GUILayout.BeginArea(new Rect(panel.x + 24f, panel.y + 20f, panel.width - 48f, panel.height - 40f));
-
-        if (procs.Count > 1)
-        {
-            GUILayout.BeginHorizontal();
-            for (int i = 0; i < procs.Count; i++)
-            {
-                string t = string.IsNullOrEmpty(procs[i].Title) ? procs[i].Id : procs[i].Title;
-                if (GUILayout.Button(t, i == selected ? tabOnStyle : tabStyle, GUILayout.Height(32f))) { selected = i; scroll = Vector2.zero; }
-            }
-            GUILayout.EndHorizontal();
-            GUILayout.Space(8f);
-        }
-
         var proc = procs[selected];
+        int n = 0;
         if (state == null)
         {
-            GUILayout.Label(proc.Title, titleStyle);
-            GUILayout.Label("Plant not running.", bodyStyle);
+            Set(title, proc.Title);
+            while (rows.Count <= 0) rows.Add(RuntimeUi.MakeLabel(content, "", TextRole.Body, TextAnchor.UpperLeft, ThemeColors.TextInkOnPaper));
+            rows[0].gameObject.SetActive(true);
+            Set(rows[0], "Plant not running.");
+            rows[0].color = ThemeColors.TextInkOnPaper;
+            rows[0].fontStyle = FontStyles.Normal;
+            n = 1;
         }
         else
         {
-            GUILayout.Label(ClipboardView.Header(proc, state), titleStyle);
-            scroll = GUILayout.BeginScrollView(scroll, GUILayout.Height(680f));
+            Set(title, ClipboardView.Header(proc, state));
             foreach (var line in ClipboardView.Lines(proc, state))
             {
-                var style = line.Current ? currentStyle : bodyStyle;
-                var old2 = GUI.contentColor;
-                GUI.contentColor = line.Current ? ThemeColors.TextPaperCurrent : (line.Ticked ? ThemeColors.TextPaperDone : ThemeColors.TextInkOnPaper);
-                GUILayout.Label(line.Mark + "  " + line.Number + ". " + line.Text, style);
-                GUI.contentColor = old2;
-                GUILayout.Space(4f);
+                while (rows.Count <= n) rows.Add(RuntimeUi.MakeLabel(content, "", TextRole.Body, TextAnchor.UpperLeft, ThemeColors.TextInkOnPaper));
+                var row = rows[n++];
+                row.gameObject.SetActive(true);
+                Set(row, line.Mark + "  " + line.Number + ". " + line.Text);
+                row.color = line.Current ? ThemeColors.TextPaperCurrent : (line.Ticked ? ThemeColors.TextPaperDone : ThemeColors.TextInkOnPaper);
+                row.fontStyle = line.Current ? FontStyles.Bold : FontStyles.Normal;
             }
-            GUILayout.EndScrollView();
         }
-
-        GUILayout.BeginHorizontal();
-        showMe = GUILayout.Toggle(showMe, "  Show me the next control", btnStyle, GUILayout.Height(36f));
-        GUILayout.FlexibleSpace();
-        if (GUILayout.Button("Close", btnStyle, GUILayout.Width(120f), GUILayout.Height(36f))) Close();
-        GUILayout.EndHorizontal();
-        GUILayout.Label("Steps tick themselves from the plant. Esc or click outside to put the clipboard down.", hintStyle);
-
-        GUILayout.EndArea();
-        GUI.contentColor = prevContent;
+        for (int i = n; i < rows.Count; i++) rows[i].gameObject.SetActive(false);
     }
 }
 
 /// <summary>
 /// The "Show me" outline, shared by the desk clipboard and the startup checklist panel: a pulsing screen-space box
-/// around each given CTL_ row root (bounds of its renderers, 8 corners projected). Drawn on Repaint only
-/// (GUI.DrawTexture ignores every other event). Each user keeps its own instance (its own lookup caches).
+/// around each given CTL_ row root (bounds of its renderers, 8 corners projected), drawn as four thin uGUI bars per box
+/// on its own overlay canvas. Show each frame while wanted, Hide otherwise. Each user keeps its own instance.
 /// </summary>
 public sealed class ShowMeOutline
 {
+    private const float Thickness = 3f;
+    private const float Pad = 6f;
+
     private readonly Dictionary<string, Transform> rowRoots = new Dictionary<string, Transform>();
     private readonly Dictionary<string, Renderer[]> rowRenderers = new Dictionary<string, Renderer[]>();
+    private readonly List<RectTransform[]> boxes = new List<RectTransform[]>();
+    private GameObject root;
 
-    /// <summary>s is the IMGUI scale (Screen.height / 1080) of the GUI.matrix the caller set.</summary>
-    public void Draw(string[] rows, float s)
+    public void Hide()
+    {
+        if (root != null && root.activeSelf) root.SetActive(false);
+    }
+
+    private void EnsureRoot()
+    {
+        if (root != null) return;
+        var canvas = RuntimeUi.CreateCanvas("ShowMeCanvas", 30, null);
+        root = canvas.gameObject;
+        root.GetComponent<GraphicRaycaster>().enabled = false;
+    }
+
+    private RectTransform[] Box(int index)
+    {
+        while (boxes.Count <= index)
+        {
+            var bars = new RectTransform[4];
+            for (int i = 0; i < 4; i++)
+            {
+                var go = new GameObject("Bar", typeof(RectTransform), typeof(Image));
+                go.transform.SetParent(root.transform, false);
+                go.GetComponent<Image>().raycastTarget = false;
+                bars[i] = (RectTransform)go.transform;
+                bars[i].anchorMin = bars[i].anchorMax = bars[i].pivot = Vector2.zero;
+            }
+            boxes.Add(bars);
+        }
+        return boxes[index];
+    }
+
+    private static void Place(RectTransform bar, float x, float y, float w, float h, Color c)
+    {
+        bar.anchoredPosition = new Vector2(x, y);
+        bar.sizeDelta = new Vector2(w, h);
+        bar.GetComponent<Image>().color = c;
+    }
+
+    public void Show(string[] rows)
     {
         var cam = Camera.main;
-        if (cam == null || rows == null) return;
-        var white = Texture2D.whiteTexture;
+        if (cam == null || rows == null || rows.Length == 0) { Hide(); return; }
+        EnsureRoot();
+        root.SetActive(true);
+        float s = Screen.height / (float)Theme.ReferenceHeight;   // canvas units per screen pixel is 1 / s
         float pulse = 0.55f + 0.45f * Mathf.Sin(Time.unscaledTime * 6f);
-        var old = GUI.color;
-        GUI.color = ThemeColors.WithAlpha(ThemeColors.HighlightPulse, pulse);
+        Color color = ThemeColors.WithAlpha(ThemeColors.HighlightPulse, pulse);
+        int used = 0;
         foreach (string row in rows)
         {
             Transform t;
@@ -393,17 +519,20 @@ public sealed class ShowMeOutline
                 Vector3 sp = cam.WorldToScreenPoint(c);
                 if (sp.z <= 0.05f) { ok = false; break; }
                 minX = Mathf.Min(minX, sp.x); maxX = Mathf.Max(maxX, sp.x);
-                minY = Mathf.Min(minY, Screen.height - sp.y); maxY = Mathf.Max(maxY, Screen.height - sp.y);
+                minY = Mathf.Min(minY, sp.y); maxY = Mathf.Max(maxY, sp.y);
             }
             if (!ok) continue;
-            var r = new Rect(minX / s - 6f, minY / s - 6f, (maxX - minX) / s + 12f, (maxY - minY) / s + 12f);
-            const float w = 3f;
-            GUI.DrawTexture(new Rect(r.x, r.y, r.width, w), white);
-            GUI.DrawTexture(new Rect(r.x, r.yMax - w, r.width, w), white);
-            GUI.DrawTexture(new Rect(r.x, r.y, w, r.height), white);
-            GUI.DrawTexture(new Rect(r.xMax - w, r.y, w, r.height), white);
+            // Screen pixels (y up) to canvas units, then pad.
+            float x0 = minX / s - Pad, y0 = minY / s - Pad, w = (maxX - minX) / s + 2f * Pad, h = (maxY - minY) / s + 2f * Pad;
+            var bars = Box(used++);
+            foreach (var bar in bars) bar.gameObject.SetActive(true);
+            Place(bars[0], x0, y0 + h - Thickness, w, Thickness, color);   // top
+            Place(bars[1], x0, y0, w, Thickness, color);                    // bottom
+            Place(bars[2], x0, y0, Thickness, h, color);                    // left
+            Place(bars[3], x0 + w - Thickness, y0, Thickness, h, color);    // right
         }
-        GUI.color = old;
+        for (int i = used; i < boxes.Count; i++)
+            foreach (var bar in boxes[i]) bar.gameObject.SetActive(false);
     }
 
     private static Bounds WorldBounds(Transform root, Renderer[] renderers)

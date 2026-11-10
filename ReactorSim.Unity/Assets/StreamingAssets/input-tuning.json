@@ -1,0 +1,11 @@
+{
+  "dragGain": 1,
+  "dragDeadZonePixels": 6,
+  "dragFineFactor": 0.2,
+  "dragContinuousPixels": 400,
+  "dragDetentPixels": 40,
+  "walkSpeed": 1.6,
+  "sprintMultiplier": 1.8,
+  "accelSeconds": 0.15,
+  "decelSeconds": 0.1
+}

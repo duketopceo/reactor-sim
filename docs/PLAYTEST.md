@@ -42,16 +42,33 @@ Write down: what confused you, what was fun, what broke (include the approximate
 
 ## Controls
 
-| Input | Action |
-|---|---|
-| Left-drag on a dial or lever | turn the dial / move the lever |
-| Left-click a button | press it |
-| SCRAM | needs two clicks (arm, then confirm) |
-| Right mouse (hold) + move | look around |
-| Mouse wheel | zoom (drifts toward the hovered control) |
-| C or middle mouse | recentre view and zoom |
-| P | expand or collapse the startup checklist panel |
-| Escape | menu: resume, reset sandbox, master volume, alarm mute, quit to menu (pauses the sim while open) |
+**Dials and levers are turned by click, hold, drag up or down, release.** A press with no drag changes nothing; the dial
+starts to move once the pointer has travelled a few pixels, up raises and down lowers. While you drag, the pointer is
+locked so it cannot leave the window, a readout shows the label, the value with its unit and the change since the press,
+and the knob turns live. Release commits. Clicking a gauge, an out-of-service row or a control that is out of reach shows a
+one-line note saying what it is and what to do.
+
+What each key does in each state:
+
+| Input | Walking | Seated | Dragging a dial | In a menu |
+|---|---|---|---|---|
+| W A S D | walk, with a short ramp up and down | nothing | nothing | nothing |
+| Shift (held) | sprint | nothing | nothing | nothing |
+| Ctrl (held) | nothing | nothing | fine adjustment: the drag moves 5x slower | nothing |
+| F | sit on the chair in front of you (a prompt shows near it) | stand up | nothing | nothing |
+| Q / E | nothing | swivel the chair left / right | nothing | nothing |
+| 1 to 6 | go to a section of the board | go to a section of the board | nothing | nothing |
+| Left mouse | press a button; start a dial drag | same | the drag | menu buttons |
+| Right mouse | hold to look around; click on a gauge to pin it | same (yaw limited) | click cancels the drag and restores the value | nothing |
+| Mouse wheel | zoom (drifts toward the hovered control) | same | nothing | nothing |
+| C or middle mouse | recentre view and zoom | same | nothing | nothing |
+| P | expand or collapse the startup checklist | same | nothing | nothing |
+| Escape | open the menu | open the menu | cancels the drag and restores the value; the menu stays closed | closes the menu |
+
+SCRAM needs two clicks (arm, then confirm). Losing window focus or opening the menu during a drag cancels it the same way
+as Escape. Mouse sensitivity, field of view, text scale and invert-Y are in the Escape menu. Walk speed, sprint, the
+ramp times and the drag feel (gain, dead zone, fine factor, pixels per sweep) are in
+`ReactorSim.Unity/Assets/StreamingAssets/input-tuning.json`; edit it and restart, no rebuild needed.
 
 The sandbox is not saved. Quitting to the menu discards the plant.
 
@@ -64,6 +81,8 @@ On the Windows box, under `%USERPROFILE%\AppData\LocalLow\duketopceo\ReactorSim\
   - `log.jsonl` one line per sim tick (power, reactivity, temperatures, pressures, alarms, intents applied)
   - `telemetry.csv` the same ticks as a CSV
   - `intent-log.jsonl` every intent applied or rejected, with issuer and class
+  - `input.jsonl` input telemetry: dial hover, press, rejected press with its reason, drag start / move / commit / cancel, and
+    walking samples (position, speed, distance asked versus achieved)
   - `session.json` build version, start time, tuning values, tick counts, and `"ended":true` after a clean quit
 
 The files are flushed as they are written and the intent log and header are refreshed every 30 seconds, so a

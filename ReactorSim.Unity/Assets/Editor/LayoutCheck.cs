@@ -53,6 +53,7 @@ public static class LayoutCheck
             ControlRoomSceneBuilder.Build(false);
             var ctx = Load();
             failures = CheckAnchors(ctx);
+            failures += CheckWalkPaths(ctx);
             int rowFailures = 0, warnings = 0;
             foreach (var row in ctx.Rows)
             {
@@ -113,6 +114,121 @@ public static class LayoutCheck
             }
         }
         return ctx;
+    }
+
+    // Walk-path probe (R10): a capsule shaped like the operator's body walks in a straight line from every start point (each stand
+    // anchor, STAND_Center, the spawn and both seat anchors) to every quick-travel stand anchor, steering at the goal each step.
+    // It fails a path that stalls (the body moves under a quarter of the distance it was asked to for eight steps running),
+    // never arrives, or detours past 1.35x the straight line (OperatorMath.IsStall / IsDetour). If CharacterController.Move does
+    // nothing in edit mode the probe says so and skips, rather than failing every path.
+    private const float WalkStep = 0.05f;
+
+    private static int CheckWalkPaths(Context ctx)
+    {
+        var starts = new List<KeyValuePair<string, Vector3>>();
+        var goals = new List<KeyValuePair<string, Vector3>>();
+        var names = new List<string> { "STAND_Center", "SPAWN_A1", "SEAT_A1", "SEAT_A2" };
+        var stands = new List<string>();
+        var secs = DesignData.Get(ctx.Layout, "sections") as List<object>;
+        if (secs != null)
+            foreach (var sec in secs)
+            {
+                var id = DesignData.Get(sec, "id") as string;
+                if (id != null) stands.Add("STAND_" + id);
+            }
+        foreach (var n in stands) names.Add(n);
+        foreach (var n in names)
+        {
+            var t = ControlRoomSceneBuilder.FindDeep(ctx.Root, n);
+            if (t == null) continue;   // a missing anchor is already reported by CheckAnchors
+            var p = new KeyValuePair<string, Vector3>(n, t.position);
+            starts.Add(p);
+            if (stands.Contains(n)) goals.Add(p);
+        }
+
+        var go = new GameObject("LayoutCheck_Walker");
+        try
+        {
+            go.layer = 2;
+            var cc = go.AddComponent<CharacterController>();
+            cc.radius = 0.3f;
+            cc.height = 1.75f;
+            cc.center = new Vector3(0f, 0.875f, 0f);
+            cc.stepOffset = OperatorMath.StepOffset;
+            cc.skinWidth = 0.03f;
+
+            // Sanity: in open space far above the room the body must move when asked.
+            Teleport(go, cc, new Vector3(0f, 500f, 0f));
+            cc.Move(Vector3.right * 0.5f);
+            if (Mathf.Abs(go.transform.position.x) < 0.1f)
+            {
+                Debug.LogWarning("[LayoutCheck] WARN walk probe skipped: CharacterController.Move does not move the body in edit mode");
+                return 0;
+            }
+
+            int failures = 0, paths = 0;
+            foreach (var a in starts)
+                foreach (var b in goals)
+                {
+                    if (a.Key == b.Key) continue;
+                    paths++;
+                    string why = WalkPath(go, cc, a.Value, b.Value);
+                    if (why != null)
+                    {
+                        failures++;
+                        Debug.LogError("[LayoutCheck] FAIL walk " + a.Key + " -> " + b.Key + ": " + why);
+                    }
+                }
+            Debug.Log("[LayoutCheck] walk probe: " + paths + " paths, " + failures + " failing");
+            return failures;
+        }
+        finally
+        {
+            Object.DestroyImmediate(go);
+            Physics.SyncTransforms();
+        }
+    }
+
+    private static void Teleport(GameObject go, CharacterController cc, Vector3 floor)
+    {
+        cc.enabled = false;
+        go.transform.position = floor;
+        cc.enabled = true;
+        Physics.SyncTransforms();
+    }
+
+    // Null when the path is fine, else why it failed.
+    private static string WalkPath(GameObject go, CharacterController cc, Vector3 from, Vector3 to)
+    {
+        Teleport(go, cc, from);
+        Vector3 flatLine = to - from;
+        flatLine.y = 0f;
+        float straight = flatLine.magnitude;
+        float travelled = 0f;
+        int stallRun = 0;
+        int maxSteps = (int)(straight / WalkStep * 3f) + 20;
+        for (int k = 0; k < maxSteps; k++)
+        {
+            Vector3 pos = go.transform.position;
+            Vector3 d = to - pos;
+            d.y = 0f;
+            float remaining = d.magnitude;
+            if (remaining < 0.15f)
+                return OperatorMath.IsDetour(travelled, straight)
+                    ? "detour: walked " + travelled.ToString("F2", CultureInfo.InvariantCulture) + " m for a " + straight.ToString("F2", CultureInfo.InvariantCulture) + " m line"
+                    : null;
+            Vector3 move = d / remaining * Mathf.Min(WalkStep, remaining);
+            cc.Move(move + Vector3.down * 0.02f);
+            Vector3 delta = go.transform.position - pos;
+            delta.y = 0f;
+            travelled += delta.magnitude;
+            if (OperatorMath.IsStall(move.magnitude, delta.magnitude))
+            {
+                if (++stallRun >= 8) return "stalled at " + go.transform.position.ToString("F2") + " after " + travelled.ToString("F2", CultureInfo.InvariantCulture) + " m";
+            }
+            else stallRun = 0;
+        }
+        return "never arrived (" + travelled.ToString("F2", CultureInfo.InvariantCulture) + " m walked, " + straight.ToString("F2", CultureInfo.InvariantCulture) + " m line)";
     }
 
     // Anchors and chairs the operator needs. Also prints how each anchor's forward compares with the board-facing

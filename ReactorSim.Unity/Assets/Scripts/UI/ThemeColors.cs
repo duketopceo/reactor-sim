@@ -16,6 +16,9 @@ public static class ThemeColors
     public static Color SurfaceRow { get { return ToColor(Theme.SurfaceRow); } }
     public static Color SurfacePaper { get { return ToColor(Theme.SurfacePaper); } }
     public static Color SurfaceTooltip { get { return ToColor(Theme.SurfaceTooltip); } }
+    public static Color SurfaceHeader { get { return ToColor(Theme.SurfaceHeader); } }
+    public static Color FocusRing { get { return ToColor(Theme.FocusRing); } }
+    public static Color Divider { get { return ToColor(Theme.Divider); } }
     public static Color TextBody { get { return ToColor(Theme.TextBody); } }
     public static Color TextDim { get { return ToColor(Theme.TextDim); } }
     public static Color TextHeading { get { return ToColor(Theme.TextHeading); } }

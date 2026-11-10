@@ -114,6 +114,80 @@ namespace ReactorSim.Tests
             Assert.True(d >= 20, "hue gap " + d);
         }
 
+        // ---- playtest-2 U5: type ramp, spacing scale, uGUI canvas rules, new surfaces ----
+
+        [Fact]
+        public void TypeRamp_IsAscending_AndEveryRoleMapsToItsToken()
+        {
+            Assert.Equal(Theme.FontCaption, Theme.RampSize(TextRole.Caption));
+            Assert.Equal(Theme.FontBody, Theme.RampSize(TextRole.Body));
+            Assert.Equal(Theme.FontHeading, Theme.RampSize(TextRole.Heading));
+            Assert.Equal(Theme.FontNumeric, Theme.RampSize(TextRole.Numeric));
+            Assert.Equal(Theme.FontTitle, Theme.RampSize(TextRole.Title));
+            Assert.Equal(Theme.FontDisplay, Theme.RampSize(TextRole.Display));
+            for (int i = 1; i < Theme.TypeRamp.Count; i++)
+                Assert.True(Theme.TypeRamp[i] > Theme.TypeRamp[i - 1], "ramp step " + i);
+            Assert.True(Theme.FontCaption >= Theme.MinSceneFontSize);
+        }
+
+        [Fact]
+        public void SpacingScale_Is_4_8_12_16_24()
+        {
+            Assert.Equal(new[] { 4, 8, 12, 16, 24 }, Theme.SpacingScale.ToArray());
+        }
+
+        [Fact]
+        public void ScaledFont_MultipliesTheRamp_WithAClamp()
+        {
+            Assert.Equal(20, Theme.ScaledFont(20, 1.0));
+            Assert.Equal(30, Theme.ScaledFont(20, 1.5));
+            Assert.Equal(30, Theme.ScaledFont(20, 3.0));       // clamped at the ceiling
+            Assert.Equal(15, Theme.ScaledFont(20, 0.1));       // clamped at the floor (0.75)
+            Assert.Equal(20, Theme.ScaledFont(20, double.NaN));
+            Assert.Equal(8, Theme.ScaledFont(4, 1.0));         // never below 8
+        }
+
+        [Fact]
+        public void Canvas_ScalesByHeightFromAStatedReference()
+        {
+            Assert.Equal(1920, Theme.ReferenceWidth);
+            Assert.Equal(1080, Theme.ReferenceHeight);
+            Assert.Equal(1920.0, Theme.CanvasWidth(1600.0, 900.0), 6);      // 16:9 window
+            Assert.Equal(2580.0, Theme.CanvasWidth(3440.0, 1440.0), 6);     // ultrawide
+            Assert.Equal(1920.0, Theme.CanvasWidth(100.0, 0.0), 6);
+        }
+
+        [Fact]
+        public void PanelWidth_GrowsWithTextScale_ButStaysOnScreen()
+        {
+            Assert.Equal(700.0, Theme.PanelWidth(700.0, 1.0, 1920.0), 6);
+            Assert.Equal(1050.0, Theme.PanelWidth(700.0, 1.5, 1920.0), 6);
+            Assert.Equal(1000.0 * Theme.PanelMaxWidthFraction, Theme.PanelWidth(1200.0, 1.5, 1000.0), 6);
+            Assert.Equal(1.0, Theme.FitScale(900.0), 6);
+            double tall = Theme.FitScale(2000.0);
+            Assert.True(tall < 1.0);
+            Assert.Equal(Theme.ReferenceHeight * Theme.PanelMaxHeightFraction, 2000.0 * tall, 6);
+        }
+
+        [Fact]
+        public void NewPanelSurfaces_HaveDeclaredPairs()
+        {
+            foreach (var bg in new[] { "SurfaceHeader" })
+                Assert.Contains(Theme.Pairs, p => p.Bg == bg && p.Kind == PairKind.Body);
+            Assert.Contains(Theme.Pairs, p => p.Fg == "TextHeading" && p.Bg == "SurfaceHeader" && p.Kind == PairKind.Large);
+            foreach (var bg in new[] { "SurfacePanel", "SurfaceRow", "SurfaceHeader", "SurfaceTooltip", "ButtonOff" })
+                Assert.Contains(Theme.Pairs, p => p.Fg == "FocusRing" && p.Bg == bg && p.Kind == PairKind.Boundary);
+        }
+
+        [Fact]
+        public void ADeliberatelyLowContrastPair_IsCaughtByTheSameCheck()
+        {
+            // The fixture a contributor might add by mistake: a dark button face on the header band.
+            var bad = new ContrastPair { Name = "fixture", Fg = "ButtonOff", Bg = "SurfaceHeader", Kind = PairKind.Body, FontSize = Theme.FontBody };
+            double ratio = Theme.Contrast(Theme.Token(bad.Fg), Theme.CompositeOver(Theme.Token(bad.Bg), new Rgba(0, 0, 0)));
+            Assert.True(ratio < 4.5, "the fixture must fail the body bar, ratio " + ratio);
+        }
+
         [Fact]
         public void Theme_CoversTheTokenGroupsTheMigrationNeeds()
         {

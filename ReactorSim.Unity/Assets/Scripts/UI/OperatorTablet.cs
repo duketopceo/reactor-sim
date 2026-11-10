@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
+using TextRole = ReactorSim.Ui.TextRole;
 using ReactorSim;
 using ReactorSim.Instruments;
 using ReactorSim.Tablet;
@@ -48,7 +50,7 @@ public class OperatorTablet : MonoBehaviour
 
     private GameObject root;
     private RectTransform panel;
-    private Text headerClock;
+    private TMP_Text headerClock;
     private readonly Image[] tabImages = new Image[TabNames.Length];
     private readonly GameObject[] pages = new GameObject[5];
 
@@ -61,43 +63,44 @@ public class OperatorTablet : MonoBehaviour
     private int phoneSub;                         // 0 dispatcher, 1 messages
     private readonly Image[] phoneSubImg = new Image[2];
     private readonly GameObject[] phoneView = new GameObject[2];
-    private Text phoneCardTitle;
-    private Text phoneCardStatus;
+    private TMP_Text phoneCardTitle;
+    private TMP_Text phoneCardStatus;
     private RectTransform phoneBarFill;
     private RectTransform phoneBarMark;
     private Image phoneBarFillImg;
-    private Text phoneBarText;
-    private Text phoneStats;
-    private readonly Text[] phoneHist = new Text[HistoryRowCount];
+    private TMP_Text phoneBarText;
+    private TMP_Text phoneStats;
+    private readonly TMP_Text[] phoneHist = new TMP_Text[HistoryRowCount];
     private readonly GameObject[] msgRowGo = new GameObject[MessageRowCount];
-    private readonly Text[] msgText = new Text[MessageRowCount];
+    private readonly TMP_Text[] msgText = new TMP_Text[MessageRowCount];
     private readonly Image[] msgImg = new Image[MessageRowCount];
     private readonly FiredMessage[] msgShown = new FiredMessage[MessageRowCount];
-    private Text msgEmpty;
-    private Text phoneTabText;
+    private TMP_Text msgEmpty;
+    private TMP_Text phoneTabText;
     private int shownUnread = -1;
     private string phoneToast = "";
     private float phoneToastUntil;
-    private GUIStyle phoneToastStyle;
+    private TMP_Text phoneToastText;
+    private GameObject phoneToastBox;
     private static Color Good { get { return ThemeColors.StatusOk; } }
 
     // pins page
     private readonly GameObject[] pinRowGo = new GameObject[PinBoard.Cap];
-    private readonly Text[] pinLabel = new Text[PinBoard.Cap];
-    private readonly Text[] pinValue = new Text[PinBoard.Cap];
-    private Text pinEmpty;
+    private readonly TMP_Text[] pinLabel = new TMP_Text[PinBoard.Cap];
+    private readonly TMP_Text[] pinValue = new TMP_Text[PinBoard.Cap];
+    private TMP_Text pinEmpty;
     // alarms page
     private readonly GameObject[] alarmRowGo = new GameObject[AlarmRowCount];
-    private readonly Text[] alarmText = new Text[AlarmRowCount];
+    private readonly TMP_Text[] alarmText = new TMP_Text[AlarmRowCount];
     private readonly AlarmEntry[] alarmShown = new AlarmEntry[AlarmRowCount];
-    private Text alarmEmpty;
-    private Text alarmMore;
+    private TMP_Text alarmEmpty;
+    private TMP_Text alarmMore;
     // trends page
-    private readonly Text[] trendTitle = new Text[4];
+    private readonly TMP_Text[] trendTitle = new TMP_Text[4];
     private readonly Image[][] trendBar = new Image[4][];
     // clock page
-    private Text clockState;
-    private Text clockPauseLabel;
+    private TMP_Text clockState;
+    private TMP_Text clockPauseLabel;
 
     // find-it
     private GameObject arrow;
@@ -108,7 +111,8 @@ public class OperatorTablet : MonoBehaviour
 
     private string toast = "";
     private float toastUntil;
-    private GUIStyle toastStyle;
+    private TMP_Text toastText, hintText;
+    private GameObject toastBox, hintBox, toastRoot;
 
     public bool IsRaised { get { return raised; } }
 
@@ -156,7 +160,7 @@ public class OperatorTablet : MonoBehaviour
         {
             if (raised) Lower(); else Raise();
         }
-        if (!raised && !PauseMenu.IsOpen && Input.GetMouseButtonDown(1)) TryPinUnderCursor();
+        if (!raised && !PauseMenu.IsOpen && Input.GetMouseButtonDown(1) && !DiegeticInteractable.InputConsumedThisFrame) TryPinUnderCursor();
 
         AnimateSlide();
         UpdateArrow();
@@ -333,19 +337,32 @@ public class OperatorTablet : MonoBehaviour
         rt.offsetMax = offMax;
     }
 
-    private static Text NewText(Transform parent, string name, int size, TextAnchor anchor, Color color)
+    private static TMP_Text NewText(Transform parent, string name, TextRole role, TextAnchor anchor, Color color)
     {
         var rt = NewRect(name, parent);
-        var t = rt.gameObject.AddComponent<Text>();
-        t.font = RuntimeUi.DefaultFont;
-        t.fontSize = size;
-        t.alignment = anchor;
+        var t = rt.gameObject.AddComponent<TextMeshProUGUI>();
+        t.font = UiFonts.For(role);
+        t.fontSize = ReactorSim.Ui.Theme.RampSize(role);
+        t.alignment = TabletAlign(anchor);
         t.color = color;
-        t.horizontalOverflow = HorizontalWrapMode.Wrap;
-        t.verticalOverflow = VerticalWrapMode.Truncate;
+        t.richText = false;
+        t.textWrappingMode = TextWrappingModes.Normal;
+        t.overflowMode = TextOverflowModes.Truncate;
         t.raycastTarget = false;
+        rt.gameObject.AddComponent<ThemedText>().role = role;
         Place(rt, Vector2.zero, Vector2.one, new Vector2(10f, 0f), new Vector2(-10f, 0f));
         return t;
+    }
+
+    private static TextAlignmentOptions TabletAlign(TextAnchor a)
+    {
+        switch (a)
+        {
+            case TextAnchor.UpperLeft: return TextAlignmentOptions.TopLeft;
+            case TextAnchor.MiddleRight: return TextAlignmentOptions.Right;
+            case TextAnchor.MiddleCenter: return TextAlignmentOptions.Center;
+            default: return TextAlignmentOptions.Left;
+        }
     }
 
     private static RectTransform NewPage(string name, Transform parent)
@@ -378,12 +395,15 @@ public class OperatorTablet : MonoBehaviour
         return img;
     }
 
-    private static void SmallButtonText(Button b, int size, TextAnchor anchor, Color color)
+    private static void SmallButtonText(Button b, TextRole role, TextAnchor anchor, Color color)
     {
-        var t = b.GetComponentInChildren<Text>();
+        var t = b.GetComponentInChildren<TMP_Text>();
         if (t == null) return;
-        t.fontSize = size;
-        t.alignment = anchor;
+        var tt = t.GetComponent<ThemedText>();
+        if (tt != null) tt.role = role;
+        t.font = UiFonts.For(role);
+        t.fontSize = ReactorSim.Ui.Theme.RampSize(role);
+        t.alignment = TabletAlign(anchor);
         t.color = color;
         if (anchor == TextAnchor.MiddleLeft)
         {
@@ -411,10 +431,10 @@ public class OperatorTablet : MonoBehaviour
         var screen = NewImage("Screen", panel, ThemeColors.SurfaceScreen);
         Place((RectTransform)screen.transform, Vector2.zero, Vector2.one, new Vector2(22f, 22f), new Vector2(-22f, -22f));
 
-        var title = NewText(screen.transform, "Title", 26, TextAnchor.MiddleLeft, Dim);
+        var title = NewText(screen.transform, "Title", TextRole.Heading, TextAnchor.MiddleLeft, Dim);
         title.text = "OPERATOR TABLET";
         Place((RectTransform)title.transform, new Vector2(0f, 1f), new Vector2(0.5f, 1f), new Vector2(12f, -48f), new Vector2(0f, -6f));
-        headerClock = NewText(screen.transform, "Clock", 24, TextAnchor.MiddleRight, Ink);
+        headerClock = NewText(screen.transform, "Clock", TextRole.Heading, TextAnchor.MiddleRight, Ink);
         Place((RectTransform)headerClock.transform, new Vector2(0.5f, 1f), new Vector2(1f, 1f), new Vector2(0f, -48f), new Vector2(-12f, -6f));
 
         var tabBar = NewRect("Tabs", screen.transform);
@@ -430,8 +450,8 @@ public class OperatorTablet : MonoBehaviour
             int idx = i;
             var b = RuntimeUi.MakeButton(tabBar, TabNames[i], () => SelectPage(idx), 54f);
             tabImages[i] = StateButtonImage(b);
-            SmallButtonText(b, 22, TextAnchor.MiddleCenter, ThemeColors.TextBody);
-            if (i == PhoneTab) phoneTabText = b.GetComponentInChildren<Text>();
+            SmallButtonText(b, TextRole.Body, TextAnchor.MiddleCenter, ThemeColors.TextBody);
+            if (i == PhoneTab) phoneTabText = b.GetComponentInChildren<TMP_Text>();
         }
 
         var body = NewRect("Pages", screen.transform);
@@ -442,6 +462,13 @@ public class OperatorTablet : MonoBehaviour
         BuildClockPage(body);
         BuildPhonePage(body);
         SelectPage(0);
+        // The device follows the text-scale setting through its canvas scaler (ApplyTextScale), so its labels sit on the
+        // unscaled ramp; letting ThemedText multiply by the setting as well would scale the text twice.
+        foreach (var tt in root.GetComponentsInChildren<ThemedText>(true))
+        {
+            tt.followTextScale = false;
+            tt.Reapply();
+        }
         root.SetActive(false);
     }
 
@@ -458,22 +485,21 @@ public class OperatorTablet : MonoBehaviour
     {
         var pg = NewPage("PinsPage", body);
         pages[0] = pg.gameObject;
-        RuntimeUi.MakeLabel(pg, "Right-click a gauge in the room to pin it here (max " + PinBoard.Cap + ", oldest drops off).",
-            20, TextAnchor.MiddleLeft, Dim, 48f);
+        RuntimeUi.MakeLabel(pg, "Right-click a gauge in the room to pin it here (max " + PinBoard.Cap + ", oldest drops off).", TextRole.Body, TextAnchor.MiddleLeft, Dim, 48f);
         for (int i = 0; i < PinBoard.Cap; i++)
         {
             var row = NewRow(pg, "Pin" + i, 56f, RowBg);
             pinRowGo[i] = row.gameObject;
-            pinLabel[i] = NewText(row, "Label", 22, TextAnchor.MiddleLeft, Ink);
+            pinLabel[i] = NewText(row, "Label", TextRole.Body, TextAnchor.MiddleLeft, Ink);
             Place((RectTransform)pinLabel[i].transform, Vector2.zero, new Vector2(0.58f, 1f), new Vector2(10f, 0f), Vector2.zero);
-            pinValue[i] = NewText(row, "Value", 26, TextAnchor.MiddleRight, Good);
+            pinValue[i] = NewText(row, "Value", TextRole.Heading, TextAnchor.MiddleRight, Good);
             Place((RectTransform)pinValue[i].transform, new Vector2(0.58f, 0f), new Vector2(0.88f, 1f), Vector2.zero, Vector2.zero);
             int slot = i;
             var x = RuntimeUi.MakeButton(row, "x", () => Unpin(slot), 40f);
             Place((RectTransform)x.transform, new Vector2(0.9f, 0.1f), new Vector2(0.99f, 0.9f), Vector2.zero, Vector2.zero);
-            SmallButtonText(x, 22, TextAnchor.MiddleCenter, ThemeColors.TextBody);
+            SmallButtonText(x, TextRole.Body, TextAnchor.MiddleCenter, ThemeColors.TextBody);
         }
-        pinEmpty = RuntimeUi.MakeLabel(pg, "Nothing pinned. The reactor is not going to read itself.", 24, TextAnchor.MiddleCenter, Dim, 80f);
+        pinEmpty = RuntimeUi.MakeLabel(pg, "Nothing pinned. The reactor is not going to read itself.", TextRole.Heading, TextAnchor.MiddleCenter, Dim, 80f);
     }
 
     private void Unpin(int slot)
@@ -487,17 +513,17 @@ public class OperatorTablet : MonoBehaviour
     {
         var pg = NewPage("AlarmsPage", body);
         pages[1] = pg.gameObject;
-        RuntimeUi.MakeLabel(pg, "Click an alarm to find its tile: it blinks and an arrow points the way.", 20, TextAnchor.MiddleLeft, Dim, 36f);
+        RuntimeUi.MakeLabel(pg, "Click an alarm to find its tile: it blinks and an arrow points the way.", TextRole.Body, TextAnchor.MiddleLeft, Dim, 36f);
         for (int i = 0; i < AlarmRowCount; i++)
         {
             int slot = i;
             var b = RuntimeUi.MakeButton(pg, "-", () => LocateSlot(slot), 44f);
             alarmRowGo[i] = b.gameObject;
-            SmallButtonText(b, 22, TextAnchor.MiddleLeft, Ink);
-            alarmText[i] = b.GetComponentInChildren<Text>();
+            SmallButtonText(b, TextRole.Body, TextAnchor.MiddleLeft, Ink);
+            alarmText[i] = b.GetComponentInChildren<TMP_Text>();
         }
-        alarmMore = RuntimeUi.MakeLabel(pg, "", 20, TextAnchor.MiddleCenter, Dim, 28f);
-        alarmEmpty = RuntimeUi.MakeLabel(pg, "All quiet. Suspiciously quiet.", 26, TextAnchor.MiddleCenter, Dim, 90f);
+        alarmMore = RuntimeUi.MakeLabel(pg, "", TextRole.Body, TextAnchor.MiddleCenter, Dim, 28f);
+        alarmEmpty = RuntimeUi.MakeLabel(pg, "All quiet. Suspiciously quiet.", TextRole.Heading, TextAnchor.MiddleCenter, Dim, 90f);
     }
 
     private void LocateSlot(int slot)
@@ -512,7 +538,7 @@ public class OperatorTablet : MonoBehaviour
         for (int s = 0; s < 4; s++)
         {
             var block = NewRow(pg, "Trend" + s, 146f, RowBg);
-            trendTitle[s] = NewText(block, "Title", 22, TextAnchor.MiddleLeft, Ink);
+            trendTitle[s] = NewText(block, "Title", TextRole.Body, TextAnchor.MiddleLeft, Ink);
             Place((RectTransform)trendTitle[s].transform, new Vector2(0f, 0.8f), Vector2.one, Vector2.zero, Vector2.zero);
             var area = NewRect("Chart", block);
             Place(area, Vector2.zero, new Vector2(1f, 0.8f), new Vector2(10f, 8f), new Vector2(-10f, -2f));
@@ -536,13 +562,13 @@ public class OperatorTablet : MonoBehaviour
     {
         var pg = NewPage("ClockPage", body);
         pages[3] = pg.gameObject;
-        clockState = RuntimeUi.MakeLabel(pg, "", 34, TextAnchor.MiddleCenter, Ink, 90f);
-        RuntimeUi.MakeLabel(pg, "The same pace, pause and skip intents as the clock rack in the room.", 20, TextAnchor.MiddleCenter, Dim, 40f);
+        clockState = RuntimeUi.MakeLabel(pg, "", TextRole.Title, TextAnchor.MiddleCenter, Ink, 90f);
+        RuntimeUi.MakeLabel(pg, "The same pace, pause and skip intents as the clock rack in the room.", TextRole.Body, TextAnchor.MiddleCenter, Dim, 40f);
         foreach (ClockAction a in System.Enum.GetValues(typeof(ClockAction)))
         {
             ClockAction act = a;
             var b = RuntimeUi.MakeButton(pg, ClockActions.Label(a), () => DoClock(act), 84f);
-            if (a == ClockAction.PauseResume) clockPauseLabel = b.GetComponentInChildren<Text>();
+            if (a == ClockAction.PauseResume) clockPauseLabel = b.GetComponentInChildren<TMP_Text>();
         }
     }
 
@@ -565,7 +591,7 @@ public class OperatorTablet : MonoBehaviour
             int idx = i;
             var b = RuntimeUi.MakeButton(sub, subNames[i], () => SelectPhoneSub(idx), 50f);
             phoneSubImg[i] = StateButtonImage(b);
-            SmallButtonText(b, 22, TextAnchor.MiddleCenter, ThemeColors.TextBody);
+            SmallButtonText(b, TextRole.Body, TextAnchor.MiddleCenter, ThemeColors.TextBody);
         }
 
         // dispatcher view
@@ -573,9 +599,9 @@ public class OperatorTablet : MonoBehaviour
         dv.gameObject.AddComponent<LayoutElement>().flexibleHeight = 1f;
         phoneView[0] = dv.gameObject;
         var card = NewRow(dv, "Card", 168f, RowBg);
-        phoneCardTitle = NewText(card, "Caller", 22, TextAnchor.UpperLeft, Ink);
+        phoneCardTitle = NewText(card, "Caller", TextRole.Body, TextAnchor.UpperLeft, Ink);
         Place((RectTransform)phoneCardTitle.transform, new Vector2(0f, 0.38f), Vector2.one, new Vector2(0f, 0f), new Vector2(0f, -8f));
-        phoneCardStatus = NewText(card, "Status", 28, TextAnchor.MiddleLeft, Good);
+        phoneCardStatus = NewText(card, "Status", TextRole.Numeric, TextAnchor.MiddleLeft, Good);
         Place((RectTransform)phoneCardStatus.transform, Vector2.zero, new Vector2(1f, 0.38f), Vector2.zero, Vector2.zero);
 
         var bar = NewRow(dv, "Progress", 46f, TabOff);
@@ -586,12 +612,12 @@ public class OperatorTablet : MonoBehaviour
         var mark = NewImage("WindowMark", bar, ThemeColors.TextHeading);
         phoneBarMark = (RectTransform)mark.transform;
         Place(phoneBarMark, Vector2.zero, new Vector2(0f, 1f), Vector2.zero, new Vector2(3f, 0f));
-        phoneBarText = NewText(bar, "BarText", 22, TextAnchor.MiddleCenter, ThemeColors.TextBody);
+        phoneBarText = NewText(bar, "BarText", TextRole.Body, TextAnchor.MiddleCenter, ThemeColors.TextBody);
         Place((RectTransform)phoneBarText.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-        phoneStats = RuntimeUi.MakeLabel(dv, "", 22, TextAnchor.MiddleLeft, Dim, 44f);
-        RuntimeUi.MakeLabel(dv, "Recent calls", 20, TextAnchor.MiddleLeft, Dim, 30f);
+        phoneStats = RuntimeUi.MakeLabel(dv, "", TextRole.Body, TextAnchor.MiddleLeft, Dim, 44f);
+        RuntimeUi.MakeLabel(dv, "Recent calls", TextRole.Body, TextAnchor.MiddleLeft, Dim, 30f);
         for (int i = 0; i < HistoryRowCount; i++)
-            phoneHist[i] = RuntimeUi.MakeLabel(dv, "", 22, TextAnchor.MiddleLeft, Ink, 34f);
+            phoneHist[i] = RuntimeUi.MakeLabel(dv, "", TextRole.Body, TextAnchor.MiddleLeft, Ink, 34f);
 
         // messages view
         var mv = NewPage("MessagesView", pg);
@@ -604,12 +630,12 @@ public class OperatorTablet : MonoBehaviour
             var b = RuntimeUi.MakeButton(mv, "-", () => ReadMessage(slot), 70f);
             msgRowGo[i] = b.gameObject;
             msgImg[i] = StateButtonImage(b);
-            SmallButtonText(b, 20, TextAnchor.MiddleLeft, Ink);
-            msgText[i] = b.GetComponentInChildren<Text>();
-            msgText[i].horizontalOverflow = HorizontalWrapMode.Wrap;
-            msgText[i].verticalOverflow = VerticalWrapMode.Truncate;
+            SmallButtonText(b, TextRole.Body, TextAnchor.MiddleLeft, Ink);
+            msgText[i] = b.GetComponentInChildren<TMP_Text>();
+            msgText[i].textWrappingMode = TextWrappingModes.Normal;
+            msgText[i].overflowMode = TextOverflowModes.Truncate;
         }
-        msgEmpty = RuntimeUi.MakeLabel(mv, "No messages. Enjoy it while it lasts.", 24, TextAnchor.MiddleCenter, Dim, 80f);
+        msgEmpty = RuntimeUi.MakeLabel(mv, "No messages. Enjoy it while it lasts.", TextRole.Heading, TextAnchor.MiddleCenter, Dim, 80f);
         SelectPhoneSub(0);
     }
 
@@ -638,8 +664,8 @@ public class OperatorTablet : MonoBehaviour
         var req = phone.Refresh(plant.Dispatcher);
         var msg = messages.Refresh(plant.Messages);
         if (msg != null) ShowPhoneToast(msg.Sender + ": " + msg.Text);
-        else if (req != null) ShowPhoneToast("Grid control: " + req.TargetMw.ToString("0", System.Globalization.CultureInfo.InvariantCulture)
-            + " MW wanted, window opens in " + PhonePage.FormatCountdown(phone.SecondsToStart));
+        else if (req != null) ShowPhoneToast("Grid control: " + ReactorSim.Ui.ReadoutFormat.Value(req.TargetMw, 0, "MW")
+            + " wanted, window opens in " + PhonePage.FormatCountdown(phone.SecondsToStart));
         if (phoneTabText != null && shownUnread != messages.Unread)
         {
             shownUnread = messages.Unread;
@@ -662,7 +688,6 @@ public class OperatorTablet : MonoBehaviour
 
     private void RefreshDispatcherView()
     {
-        var ic = System.Globalization.CultureInfo.InvariantCulture;
         var d = bridge.Sim.Plant.Dispatcher;
         float frac = 0f;
         if (!phone.HasRequest)
@@ -678,7 +703,7 @@ public class OperatorTablet : MonoBehaviour
             phoneCardTitle.text = phone.Caller;
             phoneCardStatus.text = "INCOMING  window opens in " + PhonePage.FormatCountdown(phone.SecondsToStart);
             phoneCardStatus.color = Warn;
-            phoneBarText.text = "target " + phone.TargetMw.ToString("0", ic) + " MW";
+            phoneBarText.text = "target " + ReactorSim.Ui.ReadoutFormat.Value(phone.TargetMw, 0, "MW");
         }
         else
         {
@@ -687,7 +712,7 @@ public class OperatorTablet : MonoBehaviour
             bool onTrack = phone.AverageSoFarMw >= phone.TargetMw * (1.0 - d.Config.ToleranceFrac);
             phoneCardStatus.color = onTrack ? Good : Crit;
             frac = (float)phone.DeliveredFraction;
-            phoneBarText.text = phone.AverageSoFarMw.ToString("0.0", ic) + " / " + phone.TargetMw.ToString("0", ic) + " MW average";
+            phoneBarText.text = ReactorSim.Ui.ReadoutFormat.Number(phone.AverageSoFarMw, 1) + " / " + ReactorSim.Ui.ReadoutFormat.Value(phone.TargetMw, 0, "MW") + " average";
         }
         phoneBarFill.anchorMax = new Vector2(Mathf.Clamp01(frac), 1f);
         phoneBarFillImg.color = phone.HasRequest && phone.Status == RequestStatus.Active
@@ -703,8 +728,8 @@ public class OperatorTablet : MonoBehaviour
             if (i >= phone.History.Count) { phoneHist[i].text = ""; continue; }
             var r = phone.History[i];
             bool met = r.Status == RequestStatus.Met;
-            phoneHist[i].text = (met ? "MET     " : "MISSED  ") + r.TargetMw.ToString("0", ic) + " MW for "
-                + PhonePage.FormatCountdown(r.DurationSeconds) + "   avg " + r.AverageMw.ToString("0.0", ic) + " MW";
+            phoneHist[i].text = (met ? "MET     " : "MISSED  ") + ReactorSim.Ui.ReadoutFormat.Value(r.TargetMw, 0, "MW") + " for "
+                + PhonePage.FormatCountdown(r.DurationSeconds) + "   avg " + ReactorSim.Ui.ReadoutFormat.Value(r.AverageMw, 1, "MW");
             phoneHist[i].color = met ? Good : Crit;
         }
     }
@@ -800,8 +825,7 @@ public class OperatorTablet : MonoBehaviour
             var series = (TabletTrends.Series)s;
             double latest = trends.Latest(series);
             trendTitle[s].text = TabletTrends.Titles[s] + "   "
-                + (double.IsNaN(latest) ? "--" : latest.ToString(s == 3 ? "0.00" : "0.0", System.Globalization.CultureInfo.InvariantCulture))
-                + " " + TabletTrends.UnitNames[s];
+                + ReactorSim.Ui.ReadoutFormat.Value(latest, s == 3 ? 2 : 1, TabletTrends.UnitNames[s]);
             double[] n = trends.Normalized(series, TrendBars);
             int first = TrendBars - n.Length;
             for (int i = 0; i < TrendBars; i++)
@@ -830,40 +854,39 @@ public class OperatorTablet : MonoBehaviour
         toastUntil = Time.unscaledTime + 2.4f;
     }
 
-    private void OnGUI()
+    // Toasts (short notices, the phone notice and the Tab hint) on their own overlay canvas.
+    private void LateUpdate()
     {
-        if (toastStyle == null)
+        bool showToast = Time.unscaledTime < toastUntil;
+        bool showPhone = Time.unscaledTime < phoneToastUntil;
+        bool showHint = !raised && bridge != null && bridge.Sim != null && !PauseMenu.IsOpen;
+        if (toastRoot == null)
         {
-            toastStyle = ThemeColors.BoxStyle(ReactorSim.Ui.Theme.SurfaceTooltip, UserSettings.Scaled(ReactorSim.Ui.Theme.FontCaption), ReactorSim.Ui.Theme.TextBody);
-            toastStyle.wordWrap = false;
-            toastStyle.alignment = TextAnchor.MiddleCenter;
-            toastStyle.padding = new RectOffset(10, 10, 4, 4);
+            if (!showToast && !showPhone && !showHint) return;
+            BuildToasts();
         }
-        toastStyle.fontSize = UserSettings.Scaled(ReactorSim.Ui.Theme.FontCaption);
-        if (Time.unscaledTime < toastUntil)
-        {
-            var size = toastStyle.CalcSize(new GUIContent(toast));
-            GUI.Box(new Rect((Screen.width - size.x) * 0.5f, 56f, size.x, size.y), toast, toastStyle);
-        }
-        if (Time.unscaledTime < phoneToastUntil)
-        {
-            if (phoneToastStyle == null)
-            {
-                phoneToastStyle = new GUIStyle(toastStyle);
-                phoneToastStyle.wordWrap = true;
-                phoneToastStyle.alignment = TextAnchor.MiddleLeft;
-                phoneToastStyle.normal.textColor = ThemeColors.StatusCaution;   // on the tooltip backing token
-            }
-            var content = new GUIContent("Phone  " + phoneToast);
-            float w = Mathf.Min(460f, Screen.width - 24f);
-            float hgt = phoneToastStyle.CalcHeight(content, w);
-            GUI.Box(new Rect(12f, Screen.height - hgt - 12f, w, hgt), content, phoneToastStyle);
-        }
-        if (!raised && bridge != null && bridge.Sim != null && !PauseMenu.IsOpen)
-        {
-            const string hint = "Tab  tablet";
-            var size = toastStyle.CalcSize(new GUIContent(hint));
-            GUI.Box(new Rect(Screen.width - size.x - 12f, Screen.height - size.y - 12f, size.x, size.y), hint, toastStyle);
-        }
+        if (toastBox.activeSelf != showToast) toastBox.SetActive(showToast);
+        if (showToast && toastText.text != toast) toastText.text = toast;
+        if (phoneToastBox.activeSelf != showPhone) phoneToastBox.SetActive(showPhone);
+        string phoneLine = "Phone  " + phoneToast;
+        if (showPhone && phoneToastText.text != phoneLine) phoneToastText.text = phoneLine;
+        if (hintBox.activeSelf != showHint) hintBox.SetActive(showHint);
+    }
+
+    private void BuildToasts()
+    {
+        var canvas = RuntimeUi.CreateCanvas("TabletToastCanvas", 95, transform);
+        canvas.GetComponent<GraphicRaycaster>().enabled = false;
+        toastRoot = canvas.gameObject;
+        toastBox = RuntimeUi.MakeToast(canvas.transform, "Toast", new Vector2(0.5f, 1f), new Vector2(0f, -56f), 0f,
+            TextRole.Caption, TextAnchor.MiddleCenter, ThemeColors.TextBody, out toastText).gameObject;
+        phoneToastBox = RuntimeUi.MakeToast(canvas.transform, "PhoneToast", new Vector2(0f, 0f), new Vector2(12f, 12f), 460f,
+            TextRole.Caption, TextAnchor.MiddleLeft, ThemeColors.StatusCaution, out phoneToastText).gameObject;   // on the tooltip backing token
+        hintBox = RuntimeUi.MakeToast(canvas.transform, "TabHint", new Vector2(1f, 0f), new Vector2(-12f, 12f), 0f,
+            TextRole.Caption, TextAnchor.MiddleCenter, ThemeColors.TextBody, out hintText).gameObject;
+        hintText.text = "Tab  tablet";
+        toastBox.SetActive(false);
+        phoneToastBox.SetActive(false);
+        hintBox.SetActive(false);
     }
 }

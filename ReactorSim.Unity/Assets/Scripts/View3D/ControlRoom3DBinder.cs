@@ -92,6 +92,12 @@ public class ControlRoom3DBinder : MonoBehaviour
     private readonly Dictionary<string, double> lastSubmitted = new Dictionary<string, double>();
     private readonly Dictionary<string, float> lastSubmitTime = new Dictionary<string, float>();
     private readonly Dictionary<string, double> dragStartFrac = new Dictionary<string, double>();
+    private readonly Dictionary<string, double> dragStartValue = new Dictionary<string, double>();
+    private readonly Dictionary<string, Pending> preDragPending = new Dictionary<string, Pending>();
+    private DiegeticInteractable highlighted;
+    private readonly List<Renderer> highlightRenderers = new List<Renderer>();
+    private string readoutOverride;
+    private float readoutOverrideUntil;
     private MaterialPropertyBlock mpb;
     private readonly List<LampTile> lampList = new List<LampTile>();
     private static int colorId, emissionColorId;
@@ -102,7 +108,8 @@ public class ControlRoom3DBinder : MonoBehaviour
     private string actionText = "";
     private float actionUntil;
     private float scramArmedUntil;
-    private GUIStyle hudStyle;
+    private GameObject readoutBox, noticeBox;
+    private TMPro.TMP_Text readoutLabel, noticeLabel;
 
     private void Awake()
     {
@@ -212,6 +219,8 @@ public class ControlRoom3DBinder : MonoBehaviour
         else if (s.SimSeconds != curSnap.SimSeconds) { prevSnap = curSnap; curSnap = s; }
 
         ExpirePending(s);
+        UpdateHud();
+        UpdateHoverHighlight();
         UpdateGauges();
         UpdateCounters();
         UpdateLamps(s);
@@ -469,9 +478,15 @@ public class ControlRoom3DBinder : MonoBehaviour
     {
         var spec = inter.Spec;
         var s = bridge != null ? bridge.GetSnapshot() : null;
-        lastSubmitted.Remove(Key(spec));
-        double frac = DragMapper.FractionFromValue(spec, ShownValue(spec, s));
-        dragStartFrac[Key(spec)] = frac;
+        string key = Key(spec);
+        lastSubmitted.Remove(key);
+        double shown = ShownValue(spec, s);
+        double frac = DragMapper.FractionFromValue(spec, shown);
+        dragStartFrac[key] = frac;
+        dragStartValue[key] = shown;
+        Pending prior;
+        if (pending.TryGetValue(key, out prior)) preDragPending[key] = new Pending { Value = prior.Value, SimSecondsAtSubmit = prior.SimSecondsAtSubmit };
+        else preDragPending.Remove(key);
         lastDetent[Key(spec)] = ControlSounds.DetentIndex(spec, DragMapper.ValueFromFraction(spec, frac));
         return frac;
     }
@@ -515,6 +530,73 @@ public class ControlRoom3DBinder : MonoBehaviour
         lastSubmitTime[key] = Time.unscaledTime;
         bridge.SubmitIntent(intent);
         Flash(Label(spec) + " -> " + FormatValue(spec, value) + (IsQueued(spec, s) ? " (queued)" : ""));
+    }
+
+    /// <summary>
+    /// A drag was cancelled (Escape, right click, focus lost): the dial goes back to its pre-drag state. Nothing is submitted
+    /// unless the drag had already sent a value mid-drag, in which case the original value is sent once to put the plant back.
+    /// </summary>
+    public void CancelDrag(DiegeticInteractable inter)
+    {
+        if (bridge == null || bridge.Sim == null || inter == null || inter.Spec == null) return;
+        var spec = inter.Spec;
+        string key = Key(spec);
+        double original;
+        bool sent = lastSubmitted.ContainsKey(key);
+        lastSubmitted.Remove(key);
+        Pending prior;
+        if (sent && dragStartValue.TryGetValue(key, out original) && !double.IsNaN(original))
+        {
+            var intent = ControlIntentFactory.BuildDial(spec, original, Issuer);
+            if (intent != null)
+            {
+                var s = bridge.GetSnapshot();
+                pending[key] = new Pending { Value = original, SimSecondsAtSubmit = s != null ? s.SimSeconds : 0.0 };
+                lastSubmitTime[key] = Time.unscaledTime;
+                bridge.SubmitIntent(intent);
+                Flash(Label(spec) + " restored to " + FormatValue(spec, original));
+                return;
+            }
+        }
+        if (preDragPending.TryGetValue(key, out prior)) pending[key] = prior;
+        else pending.Remove(key);
+        Flash(Label(spec) + " unchanged");
+    }
+
+    /// <summary>One-line on-screen note (a click that did nothing says why).</summary>
+    public void Notice(string text)
+    {
+        if (!string.IsNullOrEmpty(text)) Flash(text);
+    }
+
+    /// <summary>Capture runs only: shows a drag readout without a real drag.</summary>
+    public void ShowReadout(string text, float seconds)
+    {
+        readoutOverride = text;
+        readoutOverrideUntil = Time.unscaledTime + seconds;
+    }
+
+    // Operable controls light up under the cursor; indicators and out-of-service rows never do.
+    private void UpdateHoverHighlight()
+    {
+        var h = DiegeticInteractable.Hovered;
+        if (h != null && !h.Operable) h = null;
+        if (h == highlighted) return;
+        for (int i = 0; i < highlightRenderers.Count; i++)
+            if (highlightRenderers[i] != null) highlightRenderers[i].SetPropertyBlock(null);
+        highlightRenderers.Clear();
+        highlighted = h;
+        if (h == null) return;
+        h.GetComponentsInChildren(highlightRenderers);
+        for (int i = 0; i < highlightRenderers.Count; i++)
+        {
+            var r = highlightRenderers[i];
+            var m = r.sharedMaterial;
+            if (m == null || !m.HasProperty(colorId)) continue;
+            r.GetPropertyBlock(mpb);
+            mpb.SetColor(colorId, Color.Lerp(m.GetColor(colorId), ThemeColors.HighlightPulse, 0.45f));
+            r.SetPropertyBlock(mpb);
+        }
     }
 
     public void PressButton(DiegeticInteractable inter)
@@ -643,21 +725,40 @@ public class ControlRoom3DBinder : MonoBehaviour
         return ControlTooltipModel.ForControl(row, spec, s, title, pendingValue, queued, state, h.HoverNote);
     }
 
-    private void OnGUI()
+    // Drag readout (top centre) and the one-line action / rejected-press notice (bottom centre), as uGUI + TextMeshPro.
+    private void EnsureHud()
     {
-        if (bridge == null || bridge.Sim == null) return;
-        if (hudStyle == null)
+        if (readoutBox != null) return;
+        var canvas = RuntimeUi.CreateCanvas("ControlHudCanvas", 18, transform);
+        canvas.GetComponent<UnityEngine.UI.GraphicRaycaster>().enabled = false;
+        readoutBox = RuntimeUi.MakeToast(canvas.transform, "DragReadout", new Vector2(0.5f, 1f), new Vector2(0f, -170f), 0f,
+            ReactorSim.Ui.TextRole.Body, TextAnchor.MiddleCenter, ThemeColors.TextBody, out readoutLabel).gameObject;
+        noticeBox = RuntimeUi.MakeToast(canvas.transform, "ActionNotice", new Vector2(0.5f, 0f), new Vector2(0f, 24f), 0f,
+            ReactorSim.Ui.TextRole.Caption, TextAnchor.MiddleCenter, ThemeColors.TextBody, out noticeLabel).gameObject;
+        readoutBox.SetActive(false);
+        noticeBox.SetActive(false);
+    }
+
+    private void UpdateHud()
+    {
+        EnsureHud();
+        string readout = null;
+        var d = DiegeticInteractable.Dragging;
+        if (d != null && d.Drag != null && d.Drag.Started && d.Spec != null)
         {
-            hudStyle = ThemeColors.BoxStyle(ReactorSim.Ui.Theme.SurfaceTooltip, ReactorSim.Ui.Theme.FontCaption, ReactorSim.Ui.Theme.TextBody);
-            hudStyle.alignment = TextAnchor.MiddleLeft;
-            hudStyle.wordWrap = false;
-            hudStyle.padding = new RectOffset(10, 10, 6, 6);
+            var row = RuntimeInventoryStore.Inventory.Find(d.rowId);
+            double value = DragMapper.ValueFromFraction(d.Spec, d.Drag.Fraction);
+            readout = ControlTooltipModel.DragReadout(string.IsNullOrEmpty(d.rowLabel) ? Label(d.Spec) : d.rowLabel, value,
+                d.DragStartValue, row != null ? row.units : "", d.Spec.Discrete);
         }
-        if (Time.unscaledTime < actionUntil)
-        {
-            hudStyle.fontSize = UserSettings.Scaled(ReactorSim.Ui.Theme.FontCaption);
-            var size = hudStyle.CalcSize(new GUIContent(actionText));
-            GUI.Box(new Rect((Screen.width - size.x) * 0.5f, Screen.height - size.y - 24f, size.x, size.y), actionText, hudStyle);
-        }
+        else if (readoutOverride != null && Time.unscaledTime < readoutOverrideUntil) readout = readoutOverride;
+        SetBox(readoutBox, readoutLabel, readout);
+        SetBox(noticeBox, noticeLabel, Time.unscaledTime < actionUntil ? actionText : null);
+    }
+
+    private static void SetBox(GameObject box, TMPro.TMP_Text label, string text)
+    {
+        if (box.activeSelf != (text != null)) box.SetActive(text != null);
+        if (text != null && label.text != text) label.text = text;
     }
 }

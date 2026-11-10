@@ -111,6 +111,45 @@ namespace ReactorSim.Controls
             return t;
         }
 
+        // ---- feedback for a click that does nothing (R6) and the live drag readout (R4) ----
+
+        /// <summary>Reason codes logged with a rejected press.</summary>
+        public const string RejectIndicator = "indicator", RejectOutOfService = "out_of_service",
+            RejectOutOfRange = "out_of_range", RejectNoSpec = "no_spec", RejectNoBinder = "no_binder";
+
+        /// <summary>
+        /// The control row that operates an indicator row: its id is the indicator's id plus "_ctl" or a leading part of it
+        /// (cooling_water_ctl for cooling_water_flow, pzr_level_ctl for pzr_level). Null when no control matches.
+        /// </summary>
+        public static RuntimeRow RelatedControl(RuntimeInventory inv, string indicatorId)
+        {
+            if (inv == null || inv.rows == null || string.IsNullOrEmpty(indicatorId)) return null;
+            for (int i = 0; i < inv.rows.Length; i++)
+            {
+                var r = inv.rows[i];
+                if (r == null || r.role != "control" || r.id == null || !r.id.EndsWith("_ctl", StringComparison.Ordinal)) continue;
+                string stem = r.id.Substring(0, r.id.Length - 4);
+                if (stem.Length > 0 && (indicatorId == stem || indicatorId.StartsWith(stem + "_", StringComparison.Ordinal))) return r;
+            }
+            return null;
+        }
+
+        /// <summary>One line shown when a gauge or lamp is clicked: it is read, not operated.</summary>
+        public static string IndicatorNote(RuntimeRow relatedControl)
+        {
+            return relatedControl == null || string.IsNullOrEmpty(relatedControl.label)
+                ? "Indicator. Right-click to pin it to the tablet."
+                : "Indicator. Right-click to pin. Operate it with the " + relatedControl.label + " knob";
+        }
+
+        /// <summary>Drag readout: label, the value being set with its unit, and the change since the press.</summary>
+        public static string DragReadout(string label, double value, double startValue, string units, bool integer)
+        {
+            double delta = value - startValue;
+            string sign = delta > 0.0 ? "+" : "";
+            return (label ?? "") + "\n" + Fmt(value, units, integer) + "   (" + sign + Num(integer ? Math.Round(delta) : delta) + ")";
+        }
+
         /// <summary>A placed but unbound row.</summary>
         public static TooltipText ForOutOfService(RuntimeRow row, string fallbackTitle, string reason)
         {

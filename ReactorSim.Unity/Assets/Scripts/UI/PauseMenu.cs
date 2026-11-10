@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using ReactorSim.Ui;
 
 /// <summary>
 /// U11 escape menu for the control room: resume, reset sandbox, master volume, alarm mute, quit to menu.
@@ -28,7 +29,8 @@ public class PauseMenu : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Escape))
+        // Escape leaves a focused screen first; it must not also open this menu (either Update order works).
+        if (Input.GetKeyDown(KeyCode.Escape) && !ScreenFocus.ConsumesEscape && !DiegeticInteractable.InputConsumedThisFrame)
         {
             if (open) Close(); else Open();
         }
@@ -69,38 +71,42 @@ public class PauseMenu : MonoBehaviour
         var canvas = RuntimeUi.CreateCanvas("PauseMenuCanvas", 100, transform);
         root = canvas.gameObject;
         RuntimeUi.Stretch(canvas.transform, "Dim", ThemeColors.ScrimDim);
-        var col = RuntimeUi.Column(canvas.transform, "Column", 620f, ThemeColors.SurfacePanel);
+        var col = RuntimeUi.Column(canvas.transform, "Column", 660f, ThemeColors.SurfacePanel);
         var dim = ThemeColors.TextDim;
         bool sandbox = GameSession.Mode == StartMode.Sandbox;
 
-        RuntimeUi.MakeLabel(col, "PAUSED", 48, TextAnchor.MiddleCenter, ThemeColors.TextHeading, 64f);
+        RuntimeUi.MakeHeader(col, "PAUSED", TextRole.Display);
         RuntimeUi.MakeButton(col, "Resume", Close);
         RuntimeUi.MakeButton(col, sandbox ? "Reset sandbox (cold shutdown)" : "Restart mission", ResetSession);
-        RuntimeUi.MakeLabel(col, "Master volume", 24, TextAnchor.MiddleLeft, ThemeColors.TextBody, 30f);
+        RuntimeUi.MakeDivider(col);
+        RuntimeUi.MakeLabel(col, "Master volume", TextRole.Body, TextAnchor.MiddleLeft, ThemeColors.TextBody);
         RuntimeUi.MakeSlider(col, AudioListener.volume, v => AudioListener.volume = v);
         RuntimeUi.MakeToggle(col, "Mute alarm sounds", alarmMuted, v =>
         {
             alarmMuted = v;
             ApplyAlarmMute();
         });
+        RuntimeUi.MakeDivider(col);
         if (sandbox)
             RuntimeUi.MakeToggle(col, "Hide startup checklist panel", UserSettings.ChecklistHidden, v => UserSettings.ChecklistHidden = v);
-        AddSetting(col, "Text size (tooltips, tablet, clipboard)", OperatorMath.TextScaleMin, OperatorMath.TextScaleMax,
+        RuntimeUi.MakeToggle(col, "Invert look (Y axis)", UserSettings.InvertY, v => UserSettings.InvertY = v);
+        AddSetting(col, "Text size (menus, tablet, clipboard)", OperatorMath.TextScaleMin, OperatorMath.TextScaleMax,
             UserSettings.TextScale, v => UserSettings.TextScale = v);
         AddSetting(col, "Field of view", OperatorMath.FovMin, OperatorMath.FovMax,
             UserSettings.Fov, v => UserSettings.Fov = v);
         AddSetting(col, "Mouse sensitivity", OperatorMath.SensitivityMin, OperatorMath.SensitivityMax,
             UserSettings.MouseSensitivity, v => UserSettings.MouseSensitivity = v);
+        RuntimeUi.MakeDivider(col);
         RuntimeUi.MakeButton(col, "Quit to menu", QuitToMenu);
-        RuntimeUi.MakeLabel(col, "The sandbox is not saved. Quitting to the menu discards this plant.", 20,
-            TextAnchor.MiddleCenter, dim, 56f);
+        RuntimeUi.MakeLabel(col, "The sandbox is not saved. Quitting to the menu discards this plant.", TextRole.Caption,
+            TextAnchor.MiddleCenter, dim);
         root.SetActive(false);
     }
 
     // A labelled slider over [lo, hi]; the setting is saved and applied live (UserSettings).
     private static void AddSetting(Transform col, string label, float lo, float hi, float value, System.Action<float> apply)
     {
-        RuntimeUi.MakeLabel(col, label, 22, TextAnchor.MiddleLeft, ThemeColors.TextBody, 26f);
+        RuntimeUi.MakeLabel(col, label, TextRole.Body, TextAnchor.MiddleLeft, ThemeColors.TextBody);
         RuntimeUi.MakeSlider(col, OperatorMath.ToSlider(value, lo, hi), t => apply(OperatorMath.FromSlider(t, lo, hi)));
     }
 
