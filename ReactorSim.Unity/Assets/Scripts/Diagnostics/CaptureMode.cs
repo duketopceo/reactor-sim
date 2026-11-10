@@ -191,43 +191,44 @@ public class CaptureMode : MonoBehaviour
                 yield return Panel("clipboard", FindAnyObjectByType<ProcedureClipboard>(), "Open", "Close");
                 break;
             case "gallery":
-                var hall = HallVisibility.FindHall();
-                if (hall == null) { Skip(pose, "no ReactorHall object in the scene"); break; }
-                op.CaptureLookAt(HallFocus(hall), 60f);
+                // The window seen from the nearest quick-travel stand, wide: the same camera in a run with and without the new
+                // hall, so the frame-time and draw-call difference is the hall.
+                var glass = WindowGlass();
+                if (glass == null) { Skip(pose, "no window in the scene"); break; }
+                op.CaptureLookAt(glass.bounds.center, 60f);
                 yield return Shot("gallery", "gallery", 30, 0.6f, null);
-                break;
-            case "hall":
-                // Close view of the module for the owner to judge (not graded): narrow field of view, same stand as the gallery pose.
-                var hallNear = HallVisibility.FindHall();
-                if (hallNear == null) { Skip(pose, "no ReactorHall object in the scene"); break; }
-                op.CaptureLookAt(HallFocus(hallNear), 30f);
-                yield return Shot("hall", "hall-close", 30, 0.6f, null);
                 break;
             case "away":
                 // Same stand as the gallery pose but looking the other way, so the window is out of the frustum: the frame time
                 // here against the same pose on a baseline run is what the hall costs while it cannot be seen.
-                var hallAway = HallVisibility.FindHall();
-                if (hallAway == null) { Skip(pose, "no ReactorHall object in the scene"); break; }
-                Vector3 focus = HallFocus(hallAway);
-                op.CaptureLookAt(focus, 60f);
+                var glassAway = WindowGlass();
+                if (glassAway == null) { Skip(pose, "no window in the scene"); break; }
+                Vector3 window = glassAway.bounds.center;
+                op.CaptureLookAt(window, 60f);
                 yield return Frames(5);
-                Vector3 eye = Camera.main != null ? Camera.main.transform.position : focus;
-                op.CaptureLookAt(eye + new Vector3(eye.x - focus.x, 0f, eye.z - focus.z), 60f);
+                Vector3 eye = Camera.main != null ? Camera.main.transform.position : window;
+                op.CaptureLookAt(eye + new Vector3(eye.x - window.x, 0f, eye.z - window.z), 60f);
                 yield return Shot("away", "gallery-away", 30, 0.6f, null);
+                break;
+            case "hall":
+                // Standing at the window looking down at the module, for the owner to judge (not graded).
+                var glassNear = WindowGlass();
+                var hallNear = HallVisibility.FindHall();
+                Transform marker = hallNear != null ? hallNear.transform.Find("GalleryFocus") : null;
+                if (glassNear == null || marker == null) { Skip(pose, "no window or no hall gallery focus in the scene"); break; }
+                Vector3 centre = glassNear.bounds.center;
+                Vector3 toRoom = centre - marker.position;
+                toRoom.y = 0f;
+                op.CaptureAt(centre + toRoom.normalized * 1.3f, marker.position, 55f);
+                yield return Shot("hall", "hall-close", 30, 0.6f, null);
                 break;
         }
     }
 
-    // The point the gallery pose looks at: the hall's GalleryFocus marker when it has one, else the middle of its renderers.
-    private static Vector3 HallFocus(GameObject hall)
+    private static Renderer WindowGlass()
     {
-        Transform marker = hall.transform.Find("GalleryFocus");
-        if (marker != null) return marker.position;
-        var rs = hall.GetComponentsInChildren<Renderer>(true);
-        if (rs.Length == 0) return hall.transform.position;
-        Bounds b = rs[0].bounds;
-        foreach (var r in rs) b.Encapsulate(r.bounds);
-        return b.center;
+        GameObject g = GameObject.Find("Window_Glass");
+        return g != null ? g.GetComponent<Renderer>() : null;
     }
 
     // A panel is opened through its own method (they are private on some), captured, then closed again.
@@ -277,7 +278,7 @@ public class CaptureMode : MonoBehaviour
         yield return Frames(settleFrames);
         if (settleSeconds > 0f) yield return new WaitForSecondsRealtime(settleSeconds);
         FrameMetrics.Reset();
-        yield return Frames(30);   // frames the percentiles are taken over
+        yield return Frames(120);   // frames the percentiles are taken over (a short window is dominated by one slow frame)
         yield return new WaitForEndOfFrame();
 
         var tex = ScreenCapture.CaptureScreenshotAsTexture();

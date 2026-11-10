@@ -373,6 +373,18 @@ public class OperatorController : MonoBehaviour
         fovTarget = Mathf.Clamp(fov, minFov, maxFov);
     }
 
+    /// <summary>Capture only: stands at a floor position and looks at a point with the given field of view.</summary>
+    public void CaptureAt(Vector3 floorPos, Vector3 lookAt, float fov)
+    {
+        seated = false;
+        Teleport(floorPos);
+        ResetLook(yaw);
+        Vector3 d = lookAt - EyePosition();
+        yaw = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg;
+        pitch = OperatorMath.ClampPitch(-Mathf.Atan2(d.y, new Vector2(d.x, d.z).magnitude) * Mathf.Rad2Deg);
+        fovTarget = Mathf.Clamp(fov, minFov, maxFov);
+    }
+
     /// <summary>Current vertical field of view (degrees) and eye position, for the capture measurements.</summary>
     public float CurrentFov { get { return cam != null ? cam.fieldOfView : defaultFov; } }
 
