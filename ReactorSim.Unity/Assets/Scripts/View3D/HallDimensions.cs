@@ -10,17 +10,17 @@ namespace ReactorSim
     {
         // ---- pool and gallery ----
         public static readonly float WaterDepth = 22.0f;            // water surface above the pool floor
-        public static readonly float DeckAboveWater = 0.30f;         // hall deck (pool rim) above the water
-        public static readonly float PoolRadius = 6.5f;
+        public static readonly float DeckAboveWater = 0.15f;         // hall deck (pool rim) above the water: a low coaming, so it hides as little of the module as it can
+        public static readonly float PoolRadius = 11.0f;
         public static readonly float HallRadius = 15.0f;             // circular hall, concrete wall
-        // Standing eye height over the water surface. Low on purpose: from the standing and seated spots the window can only
-        // look down about 15 to 20 degrees, so the water the player should see has to lie inside that reach (see HallSightline).
+        // Standing eye height over the water surface. Low enough that the window's 15 to 20 degree downward reach still takes in
+        // the module head, high enough that the near pool rim does not hide it (see HallSightline.RimVisibleHeight).
         public static readonly float GalleryEyeAboveWater = 2.2f;
         public static readonly float EyeAboveRoomFloor = 1.6f;
         /// <summary>Control-room floor above the pool floor.</summary>
         public static readonly float RoomFloorAbovePoolFloor = WaterDepth + GalleryEyeAboveWater - EyeAboveRoomFloor;
         /// <summary>Horizontal distance from the window wall to the pool axis.</summary>
-        public static readonly float PoolAxisFromWall = 10.0f;
+        public static readonly float PoolAxisFromWall = 13.0f;
 
         // ---- observation window (south wall) and the control-room anchors that look through it ----
         public static readonly float WindowWidth = 4.0f;
@@ -28,14 +28,17 @@ namespace ReactorSim
         public static readonly float WindowHeight = 2.3f;
         public static readonly float WindowOffsetFromDoor = 3.0f;    // opening centre, along the wall from the door centre
         public static readonly float HeaderMinWall = 0.3f;           // wall the builder keeps above the opening
-        public static readonly float VesselShiftX = 1.2f;            // pool axis, from the window centre along the wall (towards the seat side)
+        public static readonly float VesselShiftX = 2.2f;            // pool axis, from the window centre along the wall (towards the seat side)
         public static readonly float StandEyeHeight = 1.65f;         // OperatorMath.StandingEyeHeight
+        public static readonly float SeatEyeHeight = 1.2f;           // OperatorMath.SeatedEyeHeight: the eye the player really has in the chair
         public static readonly float StandBackFromWall = 4.5f;       // STAND_Center distance from the window wall
-        public static readonly float SeatBackFromWall = 6.1f;        // seat distance from the window wall (the seat view uses the standing eye height)
+        public static readonly float SeatBackFromWall = 6.1f;        // seat distance from the window wall (the seat view uses the seated eye height)
         public static readonly float StandAlongWall = -3.0f;         // stand position along the wall, from the window centre
         public static readonly float SeatAlongWall = 0.49f;          // seat position along the wall, from the window centre
-        public static readonly float SightMarginDeg = 1.0f;          // the module must sit this far inside the opening's vertical reach
+        public static readonly float SightMarginDeg = 3.0f;          // the module must sit this far inside the opening's vertical reach
         public static readonly float SightEdgeMargin = 0.25f;        // and this far (m) inside the opening's side edges
+        public static readonly float HeadDomeHeight = 1.2f;          // height of the containment head's dome above its shoulder line
+        public static readonly float HeadVisibleMargin = 0.3f;       // the module must show this much more than the dome above the pool rim, from the stand and the seat
 
         // ---- reactor module (vessel inside containment, both standing on the pool floor) ----
         public static readonly float VesselDiameter = 2.7f;
@@ -43,7 +46,7 @@ namespace ReactorSim
         public static readonly float VesselHeight = 18.8f;           // overall, lower head to upper head
         public static readonly float ContainmentDiameter = 4.5f;
         public static readonly float ContainmentBase = 0.6f;
-        public static readonly float ContainmentHeight = 20.6f;      // overall, base to head
+        public static readonly float ContainmentHeight = 20.85f;      // overall, base to head
         public static readonly int PumpHousingCount = 4;             // canned recirculation pump motors on the vessel (pumped integral design)
 
         public static float VesselTop { get { return VesselBase + VesselHeight; } }
@@ -64,7 +67,7 @@ namespace ReactorSim
         public static readonly float RackHazeLength = 3.6f;          // haze cone above the rack top, kept under the surface
 
         // ---- crane (parked behind the pool, out of the sight line to the module) ----
-        public static readonly float CraneBridgeZ = 9.0f;            // bridge centre in hall space (+z is away from the window)
+        public static readonly float CraneBridgeZ = 10.0f;           // bridge centre in hall space (+z is away from the window)
         public static readonly float CraneRailAboveDeck = 5.2f;      // rail height over the hall deck
         public static readonly float HallCeilingAboveDeck = 10.0f;   // hall ceiling over the deck: clears the trolley and motor on the crane
 
@@ -95,6 +98,8 @@ namespace ReactorSim
             if (MaxRealtimeLights > 4) bad.Add("more than 4 real lights on the hall layer exceeds the default pixel-light count");
             if (HallCeilingAboveDeck < CraneRailAboveDeck + 3.5f) bad.Add("the hall ceiling is lower than the top of the crane trolley");
             if (WindowSill >= StandEyeHeight) bad.Add("the window sill is above the standing eye");
+            if (WindowSill >= SeatEyeHeight) bad.Add("the window sill is above the seated eye");
+            if (PoolAxisFromWall - PoolRadius < 1.0f) bad.Add("the deck between the window wall and the pool edge is under 1 m");
             bad.AddRange(HallSightline.CheckWindowReach());
             return bad;
         }

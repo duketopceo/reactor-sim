@@ -315,7 +315,7 @@ public static class ControlRoomSceneBuilder
         WindowHeight = HallDimensions.WindowHeight, WindowOffsetFromDoor = HallDimensions.WindowOffsetFromDoor;
     // The standing viewpoint (STAND_Center) and the seat sit 3.5 m apart along the wall, so a pool straight behind the
     // window looks well off to one side from the stand. The pool is moved toward the stand sightline (VesselShiftX, from the
-    // window centre) and pulled close to the wall (PoolDepth) so one position reads reasonably centred from both.
+    // window centre) and set back by HallDimensions.PoolAxisFromWall so one position reads reasonably centred from both.
     private static readonly float VesselShiftX = HallDimensions.VesselShiftX;
     private const int IgnoreRaycastLayer = 2;
     // Unnamed user layer for the reactor hall (culling only; no TagManager change). Hall lights light only this layer,

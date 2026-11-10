@@ -16,6 +16,49 @@ namespace ReactorSim.Core.Tests
         }
 
         [Fact]
+        public void TheModuleHeadClearsThePoolRimFromTheStandAndTheSeat()
+        {
+            double need = HallDimensions.HeadDomeHeight + HallDimensions.HeadVisibleMargin;
+            Assert.True(HallSightline.RimVisibleHeight(HallSightline.Stand()) >= need);
+            Assert.True(HallSightline.RimVisibleHeight(HallSightline.Seat()) >= need);
+        }
+
+        [Fact]
+        public void RimHiddenBelowMatchesAHandCalculationAndMovesTheRightWay()
+        {
+            // stand eye 22 + 2.2 - 1.6 + 1.65 = 24.25 m over the floor, rim 22.15 m, rim 4.5 + 13 - 11 = 6.5 m out, pool radius 11 m past it
+            Assert.Equal(22.15 - (24.25 - 22.15) * 11.0 / 6.5, HallSightline.RimHiddenBelow(HallSightline.Stand()), 2);
+            // seated eye 22 + 2.2 - 1.6 + 1.2 = 23.8 m, rim 6.1 + 13 - 11 = 8.1 m out
+            Assert.Equal(22.15 - (23.8 - 22.15) * 11.0 / 8.1, HallSightline.RimHiddenBelow(HallSightline.Seat()), 2);
+        }
+
+        [Fact]
+        public void TheSeatUsesTheRealSeatedEye()
+        {
+            Assert.Equal(1.2, HallSightline.Seat().eyeHeight, 6);
+            Assert.True(HallSightline.ReachMarginDeg(HallSightline.Seat(), HallDimensions.SightTargetHeight) >= HallDimensions.SightMarginDeg);
+        }
+
+        [Fact]
+        public void TheFirstPr6NumbersFailTheSeatedEyeCheck()
+        {
+            // negative control: gallery eye 3.0 m, pool axis 12 m, head top 21.4 m. Seated eye is 2.6 m over the water: reach atan(1.15 / 6.1) = 10.7 deg
+            // against a 3.2 m drop over 18.1 m = 10.0 deg to the head, so the margin is 0.7 deg, under the 3 deg the window must leave.
+            double reach = HallSightline.OpeningDownReachDeg(1.2, 0.05, 6.1);
+            double needed = HallSightline.DownAngleDeg(2.6 + 0.6, 6.1 + 12.0);
+            Assert.True(reach - needed < HallDimensions.SightMarginDeg, $"margin {reach - needed:0.0} deg should be under {HallDimensions.SightMarginDeg} deg");
+        }
+
+        [Fact]
+        public void ThePr4PoolAndGalleryNumbersLeftTheHeadBehindTheRim()
+        {
+            // PR4: rim 0.3 m over the water, pool radius 6.5 m, eye 2.2 m over the water, head top 21.2 m over the floor. Same maths, old inputs.
+            double eye = 22.0 + 2.2, rimTop = 22.3, toAxis = 6.1 + 10.0, toRim = toAxis - 6.5;
+            double hiddenBelow = rimTop - (eye - rimTop) * 6.5 / toRim;
+            Assert.True(21.2 - hiddenBelow < HallDimensions.HeadDomeHeight, "the PR4 seat view shows less than the head dome over the rim");
+        }
+
+        [Fact]
         public void TheOldPr2NumbersFailTheSameCheck()
         {
             // PR2: sill 0.35 m, gallery eye 9 m over the water, pool axis 11 m from the wall, stand 4.5 m back

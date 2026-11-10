@@ -4,13 +4,13 @@ An original, deterministic pressurized-water-reactor (PWR) plant simulator. A pu
 control room you can walk around in, and procedurally generated Blender assets. Educational entertainment: the
 physics is built from published reactor engineering, but it is a game, not a licensed training simulator.
 
-![Standing in the control room: annunciators, gauges, CRT pages and switch gear on curved panels](docs/media/control-room-standing.png)
+![Standing in the control room: hanging section signs, gauges, CRT pages and switch gear on the curved panel wall](docs/media/control-room-standing.png)
 
-| Window onto the reactor hall (standing) | Window onto the reactor hall (seated) |
+| Observation window, from the standing position | Observation window, from the seat (seated eye height) |
 |---|---|
-| ![Observation window with the reactor vessel head and refuelling pool beyond](docs/media/hall-window-standing.png) | ![The same window from the operator's chair](docs/media/hall-window-seated.png) |
+| ![Through the observation window: the domed containment head and upper shoulder of the reactor module just under the pool water at the lower left, a steam stub, the gallery railing and the parked overhead crane](docs/media/hall-window-standing.png) | ![The same window from a camera at the seat position at seated eye height: the whole dome of the module head and a steam stub past the gallery railing, with the crane and hall wall behind](docs/media/hall-window-seated.png) |
 
-![Top-down view of the control room layout](docs/media/control-room-top.png)
+![Top-down view of the control room: the console arc and the coloured section markers on the floor](docs/media/control-room-top.png)
 
 ## What is in it
 
@@ -25,8 +25,9 @@ physics is built from published reactor engineering, but it is a game, not a lic
   vacuum, hotwell and feed, cooling tower, latched trips.
 - **Guided startup.** A 13-step cold-shutdown-to-grid procedure with named done-conditions evaluated against live
   plant state ([docs/STARTUP.md](docs/STARTUP.md)).
-- **Control room.** Diegetic switches, gauges, annunciators and CRT pages, with an observation window onto the
-  reactor hall; procedural audio; LAN co-op over TCP.
+- **Control room.** Diegetic switches, gauges, annunciators and CRT pages, with an observation window onto a
+  true-scale small-modular-reactor module in a 22 m deep refuelling pool (its head is checked to show over the pool
+  rim from both the standing and the seated eye in `HallSightline`); procedural audio; LAN co-op over TCP.
 - **Tooling.** JSON snapshots, an intent pipeline, an HTTP API, an stdio MCP bridge, JSONL logging and golden
   replay.
 
