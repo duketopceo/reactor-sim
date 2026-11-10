@@ -149,10 +149,13 @@ public class CaptureMode : MonoBehaviour
             case "crt":
                 var screens = new List<CrtScreenRenderer>(FindObjectsByType<CrtScreenRenderer>(FindObjectsSortMode.None));
                 screens.Sort((a, b) => string.CompareOrdinal(a.screenName, b.screenName));
+                string lastPage = null;
                 foreach (var crt in screens)
                 {
                     var r = crt.GetComponent<Renderer>();
                     if (r == null) continue;
+                    if (crt.screenName == lastPage) continue;   // pages shared by several faces (STANDBY) are shot once
+                    lastPage = crt.screenName;
                     op.CaptureLookAt(r.bounds.center, 28f);
                     yield return Shot("crt", "crt-" + crt.screenName, 30, 0.6f, crt);
                 }

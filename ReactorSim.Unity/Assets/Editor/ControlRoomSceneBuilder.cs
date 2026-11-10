@@ -483,8 +483,8 @@ public static class ControlRoomSceneBuilder
     public const float RoomLightRange = RoomLighting.KeyRange;
 
     // A monitor face that no CRT_ page owns (an out-of-service screen kit: its mesh keeps the exported screen material but
-    // has no CRT_ name) would be an empty dark pane: it gets a renderer on the standby page instead, so every screen in
-    // the room shows something deliberate. Counter windows ("Digit...") keep their own display.
+    // is named OOS_Part_crt_*) would be an empty dark pane: it gets a renderer on the standby page instead, so every screen in
+    // the room shows something deliberate.
     public const string StandbyScreenName = "STANDBY";
     private static void AttachStandbyScreens(GameObject root, PlantBridge bridge)
     {
@@ -492,7 +492,8 @@ public static class ControlRoomSceneBuilder
         foreach (var r in root.GetComponentsInChildren<MeshRenderer>(true))
         {
             string nm = r.gameObject.name;
-            if (nm.StartsWith("CRT_") || nm.StartsWith("Digit")) continue;
+            // Only the out-of-service screen kits (OOS_Part_crt_*): counter windows and lamps share the screen material.
+            if (!nm.StartsWith("OOS_Part_crt_")) continue;
             if (r.GetComponentInParent<CrtScreenRenderer>() != null) continue;
             bool screen = false;
             foreach (var m in r.sharedMaterials)
