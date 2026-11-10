@@ -121,7 +121,8 @@ rail (within about a metre) to see the pool; from across the room the window sho
   at rated power). Real spent-fuel Cherenkov light comes from the fuel's own decay, not from current reactor power, so this
   scaling is a visual cue for the player, not a physics claim.
 - **Performance.** The hall switches itself off when the window is out of view. Its budget (checked against a baseline run, see
-  below) is at most 4 ms of added frame time at p95, at most 120 added draw calls, and a p99 of 12 ms or less at 1920x1080.
+  below, for every captured size) is at most 4 ms of added frame time at p95, at most 120 added draw calls, a p99 of 12 ms or
+  less in the gallery pose, and at most 1 ms of added p95 while the window is out of view.
 
 ### Capturing the hall
 
@@ -133,7 +134,8 @@ bash scripts/check-captures.sh <dir> --only glowoff,glowidle,glowmid,glowfull --
 bash scripts/check-captures.sh <dir> --baseline <baseline dir> --budget-only                                   # runtime budget
 ```
 
-The baseline is a run of the same poses on a build from before the hall change. Frame time on a shared machine is noisy (the
+The baseline is a run of the same poses on a build with the old hall: the commit before the hall build, with the capture poses
+(`gallery`, `away`) added to it, because those poses do not exist in older builds. Frame time on a shared machine is noisy (the
 same build has measured between 5.7 and 15.6 ms at p95 in different runs), so run the budget check on a quiet machine, and
 compare runs made back to back.
 

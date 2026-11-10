@@ -43,6 +43,16 @@ expect 1 "draw calls over budget fail" "$tmp/draws" --baseline "$tmp/base" --bud
 expect 1 "gallery p99 over 12 ms fails" "$tmp/p99" --baseline "$tmp/base" --budget-only
 expect 1 "out-of-view cost over 1 ms fails" "$tmp/away" --baseline "$tmp/base" --budget-only
 expect 1 "unavailable draw counter fails" "$tmp/nodraw" --baseline "$tmp/base" --budget-only
+mkdir -p "$tmp/nop95/1600x900"
+head -c 30000 /dev/zero > "$tmp/nop95/1600x900/g.png"
+cat > "$tmp/nop95/1600x900/captures.json" <<EOF
+{"captures":[
+ {"pose":"gallery","label":"gallery","file":"g.png","drawCalls":100},
+ {"pose":"away","label":"gallery-away","file":"g.png","drawCalls":50}
+]}
+EOF
+expect 1 "missing frame-time percentiles fail instead of passing" "$tmp/nop95" --baseline "$tmp/base" --budget-only
+expect 2 "an empty --only list is a usage error" "$tmp/inside" --only ""
 expect 2 "budget-only without a baseline is a usage error" "$tmp/inside" --budget-only
 
 # rack glow cases: mkglow <dir> <off> <idle> <mid> <full>

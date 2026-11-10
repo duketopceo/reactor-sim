@@ -31,15 +31,15 @@ ALLOW_SKIP=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --budget-only) BUDGET_ONLY=1; shift ;;
-    --only) [ $# -ge 2 ] || { echo "--only needs a pose list" >&2; exit 2; }; ONLY="${2//,/ }"; shift 2 ;;
+    --only) [ $# -ge 2 ] || { echo "--only needs a pose list" >&2; exit 2; }; ONLY="${2//,/ }"; [ -n "${ONLY// /}" ] || { echo "--only needs at least one pose" >&2; exit 2; }; shift 2 ;;
     --baseline) [ $# -ge 2 ] || { echo "--baseline needs a directory" >&2; exit 2; }; BASELINE="$2"; shift 2 ;;
     --allow-skip) [ $# -ge 2 ] || { echo "--allow-skip needs a value" >&2; exit 2; }; ALLOW_SKIP="$2"; shift 2 ;;
-    -h|--help) sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "unknown option: $1" >&2; exit 2 ;;
     *) [ -z "$DIR" ] || { echo "one directory only" >&2; exit 2; }; DIR="$1"; shift ;;
   esac
 done
-[ -n "$DIR" ] && [ -d "$DIR" ] || { echo "usage: check-captures.sh <dir> [--allow-skip pose,pose] [--baseline <dir>]" >&2; exit 2; }
+[ -n "$DIR" ] && [ -d "$DIR" ] || { echo "usage: check-captures.sh <dir> [--allow-skip pose,pose] [--only pose,pose] [--baseline <dir> [--budget-only]]" >&2; exit 2; }
 [ -z "$BUDGET_ONLY" ] || [ -n "$BASELINE" ] || { echo "--budget-only needs --baseline" >&2; exit 2; }
 [ -z "$BUDGET_ONLY" ] || REQUIRED_POSES="gallery away"
 [ -z "$ONLY" ] || REQUIRED_POSES="$ONLY"
@@ -159,6 +159,10 @@ for size in sizes:
         continue
     bg, ng = base[(size, "gallery")], new[(size, "gallery")]
     ba, na = base[(size, "away")], new[(size, "away")]
+    missing = [k for c in (bg, ng, ba, na) for k in ("frameMsP95", "frameMsP99") if k not in c]
+    if missing:
+        problems.append("%s: frame-time percentiles missing from a gallery capture, the budget cannot be graded" % size)
+        continue
     d95 = ng.get("frameMsP95", 0) - bg.get("frameMsP95", 0)
     dda = ng.get("drawCalls", -1) - bg.get("drawCalls", -1)
     dav = na.get("frameMsP95", 0) - ba.get("frameMsP95", 0)
