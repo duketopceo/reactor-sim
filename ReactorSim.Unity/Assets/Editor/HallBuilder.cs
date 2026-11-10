@@ -6,8 +6,8 @@ using ReactorSim;
 // Builds the reactor hall behind the control-room window (U6): a circular hall with a deep pool, the integral SMR module (see
 // SmrModuleMesh) standing in it, tinted water as stacked translucent layers, a polar crane, cable trays and hall lights.
 // Everything is collider-free original geometry on HallLayer under one "ReactorHall" root, plus a separate frustum gate object
-// (HallVisibility) that switches the root off when the window is out of view. The room is 29 m above the pool floor, so the
-// window looks down about 9 m onto the water.
+// (HallVisibility) that switches the root off when the window is out of view. The room floor sits just above the hall deck (see
+// HallDimensions.GalleryEyeAboveWater), so the window looks down only a couple of metres onto the water.
 //
 // Local hall space: origin on the pool axis at the pool floor, y up, the control-room window towards -z. The root is placed and
 // turned so that local -z points at the room. All numbers come from HallDimensions.
@@ -24,7 +24,7 @@ public static class HallBuilder
 
         float D = HallDimensions.PoolAxisFromWall, Rh = HallDimensions.HallRadius, Rp = HallDimensions.PoolRadius;
         float water = HallDimensions.WaterDepth, deckY = water + HallDimensions.DeckAboveWater;
-        float roomFloorLocal = HallDimensions.RoomFloorAbovePoolFloor, ceilY = roomFloorLocal + 6f;
+        float roomFloorLocal = HallDimensions.RoomFloorAbovePoolFloor, ceilY = deckY + HallDimensions.HallCeilingAboveDeck;
 
         var root = new GameObject(RootName);
         root.transform.position = new Vector3(cx, roomFloorY - roomFloorLocal, zOuter + dir * D);

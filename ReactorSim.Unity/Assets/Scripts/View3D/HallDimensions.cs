@@ -66,6 +66,7 @@ namespace ReactorSim
         // ---- crane (parked behind the pool, out of the sight line to the module) ----
         public static readonly float CraneBridgeZ = 9.0f;            // bridge centre in hall space (+z is away from the window)
         public static readonly float CraneRailAboveDeck = 5.2f;      // rail height over the hall deck
+        public static readonly float HallCeilingAboveDeck = 10.0f;   // hall ceiling over the deck: clears the trolley and motor on the crane
 
         // ---- budgets (KTD9). The graded copies live in scripts/check-captures.sh; these are the build-time sanity limits ----
         public static readonly int MaxRealtimeLights = 4;            // the default pixel-light count: every real light on the hall layer is a pixel light
@@ -92,6 +93,7 @@ namespace ReactorSim
             if (RackLedgeHeight + RackCellHeight + RackHazeLength >= WaterDepth) bad.Add("the rack haze would poke above the water");
             if (RackLights < 1 || RackLights > 2) bad.Add("the racks need one or two real lights");
             if (MaxRealtimeLights > 4) bad.Add("more than 4 real lights on the hall layer exceeds the default pixel-light count");
+            if (HallCeilingAboveDeck < CraneRailAboveDeck + 3.5f) bad.Add("the hall ceiling is lower than the top of the crane trolley");
             if (WindowSill >= StandEyeHeight) bad.Add("the window sill is above the standing eye");
             bad.AddRange(HallSightline.CheckWindowReach());
             return bad;

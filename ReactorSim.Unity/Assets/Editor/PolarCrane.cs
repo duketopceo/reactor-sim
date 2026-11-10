@@ -4,7 +4,8 @@ using ReactorSim;
 // Polar crane for the reactor hall (original geometry): a rail band running round the hall wall, a two-girder bridge spanning
 // the hall on end trucks, a trolley with a hoist drum, and a short hoist cable to a lifting block. Static: the crane is PARKED
 // behind the pool (as seen from the window, at HallDimensions.CraneBridgeZ) with the trolley at one end and the block raised, so
-// no girder, cable or block crosses the view of the module from the control room. HallSightline.CraneBox mirrors these numbers.
+// no girder, cable or block lies across the view of the module from the control room (the crane sits above the horizon of the
+// stand and seat, the module below it). HallSightline.CraneBox mirrors these numbers.
 // Local hall space: origin on the pool axis at the pool floor, y up.
 public static class PolarCrane
 {

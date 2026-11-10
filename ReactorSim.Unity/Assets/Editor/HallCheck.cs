@@ -140,7 +140,7 @@ public static class HallCheck
     }
 
     // PR4: the window the stand and seat look through is as wide and as low as the sight-line maths assumes, and the parked crane
-    // (read from the built meshes, in hall space) crosses no sight line from either viewpoint to the module.
+    // (read from the built meshes, in hall space) is out of the way of every sight line from either viewpoint down to the module and the pool.
     private static int CheckWindowAndCrane()
     {
         var hall = GameObject.Find(HallBuilder.RootName);
@@ -169,7 +169,7 @@ public static class HallCheck
         {
             var box = new[] { lo, hi };
             f += Report(HallSightline.CraneClearOfModule(HallSightline.Stand(), box) && HallSightline.CraneClearOfModule(HallSightline.Seat(), box),
-                $"the built crane (z {lo[2]:0.0}..{hi[2]:0.0}, y {lo[1]:0.0}..{hi[1]:0.0}) crosses no sight line to the module from the stand or the seat");
+                $"the built crane (z {lo[2]:0.0}..{hi[2]:0.0}, y {lo[1]:0.0}..{hi[1]:0.0}) is clear of the sight lines down to the module from the stand and the seat");
         }
         return f;
     }

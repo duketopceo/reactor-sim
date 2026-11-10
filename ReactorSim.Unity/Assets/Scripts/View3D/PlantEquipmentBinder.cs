@@ -4,7 +4,7 @@ using ReactorSim.Instruments;
 
 // Phase 2 plant equipment binder (N4): drives hall and containment-side motion from PlantSnapshot.
 // Flywheel_PrimaryFlow spins with PrimaryFlowFrac, the spent-fuel racks glow with power (RackGlow_* objects: cells, haze cones
-// and capped point lights, all through GlowMapping from the power FRACTION), PORV steam anchor activates when ReliefOpen,
+// and one shared point light, all through GlowMapping from the power FRACTION), PORV steam anchor activates when ReliefOpen,
 // RPV CRDM rods track BankInsertion. The rack glow is a labelled visual cue, not a physics claim (see GlowMapping).
 public class PlantEquipmentBinder : MonoBehaviour
 {
