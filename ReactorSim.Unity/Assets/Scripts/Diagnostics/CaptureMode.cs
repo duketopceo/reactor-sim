@@ -197,6 +197,18 @@ public class CaptureMode : MonoBehaviour
             case "clipboard":
                 yield return Panel("clipboard", FindAnyObjectByType<ProcedureClipboard>(), "Open", "Close");
                 break;
+            case "bar":
+            case "dial":
+                // Close-up of the first bar meter or circular dial, to read its numerals.
+                string prefix = pose == "bar" ? "BIND_BAR_" : "BIND_GAUGE_";
+                Transform found = null;
+                foreach (var tr in FindObjectsByType<Transform>(FindObjectsSortMode.None))
+                    if (tr.name.StartsWith(prefix) && (found == null || string.CompareOrdinal(tr.name, found.name) < 0)
+                        && (pose == "bar" || GaugeNumerals.FaceWidth(tr) > 0f)) found = tr;
+                if (found == null) { Skip(pose, "no " + pose + " meter in the scene"); break; }
+                op.CaptureLookAt(found.position, pose == "bar" ? 30f : 35f);
+                yield return Shot(pose, pose, 30, 0.5f, null);
+                break;
             case "gallery":
                 // The window seen from the nearest quick-travel stand, wide: the same camera in a run with and without the new
                 // hall, so the frame-time and draw-call difference is the hall.
