@@ -271,12 +271,12 @@ namespace ReactorSim.Instruments
                     break;
                 case "CRT_AssistantTerminal":
                     p = Begin("ASSISTANT", s, clock);
-                    Body(p, "TIER " + s.AssistTier + "  MISSION " + s.ActiveMissionIndex);
+                    Body(p, "ASSIST LEVEL " + s.AssistTier);
                     if (terminalLines == null || terminalLines.Count == 0)
-                        Body(p, "> all quiet.");
+                        Body(p, "- ALL QUIET");
                     else
                         for (int i = Math.Max(0, terminalLines.Count - 5); i < terminalLines.Count; i++)
-                            Body(p, "> " + terminalLines[i]);
+                            Body(p, "- " + terminalLines[i]);
                     break;
                 case "CRT_MimicStatusBoard":
                     p = Begin("STATUS", s, clock);

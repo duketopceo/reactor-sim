@@ -82,7 +82,8 @@ public class CrtScreenRenderer : MonoBehaviour
             for (int i = from; i < log.Count; i++)
             {
                 var m = log[i];
-                terminal.Add("[" + ReactorSim.Ui.ReadoutFormat.Number(m.GameMinute, 1) + "m " + m.Category + "] " + m.Finding);
+                // Plain language: the recommended action when there is one, else the finding, never the category tag.
+                terminal.Add(string.IsNullOrEmpty(m.Recommendation) ? m.Finding : m.Recommendation);
             }
         }
     }

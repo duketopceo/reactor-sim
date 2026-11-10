@@ -101,5 +101,21 @@ namespace ReactorSim.Tests
                         Assert.Equal(l.Text.TrimEnd(), l.Text);
                     }
         }
+
+        [Fact]
+        public void AssistantPage_ListsPlainBullets_NotTagsOrMarkupArtifacts()
+        {
+            var trends = new TrendBuffer(10);
+            var quiet = CrtPages.BuildPage("CRT_AssistantTerminal", Running(), new ClockState { Scale = 1.0 }, trends, new string[0]);
+            Assert.Contains(quiet.Lines, l => l.Text == "- ALL QUIET");
+            var busy = CrtPages.BuildPage("CRT_AssistantTerminal", Running(), new ClockState { Scale = 1.0 }, trends,
+                new[] { "Start coolant pumps", "Raise heater power" });
+            string text = busy.ToText();
+            Assert.Contains("- Start coolant pumps", text);
+            Assert.DoesNotContain(") ", text.Replace("RELIEF)", ""));   // a '>' bullet used to be escaped into ')'
+            Assert.DoesNotContain("PROC", text);
+            Assert.DoesNotContain("TIER", text);
+            Assert.DoesNotContain("MISSION ", text);
+        }
     }
 }
