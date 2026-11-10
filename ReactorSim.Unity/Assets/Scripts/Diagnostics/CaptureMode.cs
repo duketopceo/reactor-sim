@@ -228,7 +228,7 @@ public class CaptureMode : MonoBehaviour
                 Vector3 centre = glassNear.bounds.center;
                 Vector3 toRoom = centre - marker.position;
                 toRoom.y = 0f;
-                op.CaptureAt(centre + toRoom.normalized * 2.4f, marker.position, 55f);
+                op.CaptureAt(centre + toRoom.normalized * 0.9f, marker.position, 55f);
                 yield return Shot("hall", "hall-close", 30, 0.6f, null);
                 break;
         }
@@ -248,7 +248,7 @@ public class CaptureMode : MonoBehaviour
         Vector3 centre = glass.bounds.center;
         Vector3 toRoom = centre - focus.position;
         toRoom.y = 0f;
-        op.CaptureAt(centre + toRoom.normalized * 2.4f, focus.position, 45f);
+        op.CaptureAt(centre + toRoom.normalized * 0.9f, focus.position, 45f);
         PlantEquipmentBinder.PowerOverride = power;
         yield return Shot(pose, pose, 40, 0.8f, null, cells);
         PlantEquipmentBinder.PowerOverride = null;
