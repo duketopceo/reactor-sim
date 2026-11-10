@@ -97,8 +97,11 @@ public static class GaugeNumerals
             side = Vector3.left * (BarFaceWidthM * 0.14f);
         }
         float size = BarFaceWidthM * 0.11f;
+        // The unit rides on the maximum only when it fits the strip's width; a long one stays in the tooltip.
+        string maxText = marks[2].Text + (unit.Length == 0 || unit == "%" ? unit : " " + unit);
+        if (maxText.Length > 6) maxText = marks[2].Text;
         Make(parent, kit, marks[0].Text, off + side + ControlRoom3DBinder.KitFaceUp * lo, faceRot, size, BarFaceWidthM, k, ls, ThemeColors.TextInkOnPaper);
-        Make(parent, kit, marks[2].Text + (unit == "%" ? "" : " ") + unit, off + side + ControlRoom3DBinder.KitFaceUp * hi, faceRot, size, BarFaceWidthM, k, ls, ThemeColors.TextInkOnPaper);
+        Make(parent, kit, maxText, off + side + ControlRoom3DBinder.KitFaceUp * hi, faceRot, size, BarFaceWidthM, k, ls, ThemeColors.TextInkOnPaper);
     }
 
     private static void Make(Transform parent, Transform kit, string text, Vector3 localPos, Quaternion rot, float fontSize,
