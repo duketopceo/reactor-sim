@@ -1,0 +1,140 @@
+{
+  "procedures": [
+    {
+      "id": "cold-start-to-grid",
+      "title": "Cold start to grid",
+      "steps": [
+        {
+          "id": "start-rcps",
+          "phase": "A. Lineup",
+          "text": "Start the reactor coolant pumps so water moves through the core before anything heats.",
+          "control": "Primary flow control",
+          "target": "Flow 80 % or more",
+          "rows": ["primary_flow_ctl", "primary_flow_a"],
+          "when": "primary_flow_at_least",
+          "value": 0.8
+        },
+        {
+          "id": "pressurize",
+          "phase": "A. Lineup",
+          "text": "Heaters on. Bring primary pressure up so the water stays liquid when it warms.",
+          "control": "Pressurizer heater control",
+          "target": "Primary pressure 60 bar or more",
+          "rows": ["pzr_heater_ctl", "pzr_heater_pwr", "primary_pressure"],
+          "when": "primary_pressure_at_least",
+          "value": 60
+        },
+        {
+          "id": "draw-vacuum",
+          "phase": "A. Lineup",
+          "text": "Cooling water on and vacuum pump running, so the condenser is ready before any steam exists.",
+          "control": "Vacuum pump knob, cooling water knob",
+          "target": "Condenser 0.3 bar or lower",
+          "rows": ["condenser_pressure", "vacuum_pump_ctl", "cooling_water_ctl", "cooling_water_flow"],
+          "when": "condenser_pressure_at_most",
+          "value": 0.3
+        },
+        {
+          "id": "pull-shutdown-banks",
+          "phase": "B. Approach",
+          "text": "Pull shutdown banks D, C and B fully out. Boron still holds the core subcritical.",
+          "control": "Bank D, C and B levers",
+          "target": "All three banks out (under 5 % inserted)",
+          "rows": ["rod_bank_0_ctl", "rod_bank_1_ctl", "rod_bank_2_ctl", "rod_bank_0_pos", "rod_bank_1_pos", "rod_bank_2_pos"],
+          "when": "shutdown_banks_out",
+          "value": 0.05
+        },
+        {
+          "id": "dilute-boron",
+          "phase": "B. Approach",
+          "text": "Dilute boron down to about 1200 ppm, then stop the dilution. Boron is the slow, coarse control.",
+          "control": "Dilute rate knob",
+          "target": "Boron 1200 ppm or lower, then dilute to zero",
+          "rows": ["dilute_ctl", "boron_ppm"],
+          "when": "boron_at_most",
+          "value": 1200
+        },
+        {
+          "id": "withdraw-bank-a",
+          "phase": "B. Approach",
+          "text": "Withdraw bank A to about half. Move slowly and watch flux between pulls.",
+          "control": "Bank A lever",
+          "target": "Bank A about 50 % inserted or less",
+          "rows": ["rod_bank_3_ctl", "rod_bank_3_pos"],
+          "when": "bank_a_insertion_at_most",
+          "value": 0.5
+        },
+        {
+          "id": "reach-critical",
+          "phase": "B. Approach",
+          "text": "Trim bank A until flux holds steady with a long period. Critical, power above 2 %.",
+          "control": "Bank A lever",
+          "target": "Critical lamp on, power 2 % or more",
+          "rows": ["critical_lamp", "excore_flux", "reactor_period", "core_power_pct"],
+          "when": "critical_power_at_least",
+          "value": 0.02
+        },
+        {
+          "id": "heat-up",
+          "phase": "C. Heat-up and sync",
+          "text": "Heat the primary with the reactor. Keep the steam draw below reactor power while it warms.",
+          "control": "Bank A lever, throttle",
+          "target": "Primary 250 C or hotter",
+          "rows": ["primary_temp_a", "fuel_temp", "steam_demand_ctl", "rod_bank_3_ctl"],
+          "when": "primary_temp_at_least",
+          "value": 250
+        },
+        {
+          "id": "auto-load",
+          "phase": "C. Heat-up and sync",
+          "text": "Turbine governor on auto load, so it follows the grid once synced.",
+          "control": "Auto/manual load switch",
+          "target": "Auto load on",
+          "rows": ["turbine_auto_ctl"],
+          "when": "turbine_auto_load_on",
+          "value": 0
+        },
+        {
+          "id": "roll-turbine",
+          "phase": "C. Heat-up and sync",
+          "text": "Open the throttle in small steps and bring the turbine to rated speed. Trim bank A as you go so the primary holds its heat.",
+          "control": "Throttle handwheel, bank A lever",
+          "target": "Rotor 2940 rpm or more",
+          "rows": ["steam_demand_ctl", "turbine_rpm", "throttle_pos", "rod_bank_3_ctl"],
+          "when": "turbine_rpm_at_least",
+          "value": 2940
+        },
+        {
+          "id": "close-breaker",
+          "phase": "C. Heat-up and sync",
+          "text": "Close the generator breaker inside the sync band. Red lamp on means synced.",
+          "control": "Generator breaker switch",
+          "target": "Breaker closed (red lamp)",
+          "rows": ["gen_breaker_sw", "gen_breaker_red", "gen_breaker_green", "grid_freq"],
+          "when": "generator_synced",
+          "value": 0
+        },
+        {
+          "id": "raise-power",
+          "phase": "D. Power on the grid",
+          "text": "With the generator on the grid, raise power with bank A and boron, and open the throttle in step so steam matches power.",
+          "control": "Bank A lever, dilute knob, throttle",
+          "target": "Power about 40 %",
+          "rows": ["rod_bank_3_ctl", "dilute_ctl", "steam_demand_ctl", "core_power_mwt", "core_power_pct"],
+          "when": "power_at_least",
+          "value": 0.4
+        },
+        {
+          "id": "take-load",
+          "phase": "D. Power on the grid",
+          "text": "Take load on the grid.",
+          "control": "Grid demand knob",
+          "target": "Grid output 20 % or more",
+          "rows": ["grid_demand_ctl", "grid_output", "generator_mw"],
+          "when": "grid_output_at_least",
+          "value": 0.2
+        }
+      ]
+    }
+  ]
+}

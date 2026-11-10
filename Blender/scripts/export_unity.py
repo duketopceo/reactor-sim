@@ -1,0 +1,40 @@
+# Export Blender scenes -> Unity-ready FBX (run headless or GUI inside Blender)
+# Usage: blender -b --python Blender/scripts/export_unity.py [optional -- <blend-name>]
+# Exports ControlRoom, PanelKits, PlantEquipment to Blender/exports/*.fbx
+# Axis: -Z Forward / Y Up (Unity native), meters 1:1 (BTD1/BTD2).
+import bpy
+import os
+import sys
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BLEND_DIR = os.path.dirname(SCRIPT_DIR)
+EXPORT_DIR = os.path.join(BLEND_DIR, "exports")
+os.makedirs(EXPORT_DIR, exist_ok=True)
+
+BLENDS = ["ControlRoom", "PanelKits", "PlantEquipment"]
+
+# Optional CLI filter: -- ControlRoom PanelKits
+args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+if args:
+    BLENDS = [a for a in args if a in BLENDS]
+
+for name in BLENDS:
+    blend_path = os.path.join(BLEND_DIR, name + ".blend")
+    if not os.path.exists(blend_path):
+        print(f"EXPORT_SKIP {name}: {blend_path} not found")
+        continue
+    bpy.ops.wm.open_mainfile(filepath=blend_path)
+    out = os.path.join(EXPORT_DIR, name + ".fbx")
+    bpy.ops.export_scene.fbx(
+        filepath=out,
+        use_selection=False,
+        apply_unit_scale=True,
+        apply_scale_options="FBX_SCALE_ALL",
+        object_types={"EMPTY", "MESH", "LIGHT", "CAMERA"},
+        mesh_smooth_type="FACE",
+        axis_forward="-Z",
+        axis_up="Y",
+        add_leaf_bones=False,
+    )
+    print("EXPORTED", out)
+print("EXPORT_ALL_DONE")

@@ -1,0 +1,11 @@
+{
+  "defaultScale": 10,
+  "minScale": 0.5,
+  "maxScale": 60,
+  "devMaxScale": 600,
+  "autoSlowScale": 3,
+  "autoSlowPeriodSeconds": 60,
+  "autoSlowHoldSeconds": 20,
+  "interactiveTickSeconds": 1,
+  "maxTicksPerAdvance": 240
+}

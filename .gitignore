@@ -1,0 +1,29 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+# Unity (for ReactorSim.Unity when it lands)
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+MemoryCaptures/
+*.csproj.user
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+# Local tools/output
+tools/*.exe
+tools/bin/
+out/
+# Unity workbench artifacts (never committed)
+unity-*.log
+ReactorSim.Unity/Assets/_Recovery/
+.agentflow/
+# Python bytecode from Blender scripts
+__pycache__/

@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "reactor-sim": {
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "/path/to/reactor-sim/ReactorSim.McpBridge/ReactorSim.McpBridge.csproj",
+        "--",
+        "--url",
+        "http://127.0.0.1:7770"
+      ]
+    }
+  }
+}

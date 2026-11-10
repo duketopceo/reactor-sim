@@ -1,0 +1,635 @@
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using ReactorSim.Controls;
+using ReactorSim.Instruments;
+using System.Collections.Generic;
+
+// Control-room scene builder: installs the Blender FBX, camera, audio and CRT renderer components into
+// Bootstrap.unity. Run from menu:  ReactorSim > Build Phase-2 Scene
+// KTD12: every build deletes and re-instances the ControlRoom (and any old PlantEquipment) so a regenerated room
+// always replaces the previous one. PlantEquipment is not part of this scene any more; the only plant geometry is the
+// primitive-built "ReactorHall" seen through the south-wall window (U6), a separate scene root so it never joins the
+// room's bounds, lights or colliders.
+//   - OperatorController + CameraShake on the main camera (tagged MainCamera), AlarmFeedback on the room
+//   - a CrtScreenRenderer on every CRT_* screen mesh (not the *_Glow strip)
+//   - a DiegeticInteractable + fitted BoxCollider on every INT_* control pivot (not its _Knob/_Pointer/_Control
+//     meshes), carrying the inventory row's label and guard flag; out-of-service rows get a hover-only interactable
+//   - COL_* collision proxies become BoxColliders on the Ignore Raycast layer with their renderer disabled: they
+//     block the CharacterController but not the OnMouse* ray
+//   - the imported CAM_* cameras are disabled (RoomRender reads their pose only)
+public static class ControlRoomSceneBuilder
+{
+    private const string ScenePath = "Assets/Scenes/Bootstrap.unity";
+    private const string FbxDir = "Assets/Blender";
+
+    [MenuItem("ReactorSim/Build Phase-2 Scene")]
+    public static void BuildPhase2Scene()
+    {
+        Build(true);
+    }
+
+    /// <summary>Builds the scene hierarchy; when save is false the result stays in memory (used by the checks).</summary>
+    public static UnityEngine.SceneManagement.Scene Build(bool save)
+    {
+        var scene = EditorSceneManager.GetActiveScene();
+        bool needOpen = string.IsNullOrEmpty(scene.path)
+            || (scene.path != ScenePath && !scene.name.Contains("Bootstrap"));
+        if (needOpen)
+        {
+            scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            if (!scene.IsValid())
+            {
+                Debug.LogError("[Phase2SceneBuilder] Bootstrap.unity not found.");
+                return scene;
+            }
+        }
+
+        var crPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(FbxDir + "/ControlRoom.fbx");
+
+        // KTD12: replace, never reuse. (Old PlantEquipment instances go too; the room has no plant geometry.)
+        foreach (var root in scene.GetRootGameObjects())
+            if (root.name == "ControlRoom" || root.name == "PlantEquipment" || root.name == "ReactorHall")
+                Object.DestroyImmediate(root);
+        RemoveMissingScripts(scene);
+
+        GameObject bridgeGo = GameObject.Find("PlantSim");
+        if (bridgeGo == null)
+        {
+            bridgeGo = new GameObject("PlantSim");
+            bridgeGo.AddComponent<PlantBridge>();
+        }
+        var bridge = bridgeGo.GetComponent<PlantBridge>();
+        // U14: handheld operator tablet (Tab). Lives on the PlantSim object beside PlantBridge.
+        if (bridgeGo.GetComponent<OperatorTablet>() == null) bridgeGo.AddComponent<OperatorTablet>();
+
+        var crRoot = new GameObject("ControlRoom");
+        if (crPrefab != null)
+            PrefabUtility.InstantiatePrefab(crPrefab, crRoot.transform);
+        else
+            Debug.LogError("[Phase2SceneBuilder] " + FbxDir + "/ControlRoom.fbx not found.");
+        var binder = crRoot.AddComponent<ControlRoom3DBinder>();
+        binder.bridge = bridge;
+        crRoot.AddComponent<AlarmFeedback>().bridge = bridge;
+        crRoot.AddComponent<ControlTooltip>().binder = binder;   // U17 hover info
+
+        var rows = new Dictionary<string, DesignData.Row>();
+        try
+        {
+            foreach (var r in DesignData.LoadInventory()) rows[r.Id] = r;
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning("[Phase2SceneBuilder] inventory.csv unreadable, controls get no row metadata: " + ex.Message);
+        }
+
+        int collisionBoxes = 0;
+        foreach (Transform t in crRoot.GetComponentsInChildren<Transform>(true))
+        {
+            var importedCam = t.GetComponent<Camera>();
+            if (importedCam != null) importedCam.enabled = false; // imported CAM_* viewpoints must not render over the operator
+            var importedLight = t.GetComponent<Light>();
+            if (importedLight != null) NormaliseRoomLight(importedLight);
+
+            if (t.name.StartsWith("COL_"))
+            {
+                if (MakeCollisionProxy(t)) collisionBoxes++;
+                continue;
+            }
+            if (t.name.StartsWith("CRT_"))
+            {
+                var existing = t.GetComponent<CrtScreenRenderer>();
+                if (t.name.EndsWith("_Glow"))
+                {
+                    if (existing != null) Object.DestroyImmediate(existing);
+                }
+                else if (t.GetComponent<MeshRenderer>() != null)
+                {
+                    if (existing == null) existing = t.gameObject.AddComponent<CrtScreenRenderer>();
+                    existing.bridge = bridge;
+                    existing.screenName = t.name;
+                }
+            }
+            if (!t.name.StartsWith("INT_")) continue;
+
+            var parsed = PivotNameParser.Parse(t.name);
+            if (parsed.Status == ParseStatus.VisualChild) continue; // a mesh under a control pivot, not a control
+            // Ok controls and malformed names both get an interactable so a malformed name is reported at play.
+            FitCollider(t, 0.04f);
+            var inter = t.gameObject.AddComponent<DiegeticInteractable>();
+            inter.binder = binder;
+            DesignData.Row row;
+            var ctl = FindCtlRoot(t);
+            if (ctl != null && rows.TryGetValue(ctl.name.Substring(4), out row))
+            {
+                inter.rowId = row.Id;
+                inter.rowLabel = row.Label;
+                inter.guarded = row["kit"] == "K11" && parsed.Status == ParseStatus.Ok && parsed.Spec.Style == ControlStyle.Button;
+            }
+        }
+
+        // Out-of-service rows (KTD6): placed with a tag and no INT_ pivot. A hover-only interactable on the kit root
+        // says why and refuses clicks.
+        int oos = 0;
+        foreach (var kv in rows)
+        {
+            if (!kv.Value.IsOutOfService) continue;
+            var ctlRoot = FindDeep(crRoot.transform, "CTL_" + kv.Key);
+            if (ctlRoot == null) continue;
+            FitCollider(ctlRoot, 0.04f);
+            var oosInter = ctlRoot.gameObject.AddComponent<DiegeticInteractable>();
+            oosInter.outOfService = true;
+            oosInter.rowId = kv.Key;
+            oosInter.rowLabel = kv.Value.Label;
+            oosInter.outOfServiceReason = kv.Value["readiness"] == "needs_core_model"
+                ? "needs a new plant model (" + kv.Value["phase"] + ")"
+                : "backend binding pending (" + kv.Value["phase"] + ")";
+            oos++;
+        }
+        Debug.Log("[Phase2SceneBuilder] " + collisionBoxes + " collision proxies, " + oos + " out-of-service rows tagged.");
+
+        // U14: indicators have no collider of their own. Each bound gauge row's CTL_ root gets a hover-only collider
+        // and a pinnable DiegeticInteractable so OperatorTablet's right-click ray can find it (binding gauge:<Name>[:<index>]).
+        int pinnable = 0;
+        foreach (var kv in rows)
+        {
+            var row = kv.Value;
+            if (row.IsOutOfService || row["role"] != "indicator") continue;
+            string[] bind = row["binding"].Split(':');
+            if (bind.Length < 2 || bind[0] != "gauge" || GaugeSources.Find(bind[1]) == null) continue;
+            var ctlRoot = FindDeep(crRoot.transform, "CTL_" + kv.Key);
+            if (ctlRoot == null || ctlRoot.GetComponent<DiegeticInteractable>() != null) continue;
+            FitCollider(ctlRoot, 0.04f);
+            var pin = ctlRoot.gameObject.AddComponent<DiegeticInteractable>();
+            pin.pinnable = true;
+            pin.rowId = kv.Key;
+            pin.rowLabel = row.Label;
+            pin.pinSelector = bind[1];
+            int idx;
+            pin.pinIndex = bind.Length > 2 && int.TryParse(bind[2], out idx) ? idx : -1;
+            pinnable++;
+        }
+        Debug.Log("[Phase2SceneBuilder] " + pinnable + " indicator rows made pinnable.");
+
+        // U6: window in the south wall beside the door, and the reactor hall beyond it (primitives, no Blender asset).
+        BuildReactorWindow(crRoot.transform);
+
+        // U16: procedure clipboards on the bench in front of each chair (children of crRoot, so a rebuild replaces them).
+        PlaceClipboard(crRoot.transform, "SEAT_A1", "CLIPBOARD_A1", "Startup checklist", new[] { "cold-start-to-grid" });
+        PlaceClipboard(crRoot.transform, "SEAT_A2", "CLIPBOARD_A2", "Startup checklist", new[] { "cold-start-to-grid" });
+
+        // RoomCam: reuse imported camera if present, else create one.
+        Camera cam = Camera.main;
+        if (cam == null)
+        {
+            var found = Object.FindAnyObjectByType<Camera>();
+            Transform t = found != null ? found.transform : null;
+            if (t != null && t.name.Contains("RoomCam")) cam = found as Camera;
+        }
+        if (cam == null)
+        {
+            var camGo = new GameObject("RoomCam");
+            cam = camGo.AddComponent<Camera>();
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = new Color(0.05f, 0.07f, 0.09f, 1f);
+            cam.transform.position = new Vector3(0f, 5f, 14f);
+            cam.transform.rotation = Quaternion.Euler(82f, 0f, 0f);
+            cam.fieldOfView = 24f;
+        }
+        // Camera.main (OperatorController, CRT raycasts, InstrumentCheck) needs the tag.
+        cam.gameObject.tag = "MainCamera";
+        // ProceduralPlantAudio loops need a listener or Unity spams "no audio listeners".
+        if (cam.GetComponent<AudioListener>() == null)
+            cam.gameObject.AddComponent<AudioListener>();
+        // Operator (walk, sit, mouse look, zoom to panel, recentre) and the shake it composes.
+        if (cam.GetComponent<CameraShake>() == null)
+            cam.gameObject.AddComponent<CameraShake>();
+        if (cam.GetComponent<OperatorController>() == null)
+            cam.gameObject.AddComponent<OperatorController>();
+
+        // Audio root
+        if (GameObject.Find("AudioRoot") == null)
+        {
+            var audioGo = new GameObject("AudioRoot");
+            var audio = audioGo.AddComponent<ProceduralPlantAudio>();
+            audio.bridge = bridge;
+        }
+
+        // U11: mission readout (HUD + runner). Idempotent; the HUD shows the live hint in the sandbox too.
+        if (GameObject.Find("MissionUI") == null)
+        {
+            var missionGo = new GameObject("MissionUI");
+            var runner = missionGo.AddComponent<MissionRunner>();
+            runner.bridge = bridge;
+            var hud = missionGo.AddComponent<MissionHud>();
+            hud.bridge = bridge;
+            hud.runner = runner;
+        }
+
+        // U5: always-on startup checklist (sandbox only at runtime; the pause menu can hide it). Idempotent.
+        if (GameObject.Find("StartupChecklistUI") == null)
+            new GameObject("StartupChecklistUI").AddComponent<StartupChecklistHud>();
+
+        if (save)
+        {
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveOpenScenes();
+        }
+        Debug.Log("[Phase2SceneBuilder] Phase-2 scene hierarchy built" + (save ? " and saved." : " (not saved)."));
+        return scene;
+    }
+
+    // ---- helpers ---------------------------------------------------------------------------------------------
+
+    /// <summary>The root-level ControlRoom object (the wrapper that carries the binder), not the FBX root inside it.</summary>
+    public static GameObject FindRoot()
+    {
+        var scene = EditorSceneManager.GetActiveScene();
+        foreach (var root in scene.GetRootGameObjects())
+            if (root.name == "ControlRoom") return root;
+        return GameObject.Find("ControlRoom");
+    }
+
+    public static Transform FindDeep(Transform root, string name)
+    {
+        foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+            if (t.name == name) return t;
+        return null;
+    }
+
+    // Bench slope (layout.json): front edge 0.76 m, 15 deg rise, 0.58 m deep, its front edge about 0.6 m ahead of the seat
+    // anchor. The clipboard lies on the slope 0.85 m ahead and 0.55 m to the operator's right, top edge toward the board.
+    private static void PlaceClipboard(Transform parent, string seatName, string objName, string label, string[] procedureIds)
+    {
+        var seat = FindDeep(parent, seatName);
+        if (seat == null)
+        {
+            Debug.LogWarning("[Phase2SceneBuilder] " + seatName + " not found, no clipboard placed.");
+            return;
+        }
+        // Toward the board: outward from the board centre through the seat (the same geometric rule OperatorController
+        // and LayoutCheck use). Anchors keep Blender's local frame after the FBX export, so seat.forward points up;
+        // their local up is the board-facing axis and serves as the fallback.
+        var centre = FindDeep(parent, "STAND_Center");
+        Vector3 fwd = centre != null
+            ? Vector3.ProjectOnPlane(seat.position - centre.position, Vector3.up).normalized
+            : Vector3.ProjectOnPlane(seat.up, Vector3.up).normalized;
+        Vector3 right = Vector3.Cross(Vector3.up, fwd);
+        const float ahead = 0.85f, side = 0.55f;
+        float h = 0.76f + (ahead - 0.6f) / 0.58f * (0.915f - 0.76f) + 0.004f;
+        var go = new GameObject(objName);
+        go.transform.SetParent(parent, true);
+        go.transform.position = new Vector3(seat.position.x, 0f, seat.position.z) + fwd * ahead + right * side + Vector3.up * h;
+        go.transform.rotation = Quaternion.LookRotation(fwd, Vector3.up) * Quaternion.Euler(-15f, 0f, 0f);
+        var cb = go.AddComponent<ProcedureClipboard>();
+        cb.procedureIds = procedureIds;
+        cb.label = label;
+    }
+
+    public static Transform FindCtlRoot(Transform t)
+    {
+        for (; t != null; t = t.parent)
+            if (t.name.StartsWith("CTL_")) return t;
+        return null;
+    }
+
+    // ---- U6: reactor window and hall -------------------------------------------------------------------------
+    // Room frame in Unity (FBX maps Blender (x,y,z) to Unity (x,z,y)): x west-east, z south-north, y up. The south wall is
+    // a box whose room-side face is the interior. Wall_South and COL_Wall_South are hidden and replaced by framed pieces
+    // (left, right, sill, header) around a window opening, plus a glass pane. The door is in the same wall at the middle
+    // (door frame +-0.6 m), so the opening is offset 3.0 m toward the longer side of the wall, leaving 1.4 m of wall
+    // between the door frame and the opening. Pieces are children of the ControlRoom root so LayoutCheck sees their
+    // colliders; the hall itself is a separate root with no colliders at all.
+    private const float WindowWidth = 2.5f, WindowSill = 0.6f, WindowHeight = 1.6f, WindowOffsetFromDoor = 2.2f;
+    // The standing viewpoint (STAND_Center) and the seat sit 3.5 m apart along the wall, so a pool straight behind the
+    // window looks well off to one side from the stand. The pool is moved toward the stand sightline (VesselShiftX, from the
+    // window centre) and pulled close to the wall (PoolDepth) so one position reads reasonably centred from both.
+    private const float VesselShiftX = 0.25f, PoolDepth = 1.6f;
+    private const int IgnoreRaycastLayer = 2;
+    // Unnamed user layer for the reactor hall (culling only; no TagManager change). Hall lights light only this layer,
+    // room lights skip it.
+    public const int HallLayer = 9;
+
+
+    private static void BuildReactorWindow(Transform crRoot)
+    {
+        Transform wallT = FindDeep(crRoot, "Wall_South");
+        var wallR = wallT != null ? wallT.GetComponent<Renderer>() : null;
+        if (wallR == null)
+        {
+            Debug.LogWarning("[Phase2SceneBuilder] Wall_South not found, no window or reactor hall built.");
+            return;
+        }
+        Bounds wb = wallR.bounds;
+        Transform ceil = FindDeep(crRoot, "Ceiling");
+        var ceilR = ceil != null ? ceil.GetComponent<Renderer>() : null;
+        float roomCentreZ = ceilR != null ? ceilR.bounds.center.z : wb.center.z + 1f;
+        float inward = roomCentreZ >= wb.center.z ? 1f : -1f;   // +1: the room lies at larger z than the wall
+        float zInner = inward > 0f ? wb.max.z : wb.min.z;       // room-side face of the wall
+        float zOuter = inward > 0f ? wb.min.z : wb.max.z;       // hall-side face
+        float zMid = 0.5f * (zInner + zOuter);
+        float thick = Mathf.Max(0.05f, wb.size.z);
+        float y0 = wb.min.y, yTop = wb.max.y;
+
+        Transform door = FindDeep(crRoot, "Door_Leaf");
+        var doorR = door != null ? door.GetComponent<Renderer>() : null;
+        float doorX = doorR != null ? doorR.bounds.center.x : wb.center.x;
+        float wx = doorX + (wb.max.x - doorX >= doorX - wb.min.x ? WindowOffsetFromDoor : -WindowOffsetFromDoor);
+        float xl = wx - WindowWidth * 0.5f, xr = wx + WindowWidth * 0.5f;
+        float ySill = y0 + WindowSill, yHead = ySill + WindowHeight;
+
+        // The old wall box and its collision proxy go dark; they belong to the FBX instance so they are hidden, not destroyed.
+        wallR.enabled = false;
+        wallT.gameObject.SetActive(false);
+        Transform colWall = FindDeep(crRoot, "COL_Wall_South");
+        if (colWall != null) colWall.gameObject.SetActive(false);
+        else Debug.LogWarning("[Phase2SceneBuilder] COL_Wall_South not found, the old wall collider may still block the window.");
+
+        Material wallMat = wallR.sharedMaterial;
+        Transform frameSrc = FindDeep(crRoot, "Door_FrameL");
+        var frameR = frameSrc != null ? frameSrc.GetComponent<Renderer>() : null;
+        Material frameMat = frameR != null ? frameR.sharedMaterial : MakeMaterial("M_WindowFrame", new Color(0.55f, 0.57f, 0.6f), false, false);
+
+        var win = new GameObject("ReactorWindow");
+        win.transform.SetParent(crRoot, true);
+
+        // Wall pieces: visible, and solid for the CharacterController (Ignore Raycast, like every COL_ proxy).
+        WindowBox(win.transform, "Window_WallLeft", wb.min.x, xl, y0, yTop, zMid, thick, wallMat, true);
+        WindowBox(win.transform, "Window_WallRight", xr, wb.max.x, y0, yTop, zMid, thick, wallMat, true);
+        WindowBox(win.transform, "Window_WallSill", xl, xr, y0, ySill, zMid, thick, wallMat, true);
+        WindowBox(win.transform, "Window_WallHeader", xl, xr, yHead, yTop, zMid, thick, wallMat, true);
+        // Steel frame proud of the room face (visual only; the wall pieces already block).
+        const float ft = 0.08f, fz = 0.07f;
+        float zFrame = zInner - inward * (fz * 0.5f - 0.02f);
+        WindowBox(win.transform, "Window_FrameSill", xl - ft, xr + ft, ySill - ft * 0.5f, ySill + ft * 0.5f, zFrame, fz, frameMat, false);
+        WindowBox(win.transform, "Window_FrameHead", xl - ft, xr + ft, yHead - ft * 0.5f, yHead + ft * 0.5f, zFrame, fz, frameMat, false);
+        WindowBox(win.transform, "Window_FrameL", xl - ft, xl, ySill, yHead, zFrame, fz, frameMat, false);
+        WindowBox(win.transform, "Window_FrameR", xr, xr + ft, ySill, yHead, zFrame, fz, frameMat, false);
+
+        // Glass: translucent, solid for movement, never a click target (Ignore Raycast, so OnMouse rays pass to controls).
+        var glass = WindowBox(win.transform, "Window_Glass", xl, xr, ySill, yHead, zMid, 0.04f,
+                              MakeMaterial("M_WindowGlass", new Color(0.75f, 0.88f, 1f, 0.10f), true, false), true);
+        glass.GetComponent<BoxCollider>().size = new Vector3(1f, 1f, 1.5f); // a little thicker than the pane so nothing slips past
+
+        BuildReactorHall(wx + VesselShiftX, y0, zOuter, -inward);
+        Debug.Log($"[Phase2SceneBuilder] reactor window built: opening x {xl:0.00}..{xr:0.00} (door x {doorX:0.00}), sill {WindowSill:0.00} m, "
+                  + $"{WindowWidth:0.00} x {WindowHeight:0.00} m, wall z {zInner:0.00}/{zOuter:0.00}; hall built.");
+    }
+
+    // A box spanning x0..x1, y0..y1, centred on z with the given thickness. Solid pieces keep a collider on the Ignore Raycast
+    // layer; visual pieces lose the collider the primitive carries.
+    private static GameObject WindowBox(Transform parent, string name, float x0, float x1, float y0, float y1, float z, float thick,
+                                        Material mat, bool solid)
+    {
+        var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        go.name = name;
+        go.transform.SetParent(parent, true);
+        go.transform.position = new Vector3(0.5f * (x0 + x1), 0.5f * (y0 + y1), z);
+        go.transform.localScale = new Vector3(Mathf.Max(0.001f, x1 - x0), Mathf.Max(0.001f, y1 - y0), thick);
+        go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+        if (solid) go.layer = IgnoreRaycastLayer;
+        else Object.DestroyImmediate(go.GetComponent<Collider>());
+        return go;
+    }
+
+    // Hall beyond the wall. Depth axis: z = zOuter + dir * d (dir points away from the room). All hall pieces are
+    // collider-free primitives under one root so the room's reach and occlusion checks never see them.
+    private static void BuildReactorHall(float cx, float y0, float zOuter, float dir)
+    {
+        var root = new GameObject("ReactorHall");
+        const float hallHalfW = 6f, hallDepth = 11f, hallHeight = 6f;
+
+        Material concrete = MakeMaterial("M_HallConcrete", new Color(0.38f, 0.40f, 0.43f), false, false);
+        Material deck = MakeMaterial("M_HallDeck", new Color(0.26f, 0.28f, 0.30f), false, false);
+        Material steel = MakeMaterial("M_HallSteel", new Color(0.58f, 0.62f, 0.68f), false, false);
+        if (steel.HasProperty("_Metallic")) steel.SetFloat("_Metallic", 0.9f);
+        if (steel.HasProperty("_Glossiness")) steel.SetFloat("_Glossiness", 0.68f);
+        Material tile = MakeMaterial("M_PoolTile", new Color(0.12f, 0.30f, 0.42f), false, false);
+        Material glow = MakeMaterial("M_CherenkovGlow", new Color(0.30f, 0.60f, 1f, 0.45f), true, true);
+
+        // The hall deck is level with the control-room floor. The pool is a raised basin whose water surface sits just
+        // under the window's eye line (a distant viewer sees nothing below the sill's sight line), so the window looks
+        // slightly DOWN onto the water and the vessel standing in it.
+        float deckY = y0;
+        Material water = MakeMaterial("M_PoolWater", new Color(0.08f, 0.40f, 0.78f, 0.62f), true, false);
+        // Emissive baseline: the water reads blue at zero power and under any lighting (the Cherenkov disc adds the rest).
+        water.EnableKeyword("_EMISSION");
+        water.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+        if (water.HasProperty("_EmissionColor")) water.SetColor("_EmissionColor", new Color(0.03f, 0.18f, 0.42f));
+
+        // Shell: deck, near wall below the window, back wall, side walls, ceiling. The room's own wall is the fourth side above y0.
+        HallBox(root.transform, "Hall_Deck", cx - hallHalfW, cx + hallHalfW, deckY - 0.1f, deckY, zOuter, dir, 0f, hallDepth, deck);
+        HallBox(root.transform, "Hall_BackWall", cx - hallHalfW, cx + hallHalfW, deckY, y0 + hallHeight, zOuter, dir, hallDepth, hallDepth + 0.2f, concrete);
+        HallBox(root.transform, "Hall_WallL", cx - hallHalfW - 0.2f, cx - hallHalfW, deckY, y0 + hallHeight, zOuter, dir, 0f, hallDepth + 0.2f, concrete);
+        HallBox(root.transform, "Hall_WallR", cx + hallHalfW, cx + hallHalfW + 0.2f, deckY, y0 + hallHeight, zOuter, dir, 0f, hallDepth + 0.2f, concrete);
+        HallBox(root.transform, "Hall_Ceiling", cx - hallHalfW, cx + hallHalfW, y0 + hallHeight, y0 + hallHeight + 0.2f, zOuter, dir, 0f, hallDepth, concrete);
+
+        // Pool: a 2.3 m square basin, floor tile, translucent water up to 0.8 m. The rim is only 4 cm above the water so
+        // it does not hide the surface from the window. Centred PoolDepth beyond the wall.
+        const float half = 1.15f, rimT = 0.2f, rimTop = 0.84f, floorTop = 0.05f, surface = 0.8f, poolD = PoolDepth, d0 = poolD - half, d1 = poolD + half;
+        HallBox(root.transform, "Pool_Floor", cx - half, cx + half, deckY, deckY + floorTop, zOuter, dir, d0, d1, tile);
+        HallBox(root.transform, "Pool_RimNear", cx - half - rimT, cx + half + rimT, deckY, deckY + rimTop, zOuter, dir, d0 - rimT, d0, concrete);
+        HallBox(root.transform, "Pool_RimFar", cx - half - rimT, cx + half + rimT, deckY, deckY + rimTop, zOuter, dir, d1, d1 + rimT, concrete);
+        HallBox(root.transform, "Pool_RimL", cx - half - rimT, cx - half, deckY, deckY + rimTop, zOuter, dir, d0, d1, concrete);
+        HallBox(root.transform, "Pool_RimR", cx + half, cx + half + rimT, deckY, deckY + rimTop, zOuter, dir, d0, d1, concrete);
+        HallBox(root.transform, "Pool_Water", cx - half, cx + half, deckY + floorTop, deckY + surface, zOuter, dir, d0, d1, water);
+
+        float poolZ = zOuter + dir * poolD;
+
+        // Vessel: procedural PWR pressure vessel (shell, flange with stud ring, dome, CRDM housings, nozzles); see
+        // ReactorVesselMesh. The flange straddles the water line so the head reads from the window.
+        Material crdm = MakeMaterial("M_HallSteelDark", new Color(0.30f, 0.32f, 0.36f), false, false);
+        if (crdm.HasProperty("_Metallic")) crdm.SetFloat("_Metallic", 0.75f);
+        if (crdm.HasProperty("_Glossiness")) crdm.SetFloat("_Glossiness", 0.5f);
+        ReactorVesselMesh.Build(root.transform, new Vector3(cx, deckY, poolZ), steel, crdm);
+
+        // Core glow: a flat disc around the vessel foot, below the water line, so it shows through the water. The name
+        // CoreGlow_Mesh is what PlantEquipmentBinder drives (alpha, emission, scale, and the child light below). Unity's
+        // cylinder primitive is 2 m tall with radius 0.5, so scale (2.1, 0.12, 2.1) gives r 1.05 and 0.24 m tall.
+        var glowGo = HallCylinder(root.transform, "CoreGlow_Mesh", new Vector3(cx, deckY + 0.18f, poolZ), 1.05f, 0.12f, glow);
+        var glowLightGo = new GameObject("CoreGlow_Light");
+        glowLightGo.transform.SetParent(glowGo.transform, false);
+        glowLightGo.transform.localPosition = new Vector3(0f, 4f, 0f);   // parent y scale is 0.12, so about 0.5 m above the disc
+        var glowLight = glowLightGo.AddComponent<Light>();
+        glowLight.type = LightType.Point;
+        glowLight.color = new Color(0.30f, 0.58f, 1f);
+        glowLight.range = 4f;       // stays mostly inside the hall; the binder scales intensity by power
+        glowLight.intensity = 1.6f;
+        glowLight.shadows = LightShadows.None;
+
+        // Hall lights: cool, above the pool, wide enough to light the deck and vessel; hall layer only (see HallLayer).
+        Vector3[] lightAt =
+        {
+            new Vector3(cx - 2.0f, y0 + 3.2f, zOuter + dir * 1.8f),
+            new Vector3(cx + 2.0f, y0 + 3.2f, zOuter + dir * 1.8f),
+            new Vector3(cx,        y0 + 3.2f, zOuter + dir * 5.5f),
+        };
+        for (int i = 0; i < lightAt.Length; i++)
+        {
+            var lg = new GameObject("HallLight_" + i);
+            lg.transform.SetParent(root.transform, false);
+            lg.transform.position = lightAt[i];
+            var l = lg.AddComponent<Light>();
+            l.type = LightType.Point;
+            l.color = new Color(0.70f, 0.82f, 1f);
+            l.range = 9f;
+            l.intensity = 1.6f;
+            l.shadows = LightShadows.None;
+        }
+
+        // Culling layers keep the two lighting setups apart: every hall object (and light) sits on HallLayer, the hall
+        // lights only light that layer, and NormaliseRoomLight excludes it from the room lights.
+        foreach (var t in root.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = HallLayer;
+        foreach (var l in root.GetComponentsInChildren<Light>(true)) l.cullingMask = 1 << HallLayer;
+
+        var binder = root.AddComponent<PlantEquipmentBinder>();
+        var bridgeGo = GameObject.Find("PlantSim");
+        if (bridgeGo != null) binder.bridge = bridgeGo.GetComponent<PlantBridge>();
+    }
+
+    // Collider-free hall box spanning x0..x1, y0..y1 and depth d0..d1 beyond the wall (dir = +-1 along z).
+    private static GameObject HallBox(Transform parent, string name, float x0, float x1, float y0, float y1,
+                                      float zOuter, float dir, float d0, float d1, Material mat)
+    {
+        var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        go.name = name;
+        go.transform.SetParent(parent, true);
+        float zc = zOuter + dir * 0.5f * (d0 + d1);
+        go.transform.position = new Vector3(0.5f * (x0 + x1), 0.5f * (y0 + y1), zc);
+        go.transform.localScale = new Vector3(Mathf.Max(0.001f, x1 - x0), Mathf.Max(0.001f, y1 - y0), Mathf.Max(0.001f, d1 - d0));
+        go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+        Object.DestroyImmediate(go.GetComponent<Collider>());
+        return go;
+    }
+
+    // Collider-free upright cylinder: radius r, half-height hh (Unity's primitive is radius 0.5 and 2 m tall,
+    // so scale (2r, hh, 2r) gives radius r and half-height hh).
+    private static GameObject HallCylinder(Transform parent, string name, Vector3 centre, float r, float hh, Material mat)
+    {
+        var go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        go.name = name;
+        go.transform.SetParent(parent, true);
+        go.transform.position = centre;
+        go.transform.localScale = new Vector3(r * 2f, hh, r * 2f);
+        go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+        Object.DestroyImmediate(go.GetComponent<Collider>());
+        return go;
+    }
+
+    // Built-in pipeline Standard material (the clipboard falls back the same way). Transparent ones use the Fade setup.
+    private static Material MakeMaterial(string name, Color colour, bool fade, bool emissive)
+    {
+        Shader sh = Shader.Find("Standard");
+        if (sh == null) sh = Shader.Find("Universal Render Pipeline/Lit");
+        if (sh == null) sh = Shader.Find("Sprites/Default");
+        var m = new Material(sh) { name = name };
+        m.color = colour;
+        if (fade && m.HasProperty("_Mode"))
+        {
+            m.SetFloat("_Mode", 2f);
+            m.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            m.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            m.SetInt("_ZWrite", 0);
+            m.DisableKeyword("_ALPHATEST_ON");
+            m.EnableKeyword("_ALPHABLEND_ON");
+            m.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            m.renderQueue = emissive ? 3001 : 3000;
+        }
+        if (emissive && m.HasProperty("_EmissionColor"))
+        {
+            m.EnableKeyword("_EMISSION");
+            m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+            m.SetColor("_EmissionColor", new Color(0.25f, 0.55f, 1f) * 0.4f);
+        }
+        return m;
+    }
+
+    // The old SeatCamera component is gone; scenes saved with it carry a missing-script component.
+    // Blender point lights are authored in watts (350 W per ceiling fixture so the Blender render reads well). The FBX
+    // carries that number into Unity's built-in pipeline as a unitless intensity of hundreds, which blows every lit
+    // surface out to white. Ceiling fixtures get a fixed indoor-office level instead.
+    public const float RoomLightIntensity = 1.1f;
+    public const float RoomLightRange = 9f;
+
+    private static void NormaliseRoomLight(Light light)
+    {
+        Debug.Log($"[Phase2SceneBuilder] light {light.name}: imported {light.type} intensity={light.intensity:0.###} range={light.range:0.##} -> {RoomLightIntensity} / {RoomLightRange}");
+        light.intensity = RoomLightIntensity;
+        if (light.type == LightType.Point || light.type == LightType.Spot) light.range = RoomLightRange;
+        light.shadows = LightShadows.None;
+        light.cullingMask = ~(1 << HallLayer);
+    }
+
+    private static void RemoveMissingScripts(UnityEngine.SceneManagement.Scene scene)
+    {
+        foreach (var root in scene.GetRootGameObjects())
+            foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+                GameObjectUtility.RemoveMonoBehavioursWithMissingScript(t.gameObject);
+    }
+
+    // COL_* meshes: a BoxCollider sized to the mesh, no renderer, Ignore Raycast layer (blocks the CharacterController,
+    // skipped by the OnMouse* ray so the shell never steals clicks).
+    private static bool MakeCollisionProxy(Transform t)
+    {
+        var mf = t.GetComponent<MeshFilter>();
+        if (mf == null || mf.sharedMesh == null)
+        {
+            Debug.LogWarning("[Phase2SceneBuilder] " + t.name + " has no mesh to size a collider from.");
+            return false;
+        }
+        var box = t.GetComponent<BoxCollider>();
+        if (box == null) box = t.gameObject.AddComponent<BoxCollider>();
+        box.center = mf.sharedMesh.bounds.center;
+        box.size = mf.sharedMesh.bounds.size;
+        box.isTrigger = false;
+        var mr = t.GetComponent<MeshRenderer>();
+        if (mr != null) mr.enabled = false;
+        t.gameObject.layer = LayerMask.NameToLayer("Ignore Raycast");
+        return true;
+    }
+
+    // Bounds of every mesh at or below `root`, in root's local space (exact for yawed and pitched panels).
+    private static bool TryLocalBounds(Transform root, out Bounds bounds)
+    {
+        bool has = false;
+        bounds = new Bounds();
+        foreach (var mf in root.GetComponentsInChildren<MeshFilter>(true))
+        {
+            if (mf.sharedMesh == null) continue;
+            var mr = mf.GetComponent<MeshRenderer>();
+            if (mr == null || !mr.enabled) continue;
+            Bounds mb = mf.sharedMesh.bounds;
+            Vector3 c = mb.center, e = mb.extents;
+            for (int i = 0; i < 8; i++)
+            {
+                var corner = c + new Vector3((i & 1) == 0 ? -e.x : e.x, (i & 2) == 0 ? -e.y : e.y, (i & 4) == 0 ? -e.z : e.z);
+                Vector3 p = root.InverseTransformPoint(mf.transform.TransformPoint(corner));
+                if (!has) { bounds = new Bounds(p, Vector3.zero); has = true; }
+                else bounds.Encapsulate(p);
+            }
+        }
+        return has;
+    }
+
+    // Sizes a BoxCollider on `t` to the meshes at or below it (an empty pivot has none of its own); never thinner than
+    // minSide metres so a small control stays clickable.
+    private static void FitCollider(Transform t, float minSide)
+    {
+        var box = t.GetComponent<BoxCollider>();
+        if (box == null) box = t.gameObject.AddComponent<BoxCollider>();
+        Bounds b;
+        float s = Mathf.Max(1e-4f, (Mathf.Abs(t.lossyScale.x) + Mathf.Abs(t.lossyScale.y) + Mathf.Abs(t.lossyScale.z)) / 3f);
+        float min = minSide / s;
+        if (!TryLocalBounds(t, out b))
+        {
+            box.center = Vector3.zero;
+            box.size = new Vector3(min, min, min);
+        }
+        else
+        {
+            box.center = b.center;
+            box.size = new Vector3(Mathf.Max(b.size.x, min), Mathf.Max(b.size.y, min), Mathf.Max(b.size.z, min));
+        }
+        box.isTrigger = false;
+    }
+}

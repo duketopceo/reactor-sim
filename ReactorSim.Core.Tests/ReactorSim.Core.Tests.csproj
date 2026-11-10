@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\PivotNameParser.cs" Link="Unity\PivotNameParser.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\ControlMapping.cs" Link="Unity\ControlMapping.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\NeedleMath.cs" Link="Unity\NeedleMath.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\GlowMapping.cs" Link="Unity\GlowMapping.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\SnapshotMath.cs" Link="Unity\SnapshotMath.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\CsvReader.cs" Link="Unity\CsvReader.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\GaugeSources.cs" Link="Unity\GaugeSources.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\LampPredicates.cs" Link="Unity\LampPredicates.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\OperatorMath.cs" Link="Unity\OperatorMath.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\ClockReadout.cs" Link="Unity\ClockReadout.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\AlarmTracker.cs" Link="Unity\AlarmTracker.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\CounterText.cs" Link="Unity\CounterText.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\ControlTooltipModel.cs" Link="Unity\ControlTooltipModel.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\CrtPages.cs" Link="Unity\CrtPages.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\UI\TabletPages.cs" Link="Unity\TabletPages.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\UI\ClipboardView.cs" Link="Unity\ClipboardView.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\UI\Theme.cs" Link="Unity\Theme.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\SandboxStart.cs" Link="Unity\SandboxStart.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\Diagnostics\SessionRecorder.cs" Link="Unity\SessionRecorder.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\design\control-room\inventory.csv" Link="design\control-room\inventory.csv" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\design\control-room\kits.json" Link="design\control-room\kits.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\design\control-room\layout.json" Link="design\control-room\layout.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\ReactorSim.Unity\Assets\StreamingAssets\inventory-runtime.json" Link="StreamingAssets\inventory-runtime.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ReactorSim.Core\ReactorSim.Core.csproj" />
+  </ItemGroup>
+
+</Project>

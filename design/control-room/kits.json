@@ -1,0 +1,29 @@
+{
+  "_doc": "Kit catalogue: the shared contract between the inventory/layout (U4) and the Blender kit builders (U5). face_w/face_h are the footprint in metres on the panel face (width along the panel, height up the panel). depth is how far the kit stands proud of the face. mount says where it may go. pivot names the binder grammar the kit's moving part carries. Dimensions K01-K18 are taken from Blender/scripts/make_panel_kits.py; K19+ are new variants the plan needs.",
+  "units": "m",
+  "kits": {
+    "K01":  {"name": "Gauge_Circular_Analog",    "face_w": 0.22, "face_h": 0.22, "depth": 0.08, "mount": ["vertical"],          "role": "indicator", "pivot": "BIND_GAUGE"},
+    "K01L": {"name": "Gauge_Circular_Large",     "face_w": 0.45, "face_h": 0.45, "depth": 0.10, "mount": ["vertical"],          "role": "indicator", "pivot": "BIND_GAUGE", "note": "overview size, read from STAND_Center"},
+    "K02":  {"name": "Gauge_Edgewise_Vertical",  "face_w": 0.14, "face_h": 0.34, "depth": 0.08, "mount": ["vertical"],          "role": "indicator", "pivot": "BIND_BAR"},
+    "K03":  {"name": "Gauge_Dual_Reactivity",    "face_w": 0.26, "face_h": 0.20, "depth": 0.08, "mount": ["vertical"],          "role": "indicator", "pivot": "BIND_GAUGE"},
+    "K04":  {"name": "Counter_7Seg_Digital",     "face_w": 0.30, "face_h": 0.12, "depth": 0.08, "mount": ["vertical", "bench"], "role": "indicator", "pivot": "BIND_GAUGE"},
+    "K05":  {"name": "Annunciator_Tile",         "face_w": 0.08, "face_h": 0.06, "depth": 0.04, "mount": ["vertical"],          "role": "alarm",     "pivot": "BIND_LAMP", "note": "one tile; tiles of a section are packed into a 6-wide grid (the 4x6 frame is 0.48 x 0.36)"},
+    "K06":  {"name": "Switch_Scram_Mushroom",    "face_w": 0.09, "face_h": 0.09, "depth": 0.06, "mount": ["bench"],             "role": "control",   "pivot": "INT_BTN"},
+    "K07":  {"name": "Lever_RodBank",            "face_w": 0.08, "face_h": 0.20, "depth": 0.06, "mount": ["bench"],             "role": "control",   "pivot": "INT_DIAL"},
+    "K08":  {"name": "Knob_Rotary_Continuous",   "face_w": 0.11, "face_h": 0.11, "depth": 0.08, "mount": ["bench", "vertical"], "role": "control",   "pivot": "INT_DIAL"},
+    "K09":  {"name": "Knob_Rotary_Stepped",      "face_w": 0.12, "face_h": 0.12, "depth": 0.08, "mount": ["bench", "vertical"], "role": "control",   "pivot": "INT_DIAL"},
+    "K10":  {"name": "Wheel_Throttle_Turbine",   "face_w": 0.24, "face_h": 0.24, "depth": 0.12, "mount": ["bench"],             "role": "control",   "pivot": "INT_DIAL"},
+    "K11":  {"name": "Switch_Toggle_Guarded",    "face_w": 0.07, "face_h": 0.10, "depth": 0.08, "mount": ["bench", "vertical"], "role": "control",   "pivot": "INT_BTN", "note": "red/green lamps above the switch are part of the kit"},
+    "K12":  {"name": "Slider_Motorized_Setpoint","face_w": 0.10, "face_h": 0.24, "depth": 0.08, "mount": ["bench"],             "role": "control",   "pivot": "INT_DIAL"},
+    "K13":  {"name": "CRT_Monitor_Bezel_4x3",    "face_w": 0.40, "face_h": 0.30, "depth": 0.30, "mount": ["vertical"],          "role": "page",      "pivot": "CRT"},
+    "K16":  {"name": "Mimic_Busbar_Segment",     "face_w": 0.30, "face_h": 0.02, "depth": 0.01, "mount": ["vertical"],          "role": "indicator", "pivot": "none"},
+    "K17":  {"name": "Klaxon_Rotating_Beacon",   "face_w": 0.15, "face_h": 0.20, "depth": 0.15, "mount": ["overhead"],          "role": "alarm",     "pivot": "BIND_KLAXON"},
+    "K19":  {"name": "Pushbutton_Momentary",     "face_w": 0.06, "face_h": 0.06, "depth": 0.05, "mount": ["bench", "vertical"], "role": "control",   "pivot": "INT_BTN"},
+    "K20":  {"name": "Indicator_Lamp",           "face_w": 0.04, "face_h": 0.04, "depth": 0.03, "mount": ["bench", "vertical"], "role": "indicator", "pivot": "BIND_LAMP"},
+    "K21":  {"name": "Section_Sign_Lit",         "face_w": 1.20, "face_h": 0.25, "depth": 0.06, "mount": ["overhead"],          "role": "sign",      "pivot": "none"},
+    "K22":  {"name": "Panel_Title_Plate",        "face_w": 0.40, "face_h": 0.05, "depth": 0.01, "mount": ["vertical", "bench"], "role": "sign",      "pivot": "none"},
+    "K23":  {"name": "Out_Of_Service_Tag",       "face_w": 0.08, "face_h": 0.05, "depth": 0.005,"mount": ["vertical", "bench"], "role": "tag",       "pivot": "none", "note": "hangs over a needs_core_model row's kit (KTD6)"}
+  },
+  "label_plate": {"height": 0.025, "gap": 0.01, "note": "every placed kit gets a label plate below it (above it on the bench); text height per KTD8 for its viewpoint distance"},
+  "spacing": {"min_gap": 0.03, "note": "minimum clear gap between neighbouring kit footprints including label plates"}
+}

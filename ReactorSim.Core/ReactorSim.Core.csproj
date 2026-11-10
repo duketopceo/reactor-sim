@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>ReactorSim</RootNamespace>
+    <Description>Engine-agnostic nuclear reactor simulation core. Drop into Unity (netstandard2.1) or run standalone.</Description>
+    <!-- Keep build machine paths out of the DLL/PDB that is checked in under the Unity plugins folder. -->
+    <PathMap>$(MSBuildProjectDirectory)=/src/ReactorSim.Core</PathMap>
+    <EnableSourceLink>false</EnableSourceLink>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="ReactorSim.Core.Tests" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,464 @@
+{
+ "_doc": "Main control room layout (U4). Consumed by the Blender generator (U6) and the Unity LayoutCheck (U7); tested by ReactorSim.Core.Tests/InventoryTests. Units are metres and degrees. Room axes: x runs west-east (0..width), y runs front-back (0..depth), z is up. The board is an arc around arc.center: a point at angle t (degrees, measured from +y toward +x, so negative t is the left-hand end when facing the board) and radius r is (cx + r sin t, cy + r cos t). Sections run reactor, primary, safety, steam, turbine, electrical from start_deg to end_deg in that order; each section's panels sit side by side along its arc starting at start_deg, each panel a flat segment `width` metres wide whose face is at radius arc.radius and whose normal points at the centre. A panel's grid (see inventory.csv `slot`) is <surface>:<row>:<col>: `bench` is the sloped control surface (row 0 is nearest the operator), `vert` is the vertical panel (rows 0 to vertical.annunciator_rows-1 are the annunciator band, rows from vertical.annunciator_rows up are the instrument band, top row first). A grid cell is the kit footprint (kits.json) plus its label plate (label_plate), widened to grid.min_plate_width; annunciator tiles carry their own text (grid.no_label_plate_kits) and touch each other. Neighbouring cells keep spacing.min_gap (kits.json). system_sections maps the category path system/subsystem/function/device (longest prefix wins) to the section that owns the row. STAND_<section> is the viewpoint every row of that section is checked from; STAND_Center is the extra viewpoint for overview=y rows. checks holds the KTD8 thresholds. operating_points: pos is the eye position (x, y) in the room, eye_height is in metres, at_deg is the arc angle of the point (same convention as the board angle t), and facing_deg is the heading the operator faces, measured from +y toward +x like at_deg. An operator at a STAND_ or SEAT_ point faces the board, so facing_deg equals at_deg (it is not the direction from the board to the arc centre, which is at_deg + 180). STAND_Center faces heading 0; its cameras use headings_deg.",
+ "units": "m",
+ "room": {
+  "width": 12.0,
+  "depth": 10.0,
+  "ceiling": 3.2,
+  "wall_thickness": 0.2
+ },
+ "interaction_range_m": 2.0,
+ "arc": {
+  "center": [
+   6.0,
+   4.5
+  ],
+  "radius": 5.0,
+  "span_deg": 175.0,
+  "start_deg": -87.5,
+  "end_deg": 87.5,
+  "note": "KTD3 asked for about 120 deg at radius about 4.5 m (9.4 m of board). The 200 inventory rows need 15.2 m of panel at kit size, so the arc is 175 deg at radius 5.0 m (15.3 m of board). Revisit if rows are dropped or screens shared."
+ },
+ "bench": {
+  "front_edge_height": 0.76,
+  "slope_deg": 15.0,
+  "depth": 0.6,
+  "horizontal_depth": 0.58,
+  "back_edge_height": 0.915,
+  "note": "depth is measured along the slope; the vertical panel face stands at the back edge"
+ },
+ "vertical": {
+  "usable_from": 0.9,
+  "usable_to": 1.8,
+  "annunciator_from": 1.6,
+  "annunciator_rows": 3,
+  "annunciator_tilt_deg": 10,
+  "title_plate_z": 1.82,
+  "note": "instrument band 0.9-1.6 m; annunciator band 1.6-1.8 m, tilted toward the operator"
+ },
+ "grid": {
+  "edge_margin": 0.03,
+  "min_plate_width": 0.06,
+  "no_label_plate_kits": [
+   "K05"
+  ]
+ },
+ "label_plate": {
+  "height": 0.025,
+  "gap": 0.01,
+  "note": "every placed kit gets a label plate below it (above it on the bench); text height per KTD8 for its viewpoint distance"
+ },
+ "title_plate": {
+  "kit": "K22",
+  "width": 0.4,
+  "height": 0.05,
+  "note": "one per panel, on the panel header above the annunciator band; every panel is at least this wide plus 2 x grid.edge_margin"
+ },
+ "signage": {
+  "section_sign": {
+   "kit": "K21",
+   "mount": "overhead",
+   "centre_height": 2.75,
+   "note": "one lit sign per section, hung over the section's mid angle"
+  },
+  "mimic_stripe": {
+   "note": "a coloured stripe along the bench front lip of each section, colour = section.mimic_colour"
+  },
+  "floor_markings": {
+   "stand_pads": "a floor pad in the section's mimic colour under every STAND_<section>",
+   "bench_line": "a yellow line 0.35 m in front of the bench front edge (do not cross while operating)"
+  }
+ },
+ "system_sections": {
+  "_doc": "path prefix -> section; the path is system/subsystem/function/device; the longest matching prefix wins",
+  "Annunciators/Tiles/Chemistry": "reactor",
+  "Annunciators/Tiles/Electrical": "electrical",
+  "Annunciators/Tiles/Plumbing/Charging Loss tile": "primary",
+  "Annunciators/Tiles/Plumbing/Circ Water Loss tile": "turbine",
+  "Annunciators/Tiles/Plumbing/Feed Pump Trip tile": "steam",
+  "Annunciators/Tiles/Plumbing/Msiv Closed tile": "steam",
+  "Annunciators/Tiles/Plumbing/Rcp A Trip tile": "primary",
+  "Annunciators/Tiles/Plumbing/Rcp B Trip tile": "primary",
+  "Annunciators/Tiles/Primary": "primary",
+  "Annunciators/Tiles/Reactor protection": "safety",
+  "Annunciators/Tiles/Steam": "steam",
+  "Annunciators/Tiles/Steam/Cooling Loss tile": "turbine",
+  "Annunciators/Tiles/Turbine trips": "turbine",
+  "Annunciators/Tiles/Turbine trips/Gen Out Of Sync tile": "electrical",
+  "Annunciators/Tiles/Turbine trips/Grid Freq Off tile": "electrical",
+  "Annunciators/Tiles/Turbine trips/Hotwell Low tile": "steam",
+  "Annunciators/Tiles/Turbine trips/Sg Low Level Trip tile": "steam",
+  "Buses and transformers": "electrical",
+  "CRT pages/Pages/Page/CRT_A1_Chem": "reactor",
+  "CRT pages/Pages/Page/CRT_A1_Core": "reactor",
+  "CRT pages/Pages/Page/CRT_A1_Log": "safety",
+  "CRT pages/Pages/Page/CRT_A2_Loops": "primary",
+  "CRT pages/Pages/Page/CRT_A2_Primary": "primary",
+  "CRT pages/Pages/Page/CRT_A2_Secondary": "steam",
+  "CRT pages/Pages/Page/CRT_A2_Turbine": "turbine",
+  "CRT pages/Pages/Page/CRT_A3_Grid": "electrical",
+  "CRT pages/Pages/Page/CRT_AssistantTerminal": "safety",
+  "CRT pages/Pages/Page/CRT_MimicStatusBoard": "safety",
+  "Chemical and volume control/Boron": "reactor",
+  "Chemical and volume control/Charging": "primary",
+  "Chemical and volume control/Letdown": "primary",
+  "Chemical and volume control/pH": "reactor",
+  "Condenser and cooling": "turbine",
+  "Feedwater": "steam",
+  "Generator and grid": "electrical",
+  "Offsite and emergency power": "electrical",
+  "Operator assistance": "safety",
+  "Primary coolant": "primary",
+  "Reactor core": "reactor",
+  "Reactor protection": "safety",
+  "Reactor protection/Protection/Trip/Scram button": "reactor",
+  "Simulation clock": "safety",
+  "Steam generators": "steam",
+  "Turbine": "turbine"
+ },
+ "sections": [
+  {
+   "id": "reactor",
+   "title": "REACTOR AND RODS",
+   "start_deg": -87.5,
+   "end_deg": -44.028487,
+   "mimic_colour": "#f2a900",
+   "panels": [
+    {
+     "id": "rod_control",
+     "title": "ROD CONTROL",
+     "width": 1.73
+    },
+    {
+     "id": "nuclear_boron",
+     "title": "NUCLEAR AND BORON",
+     "width": 1.02
+    },
+    {
+     "id": "core_status",
+     "title": "CORE STATUS",
+     "width": 1.03
+    }
+   ],
+   "sign": {
+    "kit": "K21",
+    "text": "REACTOR AND RODS",
+    "centre_deg": -65.842,
+    "height": 2.75
+   }
+  },
+  {
+   "id": "primary",
+   "title": "PRIMARY AND PRESSURIZER",
+   "start_deg": -44.028487,
+   "end_deg": -14.19337,
+   "mimic_colour": "#d64545",
+   "panels": [
+    {
+     "id": "pressurizer",
+     "title": "PRESSURIZER",
+     "width": 0.99
+    },
+    {
+     "id": "coolant_loops",
+     "title": "COOLANT LOOPS",
+     "width": 0.89
+    },
+    {
+     "id": "cvcs_aux",
+     "title": "CHARGING AND PZR AUX",
+     "width": 0.71
+    }
+   ],
+   "sign": {
+    "kit": "K21",
+    "text": "PRIMARY AND PRESSURIZER",
+    "centre_deg": -29.189,
+    "height": 2.75
+   }
+  },
+  {
+   "id": "safety",
+   "title": "SAFETY AND PROTECTION",
+   "start_deg": -14.19337,
+   "end_deg": 1.08862,
+   "mimic_colour": "#e8e8e8",
+   "panels": [
+    {
+     "id": "protection",
+     "title": "PROTECTION, CLOCK AND SUPERVISION",
+     "width": 1.32
+    }
+   ],
+   "sign": {
+    "kit": "K21",
+    "text": "SAFETY AND PROTECTION",
+    "centre_deg": -6.63,
+    "height": 2.75
+   }
+  },
+  {
+   "id": "steam",
+   "title": "STEAM GENERATORS AND FEED",
+   "start_deg": 1.08862,
+   "end_deg": 31.725878,
+   "mimic_colour": "#5bc0eb",
+   "panels": [
+    {
+     "id": "sg_main",
+     "title": "STEAM GENERATOR",
+     "width": 0.99
+    },
+    {
+     "id": "sg_secondary",
+     "title": "SECONDARY DETAIL",
+     "width": 1.14
+    },
+    {
+     "id": "feedwater",
+     "title": "FEEDWATER",
+     "width": 0.53
+    }
+   ],
+   "sign": {
+    "kit": "K21",
+    "text": "STEAM GENERATORS AND FEED",
+    "centre_deg": 16.329,
+    "height": 2.75
+   }
+  },
+  {
+   "id": "turbine",
+   "title": "TURBINE",
+   "start_deg": 31.725878,
+   "end_deg": 51.59153,
+   "mimic_colour": "#2e86c1",
+   "panels": [
+    {
+     "id": "turbine",
+     "title": "TURBINE",
+     "width": 0.94
+    },
+    {
+     "id": "condenser",
+     "title": "CONDENSER AND COOLING",
+     "width": 0.78
+    }
+   ],
+   "sign": {
+    "kit": "K21",
+    "text": "TURBINE",
+    "centre_deg": 41.581,
+    "height": 2.75
+   }
+  },
+  {
+   "id": "electrical",
+   "title": "GENERATOR AND GRID",
+   "start_deg": 51.59153,
+   "end_deg": 87.5,
+   "mimic_colour": "#8e5bd1",
+   "panels": [
+    {
+     "id": "sync",
+     "title": "SYNCHRONISING AND GENERATOR",
+     "width": 1.84
+    },
+    {
+     "id": "buses",
+     "title": "BUSES AND OFFSITE POWER",
+     "width": 1.28
+    }
+   ],
+   "sign": {
+    "kit": "K21",
+    "text": "GENERATOR AND GRID",
+    "centre_deg": 69.468,
+    "height": 2.75
+   }
+  }
+ ],
+ "operating_points": {
+  "STAND_reactor": {
+   "section": "reactor",
+   "pos": [
+    2.514,
+    6.064
+   ],
+   "eye_height": 1.65,
+   "facing_deg": -65.842,
+   "at_deg": -65.842,
+   "radius": 3.82
+  },
+  "STAND_primary": {
+   "section": "primary",
+   "pos": [
+    4.137,
+    7.835
+   ],
+   "eye_height": 1.65,
+   "facing_deg": -29.189,
+   "at_deg": -29.189,
+   "radius": 3.82
+  },
+  "STAND_safety": {
+   "section": "safety",
+   "pos": [
+    5.559,
+    8.295
+   ],
+   "eye_height": 1.65,
+   "facing_deg": -6.63,
+   "at_deg": -6.63,
+   "radius": 3.82
+  },
+  "STAND_steam": {
+   "section": "steam",
+   "pos": [
+    7.074,
+    8.166
+   ],
+   "eye_height": 1.65,
+   "facing_deg": 16.329,
+   "at_deg": 16.329,
+   "radius": 3.82
+  },
+  "STAND_turbine": {
+   "section": "turbine",
+   "pos": [
+    8.536,
+    7.358
+   ],
+   "eye_height": 1.65,
+   "facing_deg": 41.581,
+   "at_deg": 41.581,
+   "radius": 3.82
+  },
+  "STAND_electrical": {
+   "section": "electrical",
+   "pos": [
+    9.578,
+    5.84
+   ],
+   "eye_height": 1.65,
+   "facing_deg": 69.468,
+   "at_deg": 69.468,
+   "radius": 3.82
+  },
+  "SEAT_A1": {
+   "section": "reactor",
+   "pos": [
+    2.514,
+    6.064
+   ],
+   "eye_height": 1.2,
+   "facing_deg": -65.842,
+   "at_deg": -65.842,
+   "radius": 3.82,
+   "note": "chair at the reactor operating point; seated"
+  },
+  "SEAT_A2": {
+   "section": "turbine/electrical",
+   "pos": [
+    8.994,
+    6.874
+   ],
+   "eye_height": 1.2,
+   "facing_deg": 51.59153,
+   "at_deg": 51.59153,
+   "radius": 3.82,
+   "note": "chair on the turbine/electrical seam; seated"
+  },
+  "SPAWN_A1": {
+   "section": "reactor",
+   "pos": [
+    2.514,
+    6.064
+   ],
+   "eye_height": 1.2,
+   "facing_deg": -65.842,
+   "at_deg": -65.842,
+   "radius": 3.82,
+   "note": "spawn seated at the reactor desk (R5)"
+  },
+  "STAND_Center": {
+   "section": "overview",
+   "pos": [
+    6.0,
+    4.5
+   ],
+   "eye_height": 1.65,
+   "facing_deg": 0,
+   "at_deg": 0,
+   "radius": 0,
+   "note": "arc centre: overview spot for the whole board and the annunciator row"
+  }
+ },
+ "cameras": {
+  "CAM_Seat_A1": {
+   "pos": [
+    2.514,
+    6.064
+   ],
+   "height": 1.2,
+   "look_at": {
+    "x": 1.438,
+    "y": 6.546,
+    "z": 1.3
+   },
+   "fov_deg": 90,
+   "note": "seated at the reactor desk"
+  },
+  "CAM_Stand_Center": {
+   "pos": [
+    6.0,
+    4.5
+   ],
+   "height": 1.65,
+   "fov_deg": 70,
+   "headings_deg": [
+    -58,
+    0,
+    58
+   ],
+   "note": "overview; one image per heading (the board spans 175 deg, wider than one frame)"
+  },
+  "CAM_Top": {
+   "pos": [
+    6.0,
+    5.0
+   ],
+   "height": 15.0,
+   "look_down": true,
+   "orthographic": true,
+   "ortho_scale": 12.5,
+   "note": "top-down; hide the ceiling"
+  }
+ },
+ "eye_height": {
+  "seated": 1.2,
+  "standing": 1.65
+ },
+ "checks": {
+  "reach_m": 0.7,
+  "min_view_angle_deg": 45,
+  "min_text_deg": 0.9,
+  "viewpoints": {
+   "default": "STAND_<section of the row>",
+   "overview": {
+    "point": "STAND_Center",
+    "rows": "inventory overview == y",
+    "note": "numerals must also be at least min_text_deg from STAND_Center; at radius 5.0 m that is about 79 mm"
+   }
+  },
+  "text_height_mm_at": {
+   "1.0m": 15.7,
+   "1.3m": 20.4,
+   "5.0m": 78.5
+  },
+  "occlusion": "the row's kit must be the first collider hit on the ray from its viewpoint",
+  "exists": "every inventory row has a CTL_<id> parent in the scene",
+  "min_label_text_deg": 0.5,
+  "label_text_note": "Engraved label plates cap text at ~19 mm (25 mm plates), which is ~0.5-1.0 deg from the operating points (1.1-2.0 m). Labels are checked at min_label_text_deg; the full name and live value are always readable via the hover tooltip and wheel zoom (KTD4). min_text_deg still applies to gauge numerals and overview items."
+ }
+}
