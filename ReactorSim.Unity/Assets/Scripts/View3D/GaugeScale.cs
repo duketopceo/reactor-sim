@@ -33,8 +33,8 @@ namespace ReactorSim.Instruments
         public const float MidFontFrac = 0.085f, EndFontFrac = 0.075f, UnitFontFrac = 0.07f;
         public const float MidRadiusFrac = 0.235f;      // the middle numeral's distance above the hub
         public const float UnitDropFrac = 0.17f;        // the unit label's distance below the hub
-        public const float EndCenterY = -0.395f;        // the end numerals' baseline row, under the end ticks
-        public const float EndMinCenterX = 0.28f;       // end numeral centres sit at least this far left and right of the hub
+        public const float EndCenterY = -0.385f;        // the end numerals' baseline row, under the end ticks
+        public const float EndMinCenterX = 0.25f;       // end numeral centres sit at least this far left and right of the hub
         public const float EndGapFrac = 0.03f;          // clear space between the two end numerals, at least
         public const float CharAdvanceFrac = 0.6f;      // monospace advance as a share of the font size
         public const float NeedleRestLengthFrac = 0.44f, NeedleHalfWidthFrac = 0.03f;   // pessimistic needle (tip beyond the ticks)

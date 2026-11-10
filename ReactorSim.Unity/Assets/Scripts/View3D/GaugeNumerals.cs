@@ -110,7 +110,7 @@ public static class GaugeNumerals
             hi = Mathf.Min(limit, hi) - BarEndInsetM;
             side = Vector3.left * (BarFaceWidthM * 0.14f);
         }
-        float size = BarFaceWidthM * 0.13f;
+        float size = BarFaceWidthM * 0.15f;
         // The unit rides on the maximum only when it fits the strip's width; a long one stays in the tooltip.
         string maxText = marks[2].Text + (unit.Length == 0 || unit == "%" ? unit : " " + unit);
         if (maxText.Length > 6) maxText = marks[2].Text;
