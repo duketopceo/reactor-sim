@@ -4,12 +4,14 @@ using ReactorSim;
 
 // Spent-fuel storage racks standing on the pool ledge (U7): a grid of tall square cells per array (one merged mesh, one shared
 // emissive material, so a whole array is one draw and the binder sets one emission colour), a dark frame, a cone of water haze
-// above it (additive, opacity from GlowMapping) and one capped point light. The glow follows plant power as a labelled visual
-// cue (see GlowMapping). Object names are what PlantEquipmentBinder and HallCheck look for: RackGlow_Cells_<i>,
-// RackGlow_Haze_<i>, RackGlow_Light_<i>.
+// above it (additive, opacity from GlowMapping). The glow follows plant power as a labelled visual cue (see GlowMapping): it is
+// carried by the cells' emission and the haze, which need no light, plus ONE shared real point light for all the arrays
+// (BuildSharedLight) so the hall stays under the default pixel-light count. Object names are what PlantEquipmentBinder and
+// HallCheck look for: RackGlow_Cells_<i>, RackGlow_Haze_<i>, RackGlow_Light_<n>.
 public static class FuelRackMesh
 {
-    public const float Pitch = 0.30f, CellSize = 0.24f, CellHeight = 3.2f;
+    public const float Pitch = 0.30f, CellSize = 0.24f;
+    public static readonly float CellHeight = HallDimensions.RackCellHeight;
 
     public sealed class Materials
     {
@@ -49,19 +51,24 @@ public static class FuelRackMesh
 
         // haze: an open cone narrowing upward from the rack top, both faces so it shows from above and below
         var haze = new MeshBuilder();
-        haze.AddFrustum(new Vector3(0f, CellHeight + 0.1f, 0f), new Vector3(0f, CellHeight + 5.5f, 0f), 0.5f * w, 0.25f, 20, false);
+        haze.AddFrustum(new Vector3(0f, CellHeight + 0.1f, 0f), new Vector3(0f, CellHeight + HallDimensions.RackHazeLength, 0f), 0.5f * w, 0.25f, 20, false);
         haze.Attach(root.transform, "RackGlow_Haze_" + index, m.haze);
 
-        var lg = new GameObject("RackGlow_Light_" + index);
-        lg.transform.SetParent(root.transform, false);
-        lg.transform.localPosition = new Vector3(0f, CellHeight + 1.6f, 0f);
+        return root;
+    }
+
+    /// <summary>The one real light of the rack glow, shared by every array, cool blue; PlantEquipmentBinder scales it with plant power.</summary>
+    public static void BuildSharedLight(Transform parent, Vector3 localPosition)
+    {
+        var lg = new GameObject("RackGlow_Light_0");
+        lg.transform.SetParent(parent, false);
+        lg.transform.localPosition = localPosition;
         var l = lg.AddComponent<Light>();
         l.type = LightType.Point;
         l.color = new Color(0.30f, 0.58f, 1f);
-        l.range = 8f;
-        l.intensity = 1.8f;
+        l.range = 11f;
+        l.intensity = 2.4f;
         l.shadows = LightShadows.None;
-        return root;
     }
 
     /// <summary>The ledge the racks stand on: a stepped band round part of the pool wall at the ledge height.</summary>

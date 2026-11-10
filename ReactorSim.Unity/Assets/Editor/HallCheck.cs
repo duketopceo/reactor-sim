@@ -21,6 +21,7 @@ public static class HallCheck
             failures += CheckHallRules();
             failures += CheckBudget(first);
             failures += CheckRacks();
+            failures += CheckWindowAndCrane();
 
             ControlRoomSceneBuilder.Build(false);
             var second = Measure();
@@ -128,12 +129,48 @@ public static class HallCheck
             else if (t.name.StartsWith("RackGlow_Haze_")) haze++;
         }
         int f = Report(cells == HallDimensions.RackArrays, $"{HallDimensions.RackArrays} rack arrays exist (found {cells})");
-        f += Report(lights == HallDimensions.RackArrays && haze == HallDimensions.RackArrays, $"each rack has a capped light and a haze cone (lights {lights}, haze {haze})");
+        f += Report(lights == HallDimensions.RackLights && haze == HallDimensions.RackArrays,
+            $"the racks share {HallDimensions.RackLights} real light (found {lights}) and each has a haze cone (found {haze}); the glow cue is emissive first");
         Material shared = null;
         bool oneMaterial = true;
         foreach (var r in hall.GetComponentsInChildren<Renderer>(true))
             if (r.name.StartsWith("RackGlow_Cells_")) { if (shared == null) shared = r.sharedMaterial; else if (shared != r.sharedMaterial) oneMaterial = false; }
         f += Report(shared != null && oneMaterial, "every rack array shares one emissive material");
+        return f;
+    }
+
+    // PR4: the window the stand and seat look through is as wide and as low as the sight-line maths assumes, and the parked crane
+    // (read from the built meshes, in hall space) crosses no sight line from either viewpoint to the module.
+    private static int CheckWindowAndCrane()
+    {
+        var hall = GameObject.Find(HallBuilder.RootName);
+        var glassGo = GameObject.Find("Window_Glass");
+        if (hall == null || glassGo == null) return Report(false, "the hall and the window glass exist for the sight-line checks");
+        Bounds g = glassGo.GetComponent<Renderer>().bounds;
+        float roomFloorWorld = hall.transform.position.y + HallDimensions.RoomFloorAbovePoolFloor;
+        float sill = g.min.y - roomFloorWorld, width = Mathf.Max(g.size.x, g.size.z);
+        int f = Report(Mathf.Abs(sill - HallDimensions.WindowSill) < 0.02f, $"the window sill is {sill:0.00} m (expected {HallDimensions.WindowSill:0.00})");
+        f += Report(width >= HallDimensions.WindowWidth - 0.05f, $"the window is {width:0.00} m wide (expected {HallDimensions.WindowWidth:0.00})");
+        f += Report(HallSightline.CheckWindowReach().Count == 0, "the stand sees the module head and the seat sees the water over it through the window");
+
+        var lo = new double[] { double.MaxValue, double.MaxValue, double.MaxValue };
+        var hi = new double[] { double.MinValue, double.MinValue, double.MinValue };
+        int parts = 0;
+        foreach (var mf in hall.GetComponentsInChildren<MeshFilter>(true))
+        {
+            if (!mf.name.StartsWith("Crane_") || mf.name == "Crane_RailRing" || mf.sharedMesh == null) continue;
+            Bounds b = mf.sharedMesh.bounds;   // the crane meshes are built in hall space under a root with identity local transform
+            parts++;
+            lo[0] = System.Math.Min(lo[0], b.min.x); lo[1] = System.Math.Min(lo[1], b.min.y); lo[2] = System.Math.Min(lo[2], b.min.z);
+            hi[0] = System.Math.Max(hi[0], b.max.x); hi[1] = System.Math.Max(hi[1], b.max.y); hi[2] = System.Math.Max(hi[2], b.max.z);
+        }
+        f += Report(parts >= 2, $"the crane bridge and trolley meshes exist (found {parts})");
+        if (parts >= 2)
+        {
+            var box = new[] { lo, hi };
+            f += Report(HallSightline.CraneClearOfModule(HallSightline.Stand(), box) && HallSightline.CraneClearOfModule(HallSightline.Seat(), box),
+                $"the built crane (z {lo[2]:0.0}..{hi[2]:0.0}, y {lo[1]:0.0}..{hi[1]:0.0}) crosses no sight line to the module from the stand or the seat");
+        }
         return f;
     }
 }

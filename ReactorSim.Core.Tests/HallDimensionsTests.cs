@@ -37,11 +37,12 @@ namespace ReactorSim.Core.Tests
         }
 
         [Fact]
-        public void GalleryEyeIsNineMetresOverTheWaterAndRoomFloorFollows()
+        public void GalleryEyeIsLowEnoughForTheWindowToLookDownAtThePool()
         {
-            Assert.Equal(9.0f, HallDimensions.GalleryEyeAboveWater);
-            // eye = room floor + 1.6 m, so the room floor is 29.4 m over the pool floor
-            Assert.Equal(HallDimensions.WaterDepth + 9.0f - 1.6f, HallDimensions.RoomFloorAbovePoolFloor, 4);
+            // 3.2 m over the water: the stand and seat reach (about 19 and 15 degrees) covers the water over the module
+            Assert.Equal(3.2f, HallDimensions.GalleryEyeAboveWater);
+            Assert.Equal(HallDimensions.WaterDepth + 3.2f - 1.6f, HallDimensions.RoomFloorAbovePoolFloor, 4);
+            Assert.True(HallDimensions.PoolAxisFromWall - HallDimensions.PoolRadius > 1.0f, "the deck must stay between the wall and the pool edge");
         }
 
         [Fact]
@@ -59,9 +60,10 @@ namespace ReactorSim.Core.Tests
         }
 
         [Fact]
-        public void LightBudgetIsAtMostSix()
+        public void LightBudgetIsAtMostTheDefaultPixelLightCount()
         {
-            Assert.True(HallDimensions.MaxRealtimeLights <= 6);
+            Assert.True(HallDimensions.MaxRealtimeLights <= 4);
+            Assert.True(HallDimensions.RackLights >= 1 && HallDimensions.RackLights <= 2);
         }
     }
 }

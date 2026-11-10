@@ -13,12 +13,29 @@ namespace ReactorSim
         public static readonly float DeckAboveWater = 0.30f;         // hall deck (pool rim) above the water
         public static readonly float PoolRadius = 6.5f;
         public static readonly float HallRadius = 15.0f;             // circular hall, concrete wall
-        public static readonly float GalleryEyeAboveWater = 9.0f;    // standing eye height over the water surface
+        // Standing eye height over the water surface. Low on purpose: from the standing and seated spots the window can only
+        // look down about 15 degrees, so the water the player should see has to lie inside that reach (see HallSightline).
+        public static readonly float GalleryEyeAboveWater = 3.2f;
         public static readonly float EyeAboveRoomFloor = 1.6f;
         /// <summary>Control-room floor above the pool floor.</summary>
         public static readonly float RoomFloorAbovePoolFloor = WaterDepth + GalleryEyeAboveWater - EyeAboveRoomFloor;
         /// <summary>Horizontal distance from the window wall to the pool axis.</summary>
-        public static readonly float PoolAxisFromWall = 11.0f;
+        public static readonly float PoolAxisFromWall = 8.5f;
+
+        // ---- observation window (south wall) and the control-room anchors that look through it ----
+        public static readonly float WindowWidth = 4.0f;
+        public static readonly float WindowSill = 0.05f;             // glass runs almost to the floor so the standing eye can look steeply down
+        public static readonly float WindowHeight = 2.3f;
+        public static readonly float WindowOffsetFromDoor = 3.0f;    // opening centre, along the wall from the door centre
+        public static readonly float HeaderMinWall = 0.3f;           // wall the builder keeps above the opening
+        public static readonly float VesselShiftX = 0.9f;            // pool axis, from the window centre along the wall (towards the seat side)
+        public static readonly float StandEyeHeight = 1.65f;         // OperatorMath.StandingEyeHeight
+        public static readonly float StandBackFromWall = 4.5f;       // STAND_Center distance from the window wall
+        public static readonly float SeatBackFromWall = 6.1f;        // seat distance from the window wall (the seat view uses the standing eye height)
+        public static readonly float StandAlongWall = -3.0f;         // stand position along the wall, from the window centre
+        public static readonly float SeatAlongWall = 0.49f;          // seat position along the wall, from the window centre
+        public static readonly float SightMarginDeg = 1.0f;          // the module must sit this far inside the opening's vertical reach
+        public static readonly float SightEdgeMargin = 0.25f;        // and this far (m) inside the opening's side edges
 
         // ---- reactor module (vessel inside containment, both standing on the pool floor) ----
         public static readonly float VesselDiameter = 2.7f;
@@ -33,15 +50,28 @@ namespace ReactorSim
         public static float ContainmentTop { get { return ContainmentBase + ContainmentHeight; } }
         /// <summary>Height at which the steam and feedwater stubs run sideways to the pool wall (just under the surface).</summary>
         public static float PipeRunHeight { get { return WaterDepth - 0.45f; } }
+        /// <summary>The point the stand's sight line aims at: the top of the module, just under the water surface.</summary>
+        public static float SightTargetHeight { get { return ContainmentTop; } }
+        /// <summary>Top of the observation-window opening above the room floor.</summary>
+        public static float WindowTop { get { return WindowSill + WindowHeight; } }
+        /// <summary>Eye height over the pool floor for a viewpoint at the given eye height over the room floor.</summary>
+        public static float EyeAbovePoolFloor(float eyeAboveRoomFloor) { return RoomFloorAbovePoolFloor + eyeAboveRoomFloor; }
 
         // ---- spent-fuel racks (on a ledge on the far wall, shallow enough to read from the gallery) ----
-        public static readonly float RackLedgeHeight = 12.0f;        // ledge top above the pool floor
+        public static readonly float RackLedgeHeight = 14.5f;        // ledge top above the pool floor
         public static readonly int RackArrays = 3;
         public static readonly int RackRows = 6;
         public static readonly int RackColumns = 10;
+        public static readonly float RackCellHeight = 3.2f;
+        public static readonly float RackHazeLength = 3.6f;          // haze cone above the rack top, kept under the surface
+
+        // ---- crane (parked behind the pool, out of the sight line to the module) ----
+        public static readonly float CraneBridgeZ = 9.0f;            // bridge centre in hall space (+z is away from the window)
+        public static readonly float CraneRailAboveDeck = 5.2f;      // rail height over the hall deck
 
         // ---- budgets (KTD9). The graded copies live in scripts/check-captures.sh; these are the build-time sanity limits ----
-        public static readonly int MaxRealtimeLights = 6;
+        public static readonly int MaxRealtimeLights = 4;            // the default pixel-light count: every real light on the hall layer is a pixel light
+        public static readonly int RackLights = 1;                   // one shared real light for all rack arrays; the glow cue is emissive first
         public static readonly int MaxHallTriangles = 120000;
 
         /// <summary>Everything that must hold for the module to be the size the plan promises. Empty means all true.</summary>
@@ -61,6 +91,11 @@ namespace ReactorSim
             if (PoolRadius + 1.0f > HallRadius) bad.Add("the pool does not fit in the hall");
             if (RackLedgeHeight >= WaterDepth - 3.0f) bad.Add("the rack ledge is too shallow to be under water");
             if (RackLedgeHeight < ContainmentBase + 4.0f) bad.Add("the rack ledge is too deep to read from the gallery");
+            if (RackLedgeHeight + RackCellHeight + RackHazeLength >= WaterDepth) bad.Add("the rack haze would poke above the water");
+            if (RackLights < 1 || RackLights > 2) bad.Add("the racks need one or two real lights");
+            if (MaxRealtimeLights > 4) bad.Add("more than 4 real lights on the hall layer exceeds the default pixel-light count");
+            if (WindowSill >= StandEyeHeight) bad.Add("the window sill is above the standing eye");
+            bad.AddRange(HallSightline.CheckWindowReach());
             return bad;
         }
     }
