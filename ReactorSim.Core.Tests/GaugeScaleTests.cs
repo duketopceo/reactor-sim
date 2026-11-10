@@ -26,7 +26,7 @@ namespace ReactorSim.Core.Tests
         public void NarrowScales_KeepADecimal_AndNegativeMinimumsKeepTheirSign()
         {
             Assert.Equal(new[] { "6.5", "7.5", "8.5" }, GaugeScale.Marks(6.5, 8.5, "pH").Select(x => x.Text).ToArray());
-            Assert.Equal(new[] { "-8000", "-3500", "1000" }, GaugeScale.Marks(-8000, 1000, "pcm").Select(x => x.Text).ToArray());
+            Assert.Equal(new[] { "-8k", "-3.5k", "1k" }, GaugeScale.Marks(-8000, 1000, "pcm").Select(x => x.Text).ToArray());
         }
 
         [Fact]
@@ -34,6 +34,8 @@ namespace ReactorSim.Core.Tests
         {
             Assert.Equal("320M", GaugeScale.Tick(3.2e8, 3.2e8));
             Assert.Equal("30k", GaugeScale.Tick(30000, 30000));
+            Assert.Equal("2.5k", GaugeScale.Tick(2500, 2500));
+            Assert.Equal("999", GaugeScale.Tick(999, 2500));
             Assert.Equal("0", GaugeScale.Tick(-0.0001, 200));
             Assert.Equal("--", GaugeScale.Tick(double.NaN, 1));
         }

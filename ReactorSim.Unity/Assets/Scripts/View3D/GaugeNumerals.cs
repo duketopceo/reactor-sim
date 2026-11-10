@@ -10,8 +10,8 @@ public static class GaugeNumerals
 {
     // Face widths (m) of the circular kits (design/control-room/kits.json K01, K01L).
     private const float SmallFaceM = 0.22f, LargeFaceM = 0.45f;
-    private const float RingRadiusFrac = 0.29f;     // numeral radius as a share of the face width
-    private const float UnitDropFrac = 0.26f;       // unit label distance below the hub
+    private const float RingRadiusFrac = 0.235f;     // numeral radius as a share of the face width
+    private const float UnitDropFrac = 0.215f;       // unit label distance below the hub
     private const float LiftM = 0.0025f;
 
     /// <summary>Kit face width for a circular dial pivot, or 0 when it is not one (bars, counters, other kits).</summary>
@@ -44,13 +44,13 @@ public static class GaugeNumerals
             // The needle turns about the face normal by NeedleDeg(frac); a numeral stands at the same angle from "up".
             Quaternion turn = Quaternion.AngleAxis(GaugeGeometry.NeedleDeg(mark.Frac), ControlRoom3DBinder.KitFaceNormal);
             Vector3 at = pivot.localPosition + turn * ControlRoom3DBinder.KitFaceUp * (face * RingRadiusFrac);
-            Make(parent, kit, mark.Text, at, faceRot, face * 0.16f, face, k, ls, ThemeColors.TextInkOnPaper);
+            Make(parent, kit, mark.Text, at, faceRot, face * 0.085f, face, k, ls, ThemeColors.TextInkOnPaper);
         }
         string unit = GaugeScale.UnitLabel(src.Units);
         if (unit.Length > 0)
         {
             Vector3 at = pivot.localPosition - ControlRoom3DBinder.KitFaceUp * (face * UnitDropFrac);
-            Make(parent, kit, unit, at, faceRot, face * 0.13f, face, k, ls, ThemeColors.TextInkOnPaper);
+            Make(parent, kit, unit, at, faceRot, face * 0.07f, face, k, ls, ThemeColors.TextInkOnPaper);
         }
     }
 
@@ -63,7 +63,7 @@ public static class GaugeNumerals
         go.transform.localPosition = localPos + ControlRoom3DBinder.KitFaceNormal * (LiftM / k);
         go.transform.localRotation = rot;
         var t = go.AddComponent<TextMeshPro>();
-        t.rectTransform.sizeDelta = new Vector2(face * 0.34f, face * 0.18f);
+        t.rectTransform.sizeDelta = new Vector2(face * 0.30f, face * 0.12f);
         t.font = UiFonts.Mono;
         t.fontSize = fontSize * 10f;   // TextMeshPro (3D): one font-size unit is 0.1 world units
         t.enableAutoSizing = false;

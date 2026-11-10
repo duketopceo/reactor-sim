@@ -42,7 +42,7 @@ namespace ReactorSim.Instruments
             if (double.IsNaN(v) || double.IsInfinity(v)) return "--";
             double a = Math.Abs(v);
             if (a >= 1e6) return Trim(v / 1e6) + "M";
-            if (a >= 1e4) return Trim(v / 1e3) + "k";
+            if (a >= 1e3) return Trim(v / 1e3) + "k";
             int decimals = Math.Abs(span) >= 10.0 ? 0 : (Math.Abs(span) >= 1.0 ? 1 : 2);
             string s = v.ToString("F" + decimals, CultureInfo.InvariantCulture);
             return s.Trim('-', '0', '.').Length == 0 ? s.TrimStart('-') : s;
