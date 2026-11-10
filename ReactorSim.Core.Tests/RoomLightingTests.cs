@@ -43,7 +43,8 @@ namespace ReactorSim.Core.Tests
         {
             double wall = RoomLighting.Luma(RoomLighting.WallTint), ceiling = RoomLighting.Luma(RoomLighting.CeilingTint),
                 floor = RoomLighting.Luma(RoomLighting.FloorTint);
-            Assert.True(wall < 0.85, "walls must step down from the consoles (1.0)");
+            Assert.True(wall < 0.75, "walls must step down from the consoles (1.0)");
+            Assert.True(floor < 0.45, "the floor must read clearly darker than the bench tops");
             Assert.True(ceiling < wall && floor < wall, "ceiling and floor go darker than the walls");
             Assert.True(RoomLighting.WallTint.B > RoomLighting.WallTint.R, "walls lean cool");
         }

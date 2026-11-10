@@ -147,6 +147,7 @@ public class ControlRoom3DBinder : MonoBehaviour
                 continue;
             }
             if (gauge) GaugeNumerals.Attach(t, src);   // circular dials get min / mid / max numerals and the unit
+            else GaugeNumerals.AttachBar(t, src, GaugeGeometry.TravelM(src.Name));   // bars get min / max numerals and the unit
             gauges.Add(new GaugeBinding
             {
                 Pivot = t,

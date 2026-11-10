@@ -7,6 +7,23 @@ namespace ReactorSim.Tests
     public class ReadoutFormatTests
     {
         [Fact]
+        public void Adaptive_CapsDecimalsByMagnitude_AndTrimsZeros()
+        {
+            Assert.Equal("-7250", ReadoutFormat.Adaptive(-7250.26));
+            Assert.Equal("123.5", ReadoutFormat.Adaptive(123.46));
+            Assert.Equal("1.5", ReadoutFormat.Adaptive(1.5));
+            Assert.Equal("0.25", ReadoutFormat.Adaptive(0.25));
+            Assert.Equal("0", ReadoutFormat.Adaptive(-0.0));
+            Assert.Equal("-1e-4", ReadoutFormat.Adaptive(-0.0001));
+            Assert.Equal("--", ReadoutFormat.Adaptive(double.NaN));
+            Assert.Equal("--", ReadoutFormat.Adaptive(double.PositiveInfinity));
+            Assert.Equal("1000", ReadoutFormat.Adaptive(999.96));
+            Assert.Equal("10", ReadoutFormat.Adaptive(9.996));
+            Assert.Equal("2.5e-5", ReadoutFormat.Adaptive(0.000025));
+            Assert.Equal("1e+7", ReadoutFormat.Adaptive(1e7));
+        }
+
+        [Fact]
         public void Number_IsInvariantUnderACommaDecimalCulture()
         {
             var saved = System.Threading.Thread.CurrentThread.CurrentCulture;
