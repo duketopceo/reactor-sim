@@ -267,7 +267,7 @@ public class StartupChecklistHud : MonoBehaviour
         else
         {
             Set(cPhase, model.Phase);
-            Set(cStep, model.Mark + " Step " + model.StepNumber + " of " + model.StepCount + "  -  " + model.Progress);
+            Set(cStep, model.Mark + " Step " + model.StepNumber + " of " + model.StepCount);
             Set(cAction, model.Action);
             cAction.color = ThemeColors.TextBody;
             Set(cControl, model.Control.Length > 0 ? "Control: " + model.Control : "");
