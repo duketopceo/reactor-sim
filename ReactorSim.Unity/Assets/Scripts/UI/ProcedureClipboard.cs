@@ -375,7 +375,11 @@ public class ProcedureClipboard : MonoBehaviour
         {
             Set(hoverText, label + (InRange ? " - click to read" : " - walk closer"));
             float s = Screen.height / (float)Theme.ReferenceHeight;
-            ((RectTransform)hoverBox.transform).anchoredPosition = new Vector2((Input.mousePosition.x + 16f) / s, (Input.mousePosition.y - 8f) / s);
+            var hoverRect = (RectTransform)hoverBox.transform;
+            float hoverLeft, hoverTop;
+            ReactorSim.Ui.TooltipClamp.Place(Input.mousePosition.x, Input.mousePosition.y, hoverRect.rect.width * s, hoverRect.rect.height * s,
+                Screen.width, Screen.height, 16f, 4f, out hoverLeft, out hoverTop);
+            hoverRect.anchoredPosition = new Vector2(hoverLeft / s, hoverTop / s);
         }
     }
 

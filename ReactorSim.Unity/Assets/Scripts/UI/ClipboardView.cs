@@ -34,6 +34,9 @@ namespace ReactorSim.Clipboard
         public bool Ticked;         // true only once the whole procedure is complete
         public string Mark = "[ ]";
         public string[] HighlightRows = new string[0];
+        public int DoneCount;       // steps already ticked before the current one
+        public string Next = "";    // the step after the current one, empty on the last step and once complete
+        public string Progress = ""; // "3 of 13 done"
     }
 
     public static class ClipboardView
@@ -51,6 +54,8 @@ namespace ReactorSim.Clipboard
                 m.Action = "On the grid";
                 m.Ticked = true;
                 m.Mark = "[x]";
+                m.DoneCount = m.StepCount;
+                m.Progress = m.StepCount + " of " + m.StepCount + " done";
                 return m;
             }
             var step = state.Current;
@@ -63,6 +68,10 @@ namespace ReactorSim.Clipboard
             m.Reading = Reading(m.LiveValue, m.Target);
             m.Mark = "[>]";
             m.HighlightRows = state.HighlightedRows;
+            m.DoneCount = state.CurrentIndex;
+            m.Progress = m.DoneCount + " of " + m.StepCount + " done";
+            int nextIndex = state.CurrentIndex + 1;
+            if (nextIndex < procedure.Steps.Count) m.Next = procedure.Steps[nextIndex].Text ?? "";
             return m;
         }
 

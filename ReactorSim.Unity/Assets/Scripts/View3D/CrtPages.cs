@@ -271,12 +271,20 @@ namespace ReactorSim.Instruments
                     break;
                 case "CRT_AssistantTerminal":
                     p = Begin("ASSISTANT", s, clock);
-                    Body(p, "TIER " + s.AssistTier + "  MISSION " + s.ActiveMissionIndex);
+                    Body(p, "ASSIST LEVEL " + s.AssistTier);
                     if (terminalLines == null || terminalLines.Count == 0)
-                        Body(p, "> all quiet.");
+                        Body(p, "- ALL QUIET");
                     else
+                    {
+                        // A repeated advisory prints once: the screen shows what changed, not how often it was said.
+                        string previous = null;
                         for (int i = Math.Max(0, terminalLines.Count - 5); i < terminalLines.Count; i++)
-                            Body(p, "> " + terminalLines[i]);
+                        {
+                            if (terminalLines[i] == previous) continue;
+                            previous = terminalLines[i];
+                            Body(p, "- " + terminalLines[i]);
+                        }
+                    }
                     break;
                 case "CRT_MimicStatusBoard":
                     p = Begin("STATUS", s, clock);
@@ -284,8 +292,8 @@ namespace ReactorSim.Instruments
                     Body(p, "CLOCK " + ClockReadout.Format(clock));
                     break;
                 default:
-                    p = Begin("SCREEN", s, clock);
-                    Body(p, "SCRAM " + (s.Scrammed ? "YES" : "NO"));
+                    p = Begin("STANDBY", s, clock);
+                    Body(p, "NO SIGNAL");
                     break;
             }
             return p;

@@ -166,6 +166,22 @@ namespace ReactorSim.Tests
         }
 
         [Fact]
+        public void Hud_NamesTheNextStepAndProgress_AndClearsThemOnTheLastStepAndAtCompletion()
+        {
+            var p = ProcedureLoader.Parse(RichJson)[0];
+            var snap = new PlantSnapshot { PrimaryFlowFrac = 1.0, BoronPpm = 1347.25 };
+            var mid = ClipboardView.Hud(p, p.Evaluate(snap), snap);
+            Assert.Equal(1, mid.DoneCount);
+            Assert.Equal("1 of 3 done", mid.Progress);
+            Assert.Equal(p.Steps[2].Text, mid.Next);
+            Assert.True(mid.Next.Length > 0);
+
+            var first = ClipboardView.Hud(p, p.Evaluate(new PlantSnapshot()), new PlantSnapshot());
+            Assert.Equal(0, first.DoneCount);
+            Assert.Equal(p.Steps[1].Text, first.Next);
+        }
+
+        [Fact]
         public void Hud_Reading_ShowsLiveValueAgainstTarget_WithoutCultureDependence()
         {
             var p = ProcedureLoader.Parse(RichJson)[0];

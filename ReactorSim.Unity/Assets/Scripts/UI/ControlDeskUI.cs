@@ -1,3 +1,5 @@
+// Development-only debug overlay: compiled out of release builds so players never see IMGUI.
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
 // ReactorSim.Unity — U6: Full-screen PWR Control Desk UI.
 // Renders an industrial dark-theme 3-column Control Room dashboard scaled to 1920x1080.
 // Every operator control dispatches a PlantIntent through PlantBridge.SubmitIntent(),
@@ -660,3 +662,4 @@ public class ControlDeskUI : MonoBehaviour
         }
     }
 }
+#endif

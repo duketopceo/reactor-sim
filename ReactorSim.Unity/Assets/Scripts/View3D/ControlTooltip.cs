@@ -108,8 +108,8 @@ public class ControlTooltip : MonoBehaviour
         Vector2 m = AnchorOverride.HasValue ? new Vector2(AnchorOverride.Value.x, Screen.height - AnchorOverride.Value.y) : (Vector2)Input.mousePosition;
         float k = canvas.scaleFactor;
         float w = box.rect.width * k, hgt = box.rect.height * k;
-        float x = Mathf.Clamp(m.x + CursorGap, EdgeGap, Mathf.Max(EdgeGap, Screen.width - w - EdgeGap));
-        float top = Mathf.Clamp(m.y - CursorGap, Mathf.Min(hgt + EdgeGap, Screen.height - EdgeGap), Screen.height - EdgeGap);
+        float x, top;
+        ReactorSim.Ui.TooltipClamp.Place(m.x, m.y, w, hgt, Screen.width, Screen.height, CursorGap, EdgeGap, out x, out top);
         box.anchoredPosition = new Vector2(x / k, (top - Screen.height) / k);
     }
 }

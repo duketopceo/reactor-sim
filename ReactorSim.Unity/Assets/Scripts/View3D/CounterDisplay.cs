@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 using TMPro;
 
 // K04 seven-segment counters (boron ppm, game clock, generator kW ...). The kit carries a BIND_GAUGE pivot with no
@@ -60,7 +61,38 @@ public static class CounterDisplay
         text.textWrappingMode = TextWrappingModes.NoWrap;
         text.overflowMode = TextOverflowModes.Overflow;
         text.text = "-----";
+        DarkenWindows(kit);
         return text;
+    }
+
+    // The kit's number windows arrive glowing pale cyan (the exported screen emission), which washes out the amber numerals.
+    // Each distinct window material is cloned once with a dark screen emission, so the numerals read like a lit display.
+    private static readonly Dictionary<Material, Material> darkWindows = new Dictionary<Material, Material>();
+
+    private static void DarkenWindows(Transform kit)
+    {
+        foreach (var r in kit.GetComponentsInChildren<MeshRenderer>(true))
+        {
+            var mats = r.sharedMaterials;
+            bool changed = false;
+            for (int i = 0; i < mats.Length; i++)
+            {
+                var m = mats[i];
+                if (m == null || m.name.IndexOf("CrtScreen", System.StringComparison.OrdinalIgnoreCase) < 0) continue;
+                Material dark;
+                if (!darkWindows.TryGetValue(m, out dark) || dark == null)
+                {
+                    dark = new Material(m) { name = m.name + "_NumberWindow" };
+                    if (dark.HasProperty("_Color")) dark.SetColor("_Color", Color.black);
+                    if (dark.HasProperty("_EmissionColor")) dark.SetColor("_EmissionColor", ThemeColors.SurfaceScreen);
+                    if (dark.HasProperty("_EmissionMap")) dark.SetTexture("_EmissionMap", null);
+                    darkWindows[m] = dark;
+                }
+                mats[i] = dark;
+                changed = true;
+            }
+            if (changed) r.sharedMaterials = mats;
+        }
     }
 
     private static float Inv(float v)

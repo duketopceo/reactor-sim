@@ -71,7 +71,9 @@ public class PlantBridge : MonoBehaviour
     public Simulation Sim { get; private set; }
     public HttpApiServer HttpServer { get; private set; }
     public CoopSessionManager Coop { get; private set; }
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
     public ControlDeskUI DeskUI { get; private set; }
+#endif
 
     [Tooltip("Cutover 2D->3D: when false (default), the legacy IMGUI ControlDeskUI overlay stays off; the 3D control room is the UI. Enable for the debug overlay.")]
     public bool show2DControlDesk = false;
@@ -137,6 +139,7 @@ public class PlantBridge : MonoBehaviour
             Coop = gameObject.AddComponent<CoopSessionManager>();
         Coop.Initialize(this);
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         if (show2DControlDesk)
         {
             DeskUI = GetComponent<ControlDeskUI>();
@@ -144,6 +147,7 @@ public class PlantBridge : MonoBehaviour
                 DeskUI = gameObject.AddComponent<ControlDeskUI>();
             DeskUI.Initialize(this);
         }
+#endif
     }
 
     /// <summary>
