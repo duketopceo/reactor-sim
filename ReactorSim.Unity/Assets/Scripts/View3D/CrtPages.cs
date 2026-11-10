@@ -292,8 +292,15 @@ namespace ReactorSim.Instruments
                     Body(p, "CLOCK " + ClockReadout.Format(clock));
                     break;
                 default:
-                    p = Begin("STANDBY", s, clock);
-                    Key(p, "NO SIGNAL");
+                    // A screen with no page: standby content only, no live plant rows. The out-of-service tag sits over the
+                    // middle of the face, so the text stays in the upper and lower thirds with blank rows between.
+                    p = new CrtPage();
+                    Key(p, "STANDBY");
+                    Body(p, "NO SIGNAL");
+                    Body(p, "");
+                    Body(p, "");
+                    Body(p, "");
+                    Body(p, "");
                     Body(p, "NOT ASSIGNED");
                     Body(p, "SEE CORE, PRIMARY, STATUS");
                     break;

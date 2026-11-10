@@ -28,15 +28,60 @@ namespace ReactorSim.Instruments
             }
         }
 
-        /// <summary>Where a numeral stands, as (angle from "up" in degrees, radius as a share of the face width). The middle
-        /// numeral keeps the needle's own angle (the needle only crosses it mid-scale); the end numerals sit past the sweep
-        /// ends, low in the bottom gap, so the needle at rest never covers the minimum.</summary>
-        public static void NumeralSpot(float frac, float sweepMinDeg, float sweepMaxDeg, out float angleDeg, out float radiusFrac)
+        // ---- circular dial layout, in shares of the face width with the hub at the origin, +Y up, +X right ----
+
+        public const float MidFontFrac = 0.085f, EndFontFrac = 0.075f, UnitFontFrac = 0.07f;
+        public const float MidRadiusFrac = 0.235f;      // the middle numeral's distance above the hub
+        public const float UnitDropFrac = 0.17f;        // the unit label's distance below the hub
+        public const float EndCenterY = -0.395f;        // the end numerals' baseline row, under the end ticks
+        public const float EndMinCenterX = 0.28f;       // end numeral centres sit at least this far left and right of the hub
+        public const float EndGapFrac = 0.03f;          // clear space between the two end numerals, at least
+        public const float CharAdvanceFrac = 0.6f;      // monospace advance as a share of the font size
+        public const float NeedleRestLengthFrac = 0.44f, NeedleHalfWidthFrac = 0.03f;   // pessimistic needle (tip beyond the ticks)
+
+        /// <summary>An axis-aligned text box: centre and size.</summary>
+        public struct FaceBox
         {
-            const float EndPushDeg = 28f;
-            if (frac <= 0f) { angleDeg = sweepMinDeg - EndPushDeg; radiusFrac = 0.32f; }
-            else if (frac >= 1f) { angleDeg = sweepMaxDeg + EndPushDeg; radiusFrac = 0.32f; }
-            else { angleDeg = sweepMinDeg + (sweepMaxDeg - sweepMinDeg) * frac; radiusFrac = 0.235f; }
+            public float X, Y, W, H;
+            public FaceBox(float x, float y, float w, float h) { X = x; Y = y; W = w; H = h; }
+        }
+
+        public static FaceBox TextBox(string text, float cx, float cy, float fontFrac)
+        {
+            int n = text == null ? 0 : text.Length;
+            return new FaceBox(cx, cy, n * CharAdvanceFrac * fontFrac, fontFrac);
+        }
+
+        /// <summary>The minimum (left) or maximum (right) numeral: low in the bottom gap under the end ticks, well below where the
+        /// needle's tip rests at its end stop, and never closer to the hub axis than the other end numeral.</summary>
+        public static FaceBox EndNumeralBox(string text, bool isMax)
+        {
+            float w = (text == null ? 0 : text.Length) * CharAdvanceFrac * EndFontFrac;
+            float cx = Math.Max(EndMinCenterX, w / 2f + EndGapFrac / 2f);
+            return TextBox(text, isMax ? cx : -cx, EndCenterY, EndFontFrac);
+        }
+
+        public static FaceBox UnitBox(string unit)
+        {
+            return TextBox(unit, 0f, -UnitDropFrac, UnitFontFrac);
+        }
+
+        public static bool Overlaps(FaceBox a, FaceBox b)
+        {
+            return Math.Abs(a.X - b.X) < (a.W + b.W) / 2f && Math.Abs(a.Y - b.Y) < (a.H + b.H) / 2f;
+        }
+
+        /// <summary>True when the needle at the given angle from up (degrees, positive to the right) touches the box.</summary>
+        public static bool NeedleTouches(FaceBox box, float angleDeg)
+        {
+            double rad = angleDeg * Math.PI / 180.0;
+            for (float t = 0f; t <= NeedleRestLengthFrac; t += 0.005f)
+            {
+                float px = (float)Math.Sin(rad) * t, py = (float)Math.Cos(rad) * t;
+                if (Math.Abs(px - box.X) <= box.W / 2f + NeedleHalfWidthFrac && Math.Abs(py - box.Y) <= box.H / 2f + NeedleHalfWidthFrac)
+                    return true;
+            }
+            return false;
         }
 
         /// <summary>Three marks: minimum, middle, maximum. Fractions are shown 0 to 100.</summary>

@@ -6,22 +6,42 @@ namespace ReactorSim.Core.Tests
 {
     public class GaugeScaleTests
     {
+        // Every end numeral a dial can print, from the inventory's ranges (k and M notation, decimals, signs).
+        private static readonly string[] Samples =
+            { "0", "100", "200", "-750", "-2.5k", "1k", "4.0", "10.0", "-3k", "-1.5k", "-8k", "-999", "999", "700", "1.4k", "6.5", "8.5", "320M", "30k", "-4k" };
+        private static readonly string[] Units = { "MWt", "pcm", "\u00b0C", "%", "pH", "s", "bar", "ppm", "kV", "Hz" };
+
         [Fact]
-        public void EndNumerals_SitPastTheSweepEnds_SoTheNeedleNeverCoversThem()
+        public void EndNumerals_AreSeparate_ClearOfTheUnit_AndOfTheNeedleAtItsEndStops()
         {
-            float a, r;
-            GaugeScale.NumeralSpot(0f, -135f, 135f, out a, out r);
-            Assert.Equal(-163f, a);
-            Assert.Equal(0.32f, r);
-            float lo = a;
-            GaugeScale.NumeralSpot(1f, -135f, 135f, out a, out r);
-            Assert.True(a > 135f + 20f);
-            Assert.Equal(-lo, a);
-            GaugeScale.NumeralSpot(0.5f, -135f, 135f, out a, out r);
-            Assert.Equal(0f, a);
-            Assert.Equal(0.235f, r);
-            GaugeScale.NumeralSpot(0.25f, -135f, 135f, out a, out r);
-            Assert.Equal(-67.5f, a);
+            foreach (var lo in Samples)
+                foreach (var hi in Samples)
+                {
+                    var a = GaugeScale.EndNumeralBox(lo, false);
+                    var b = GaugeScale.EndNumeralBox(hi, true);
+                    Assert.False(GaugeScale.Overlaps(a, b), lo + " vs " + hi);
+                    Assert.True(a.X < 0f && b.X > 0f);
+                    foreach (var box in new[] { a, b })
+                    {
+                        Assert.False(GaugeScale.NeedleTouches(box, -135f), box.W + " covered by the needle at its minimum");
+                        Assert.False(GaugeScale.NeedleTouches(box, 135f), box.W + " covered by the needle at its maximum");
+                        Assert.True(System.Math.Abs(box.X) + box.W / 2f <= 0.44f && System.Math.Abs(box.Y) + box.H / 2f <= 0.45f, "inside the face");
+                    }
+                    foreach (var unit in Units)
+                    {
+                        var u = GaugeScale.UnitBox(unit);
+                        Assert.False(GaugeScale.Overlaps(a, u) || GaugeScale.Overlaps(b, u), lo + "/" + hi + " vs unit " + unit);
+                    }
+                }
+        }
+
+        [Fact]
+        public void NeedleTouches_DetectsAnOverlapOnTheRestLine()
+        {
+            // a box on the needle's own line at the minimum must be reported (the original defect)
+            var onLine = new GaugeScale.FaceBox(-0.166f, -0.166f, 0.1f, 0.085f);
+            Assert.True(GaugeScale.NeedleTouches(onLine, -135f));
+            Assert.False(GaugeScale.NeedleTouches(onLine, 135f));
         }
 
         [Fact]

@@ -11,7 +11,6 @@ public static class GaugeNumerals
 {
     // Face widths (m) of the circular kits (design/control-room/kits.json K01, K01L).
     private const float SmallFaceM = 0.22f, LargeFaceM = 0.45f;
-    private const float UnitDropFrac = 0.17f;       // unit label distance below the hub
     private const float LiftM = 0.0025f;
 
     /// <summary>Kit face width for a circular dial pivot, or 0 when it is not one (bars, counters, other kits).</summary>
@@ -36,27 +35,41 @@ public static class GaugeNumerals
         var parent = new GameObject(pivot.name + "_Scale").transform;
         parent.SetParent(kit, false);
 
-        foreach (var mark in GaugeScale.Marks(src.Min, src.Max, src.Units))
+        var marks = GaugeScale.Marks(src.Min, src.Max, src.Units);
+        var right = Vector3.right;   // local +X is the face's right (the needle sweeps toward it as the value rises)
+        for (int i = 0; i < marks.Count; i++)
         {
-            // The needle turns about the face normal by NeedleDeg(frac); see GaugeScale.NumeralSpot.
-            float deg, radius;
-            GaugeScale.NumeralSpot(mark.Frac, GaugeGeometry.NeedleSweepMinDeg, GaugeGeometry.NeedleSweepMaxDeg, out deg, out radius);
-            Quaternion turn = Quaternion.AngleAxis(deg, ControlRoom3DBinder.KitFaceNormal);
-            Vector3 at = pivot.localPosition + turn * ControlRoom3DBinder.KitFaceUp * (face * radius);
-            Make(parent, kit, mark.Text, at, faceRot, face * 0.085f, face, k, ls, ThemeColors.TextInkOnPaper);
+            var mark = marks[i];
+            Vector3 at;
+            float size;
+            if (mark.Frac > 0f && mark.Frac < 1f)
+            {
+                // The middle numeral stands above the hub, at the needle's own angle for its fraction.
+                Quaternion turn = Quaternion.AngleAxis(GaugeGeometry.NeedleDeg(mark.Frac), ControlRoom3DBinder.KitFaceNormal);
+                at = pivot.localPosition + turn * ControlRoom3DBinder.KitFaceUp * (face * GaugeScale.MidRadiusFrac);
+                size = face * GaugeScale.MidFontFrac;
+            }
+            else
+            {
+                // The end numerals sit in the two bottom corners, clear of each other, the unit and the needle at rest.
+                var box = GaugeScale.EndNumeralBox(mark.Text, mark.Frac >= 1f);
+                at = pivot.localPosition + (right * box.X + ControlRoom3DBinder.KitFaceUp * box.Y) * face;
+                size = face * GaugeScale.EndFontFrac;
+            }
+            Make(parent, kit, mark.Text, at, faceRot, size, face, k, ls, ThemeColors.TextInkOnPaper);
         }
         string unit = GaugeScale.UnitLabel(src.Units);
         if (unit.Length > 0)
         {
-            Vector3 at = pivot.localPosition - ControlRoom3DBinder.KitFaceUp * (face * UnitDropFrac);
-            Make(parent, kit, unit, at, faceRot, face * 0.07f, face, k, ls, ThemeColors.TextInkOnPaper);
+            Vector3 at = pivot.localPosition - ControlRoom3DBinder.KitFaceUp * (face * GaugeScale.UnitDropFrac);
+            Make(parent, kit, unit, at, faceRot, face * GaugeScale.UnitFontFrac, face, k, ls, ThemeColors.TextInkOnPaper);
         }
     }
 
     // The edgewise bars (K02): the minimum and maximum stand just past the ends of the pointer's travel, the unit rides
     // on the maximum, so a level reads off the strip. The middle is left off: the tick lines already mark it.
     private const float BarFaceWidthM = 0.14f, BarFaceHeightM = 0.34f;
-    private const float BarEndGapM = 0.022f;
+    private const float BarEndGapM = 0.022f, BarEndInsetM = 0.03f;
 
     public static bool IsBarKit(Transform pivot)
     {
@@ -92,11 +105,12 @@ public static class GaugeNumerals
         Vector3 side = Vector3.zero;
         if (lo < -limit || hi > limit)
         {
-            lo = Mathf.Max(-limit, lo);
-            hi = Mathf.Min(limit, hi);
+            // inside the strip, a little in from its ends, so the limit markers there do not sit on the numerals
+            lo = Mathf.Max(-limit, lo) + BarEndInsetM;
+            hi = Mathf.Min(limit, hi) - BarEndInsetM;
             side = Vector3.left * (BarFaceWidthM * 0.14f);
         }
-        float size = BarFaceWidthM * 0.11f;
+        float size = BarFaceWidthM * 0.13f;
         // The unit rides on the maximum only when it fits the strip's width; a long one stays in the tooltip.
         string maxText = marks[2].Text + (unit.Length == 0 || unit == "%" ? unit : " " + unit);
         if (maxText.Length > 6) maxText = marks[2].Text;

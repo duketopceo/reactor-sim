@@ -43,16 +43,22 @@ namespace ReactorSim.Tests
         }
 
         [Fact]
-        public void StandbyPage_ForAnUnassignedScreen_ShowsNoSignalWithinTheBudget()
+        public void StandbyPage_ForAnUnassignedScreen_ShowsOnlyStandbyContent_WithinTheBudget()
         {
             foreach (var s in States())
             {
                 var p = Build("STANDBY", s);
-                Assert.Contains("STANDBY", p.Lines[1].Text);
-                Assert.Contains("NO SIGNAL", p.ToText());
-                Assert.DoesNotContain("SCREEN", p.ToText());
+                string text = p.ToText();
+                Assert.Contains("STANDBY", p.Lines[0].Text);
+                Assert.Contains("NO SIGNAL", text);
+                Assert.DoesNotContain("SCREEN", text);
+                foreach (var live in new[] { "PWR", "RHO", "[OK]", "[XX]", "[!!]", "pcm", "MWt", "bar" })
+                    Assert.DoesNotContain(live, text);
                 Assert.True(p.RowCost <= CrtPages.RowBudget);
                 Assert.True(p.MaxCellWidth <= CrtPages.Columns);
+                // the middle of the face stays free for the out-of-service tag: the first body row after the title is
+                // followed by blank rows
+                Assert.True(string.IsNullOrWhiteSpace(p.Lines[2].Text) && string.IsNullOrWhiteSpace(p.Lines[3].Text));
             }
         }
 
