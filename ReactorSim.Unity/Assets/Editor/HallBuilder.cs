@@ -46,11 +46,11 @@ public static class HallBuilder
         }
         // Water: one tint colour for every layer, so the order the layers blend in does not matter, and an emissive baseline so
         // the pool reads blue at zero power and under any lighting.
-        Material waterVolume = makeMaterial("M_PoolVolume", new Color(0.04f, 0.30f, 0.50f, 0.075f), true, false);
-        Material waterSurface = makeMaterial("M_PoolSurface", new Color(0.10f, 0.45f, 0.72f, 0.20f), true, false);
+        Material waterVolume = makeMaterial("M_PoolVolume", new Color(0.03f, 0.26f, 0.44f, 0.04f), true, false);
+        Material waterSurface = makeMaterial("M_PoolSurface", new Color(0.10f, 0.45f, 0.72f, 0.10f), true, false);
         waterSurface.EnableKeyword("_EMISSION");
         waterSurface.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
-        if (waterSurface.HasProperty("_EmissionColor")) waterSurface.SetColor("_EmissionColor", new Color(0.02f, 0.12f, 0.28f));
+        if (waterSurface.HasProperty("_EmissionColor")) waterSurface.SetColor("_EmissionColor", new Color(0.01f, 0.06f, 0.14f));
 
         // ---- shell: hall wall, deck, ceiling, floor, pool wall ----
         var ang = Angles(D, Rh);
@@ -103,6 +103,27 @@ public static class HallBuilder
         SmrModuleMesh.Build(T, new SmrModuleMesh.Materials { vessel = steel, dark = dark, containment = paint, skin = skin });
         PolarCrane.Build(T, steel, dark, roomFloorLocal - 2.4f, Rh, D);
         CableTray.Build(T, dark, Rh - 0.45f, deckY + 3.6f, 0.15f * Mathf.PI, 0.85f * Mathf.PI);
+
+        // ---- spent-fuel racks on a ledge on the far wall; their glow follows plant power (U7) ----
+        Material rackCells = makeMaterial("M_RackCells", new Color(0.05f, 0.10f, 0.18f), false, true);
+        rackCells.enableInstancing = true;
+        Shader additive = Shader.Find("Legacy Shaders/Particles/Additive");
+        if (additive == null) additive = Shader.Find("Sprites/Default");
+        var rackHaze = new Material(additive) { name = "M_RackHaze" };
+        if (rackHaze.HasProperty("_TintColor")) rackHaze.SetColor("_TintColor", new Color(0.30f, 0.60f, 1f, (float)ReactorSim.Instruments.GlowMapping.HazeFloor));
+        float ledge = HallDimensions.RackLedgeHeight;
+        FuelRackMesh.BuildLedge(T, tile, Rp, ledge, 0.5f * Mathf.PI - 1.25f, 0.5f * Mathf.PI + 1.25f, 3.4f);
+        var rackMats = new FuelRackMesh.Materials { cells = rackCells, frame = dark, haze = rackHaze };
+        for (int i = 0; i < HallDimensions.RackArrays; i++)
+        {
+            float phi = 0.5f * Mathf.PI + (i - 0.5f * (HallDimensions.RackArrays - 1)) * 0.70f;
+            float rr = Rp - 1.8f;
+            FuelRackMesh.Build(T, i, new Vector3(Mathf.Cos(phi) * rr, ledge, Mathf.Sin(phi) * rr),
+                               Mathf.Atan2(-Mathf.Cos(phi), -Mathf.Sin(phi)) * Mathf.Rad2Deg, rackMats);
+        }
+        var rackFocus = new GameObject("RackFocus");
+        rackFocus.transform.SetParent(T, false);
+        rackFocus.transform.localPosition = new Vector3(0f, ledge + 2.2f, Rp - 1.8f);
 
         // gallery focus: where the capture poses look (mid-depth of the visible water, over the module)
         var focus = new GameObject("GalleryFocus");

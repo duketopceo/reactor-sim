@@ -20,6 +20,7 @@ public static class HallCheck
             failures += CheckModule();
             failures += CheckHallRules();
             failures += CheckBudget(first);
+            failures += CheckRacks();
 
             ControlRoomSceneBuilder.Build(false);
             var second = Measure();
@@ -114,7 +115,7 @@ public static class HallCheck
         return f;
     }
 
-    // Racks are built in U7; this stays a no-op until they exist, then checks their wiring.
+    // Racks (U7): the arrays, their lights and haze cones exist, the light budget holds with them, the cells share one material.
     private static int CheckRacks()
     {
         var hall = GameObject.Find(HallBuilder.RootName);
@@ -128,6 +129,11 @@ public static class HallCheck
         }
         int f = Report(cells == HallDimensions.RackArrays, $"{HallDimensions.RackArrays} rack arrays exist (found {cells})");
         f += Report(lights == HallDimensions.RackArrays && haze == HallDimensions.RackArrays, $"each rack has a capped light and a haze cone (lights {lights}, haze {haze})");
+        Material shared = null;
+        bool oneMaterial = true;
+        foreach (var r in hall.GetComponentsInChildren<Renderer>(true))
+            if (r.name.StartsWith("RackGlow_Cells_")) { if (shared == null) shared = r.sharedMaterial; else if (shared != r.sharedMaterial) oneMaterial = false; }
+        f += Report(shared != null && oneMaterial, "every rack array shares one emissive material");
         return f;
     }
 }

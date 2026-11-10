@@ -45,7 +45,7 @@ public class CaptureMode : MonoBehaviour
             string poseArg = ArgValue(args, "-poses");
             List<string> list = poseArg != null
                 ? CaptureMath.ParsePoses(poseArg)
-                : CaptureMath.ParsePoses("menu,seat,stand,crt,tooltip,rejected,drag,checklist,pause,tablet,clipboard,gallery,away,hall");
+                : CaptureMath.ParsePoses("menu,seat,stand,crt,tooltip,rejected,drag,checklist,pause,tablet,clipboard,gallery,away,hall,glowidle,glowmid,glowfull");
             var go = new GameObject("CaptureMode");
             DontDestroyOnLoad(go);
             var c = go.AddComponent<CaptureMode>();
@@ -198,6 +198,15 @@ public class CaptureMode : MonoBehaviour
                 op.CaptureLookAt(glass.bounds.center, 60f);
                 yield return Shot("gallery", "gallery", 30, 0.6f, null);
                 break;
+            case "glowidle":
+                yield return GlowShot(pose, 0.0);
+                break;
+            case "glowmid":
+                yield return GlowShot(pose, 0.3);
+                break;
+            case "glowfull":
+                yield return GlowShot(pose, 1.0);
+                break;
             case "away":
                 // Same stand as the gallery pose but looking the other way, so the window is out of the frustum: the frame time
                 // here against the same pose on a baseline run is what the hall costs while it cannot be seen.
@@ -219,10 +228,30 @@ public class CaptureMode : MonoBehaviour
                 Vector3 centre = glassNear.bounds.center;
                 Vector3 toRoom = centre - marker.position;
                 toRoom.y = 0f;
-                op.CaptureAt(centre + toRoom.normalized * 1.3f, marker.position, 55f);
+                op.CaptureAt(centre + toRoom.normalized * 2.4f, marker.position, 55f);
                 yield return Shot("hall", "hall-close", 30, 0.6f, null);
                 break;
         }
+    }
+
+    // The spent-fuel racks seen from the window with the plant power forced to one fraction (capture only; the rack glow follows
+    // plant power as a labelled cue). The JSON carries cropLuma, the brightness of the brightest pixels over the racks, so the
+    // grader can check the glow really changes in the rendered image.
+    private IEnumerator GlowShot(string pose, double power)
+    {
+        var glass = WindowGlass();
+        var hallRoot = HallVisibility.FindHall();
+        Transform focus = hallRoot != null ? hallRoot.transform.Find("RackFocus") : null;
+        if (glass == null || focus == null) { Skip(pose, "no window or no rack focus in the scene"); yield break; }
+        var cells = new List<Renderer>();
+        foreach (var r in hallRoot.GetComponentsInChildren<Renderer>(true)) if (r.name.StartsWith("RackGlow_Cells_")) cells.Add(r);
+        Vector3 centre = glass.bounds.center;
+        Vector3 toRoom = centre - focus.position;
+        toRoom.y = 0f;
+        op.CaptureAt(centre + toRoom.normalized * 2.4f, focus.position, 45f);
+        PlantEquipmentBinder.PowerOverride = power;
+        yield return Shot(pose, pose, 40, 0.8f, null, cells);
+        PlantEquipmentBinder.PowerOverride = null;
     }
 
     private static Renderer WindowGlass()
@@ -273,7 +302,7 @@ public class CaptureMode : MonoBehaviour
         for (int i = 0; i < n; i++) yield return null;
     }
 
-    private IEnumerator Shot(string pose, string label, int settleFrames, float settleSeconds, CrtScreenRenderer crt)
+    private IEnumerator Shot(string pose, string label, int settleFrames, float settleSeconds, CrtScreenRenderer crt, List<Renderer> measure = null)
     {
         yield return Frames(settleFrames);
         if (settleSeconds > 0f) yield return new WaitForSecondsRealtime(settleSeconds);
@@ -294,10 +323,44 @@ public class CaptureMode : MonoBehaviour
         sb.Append(",\"frameMsP99\":").Append(InputLogFormat.Num(FrameMetrics.Percentile(99)));
         sb.Append(",\"drawCalls\":").Append(FrameMetrics.DrawCalls);
         if (crt != null) AppendScreenMeasure(sb, crt, tex);
+        if (measure != null && measure.Count > 0) AppendCropLuma(sb, measure, tex);
         sb.Append('}');
         records.Add(sb.ToString());
         Destroy(tex);
         Debug.Log("[Capture] " + file);
+    }
+
+    // Brightest-pixel luminance inside the screen rectangle that covers the given renderers.
+    private static void AppendCropLuma(StringBuilder sb, List<Renderer> renderers, Texture2D tex)
+    {
+        var cam = Camera.main;
+        if (cam == null) return;
+        float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
+        foreach (var r in renderers)
+        {
+            Bounds b = r.bounds;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 corner = b.center + Vector3.Scale(b.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+                Vector3 p = cam.WorldToScreenPoint(corner);
+                if (p.z <= 0f) return;
+                minX = Mathf.Min(minX, p.x); maxX = Mathf.Max(maxX, p.x);
+                minY = Mathf.Min(minY, p.y); maxY = Mathf.Max(maxY, p.y);
+            }
+        }
+        int x0 = Mathf.Clamp(Mathf.RoundToInt(minX), 0, tex.width - 1), y0 = Mathf.Clamp(Mathf.RoundToInt(minY), 0, tex.height - 1);
+        int w = Mathf.Clamp(Mathf.RoundToInt(maxX) - x0, 1, tex.width - x0), h = Mathf.Clamp(Mathf.RoundToInt(maxY) - y0, 1, tex.height - y0);
+        Color32[] px = tex.GetPixels32();
+        var crop = new byte[w * h * 4];
+        for (int j = 0; j < h; j++)
+            for (int i = 0; i < w; i++)
+            {
+                Color32 c = px[(y0 + j) * tex.width + x0 + i];
+                int o = (j * w + i) * 4;
+                crop[o] = c.r; crop[o + 1] = c.g; crop[o + 2] = c.b; crop[o + 3] = 255;
+            }
+        sb.Append(",\"cropLuma\":").Append(InputLogFormat.Num(CaptureMath.CropPeakLuminance(crop, w, 0, 0, w, h)));
+        sb.Append(",\"cropW\":").Append(w).Append(",\"cropH\":").Append(h);
     }
 
     // Measurements of a CRT as it appears in the captured image: its on-screen width, the characters per line of its text, the

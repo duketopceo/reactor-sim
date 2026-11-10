@@ -37,7 +37,7 @@ namespace ReactorSim
         // ---- spent-fuel racks (on a ledge on the far wall, shallow enough to read from the gallery) ----
         public static readonly float RackLedgeHeight = 12.0f;        // ledge top above the pool floor
         public static readonly int RackArrays = 3;
-        public static readonly int RackRows = 4;
+        public static readonly int RackRows = 6;
         public static readonly int RackColumns = 10;
 
         // ---- budgets (KTD9). The graded copies live in scripts/check-captures.sh; these are the build-time sanity limits ----

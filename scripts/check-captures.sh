@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Grades a fetched capture run (scripts/capture-playtest.sh, or a local -capture run) against fixed thresholds.
-#   bash scripts/check-captures.sh <dir> [--allow-skip pose,pose] [--baseline <dir> [--budget-only]]
+#   bash scripts/check-captures.sh <dir> [--allow-skip pose,pose] [--only pose,pose] [--baseline <dir> [--budget-only]]
 # <dir> holds <WxH>/captures.json and the PNGs next to it. The thresholds live here, not in the build, so the build cannot grade
 # itself. With --baseline <dir> (a capture run of the same poses before the hall change) it also grades the hall's runtime
 # budget (KTD9): the gallery and gallery-away captures must both exist in both runs. Exit 0: every check passed. 
-# --budget-only grades only the gallery and gallery-away poses (a run made with -poses gallery,away).
+# --budget-only grades only the gallery and gallery-away poses (a run made with -poses gallery,away). --only a,b requires only
+# those poses (for example glowidle,glowfull). When glow poses are present, the rack glow must rise between idle and full power.
 # Exit 1: a check failed (each failure is named). Exit 2: bad usage or nothing to grade.
 set -uo pipefail
 
@@ -17,15 +18,19 @@ BUDGET_P95_MS=4          # gallery pose: p95 frame time may rise at most this mu
 BUDGET_DRAWS=120         # gallery pose: draw calls may rise at most this much over the baseline
 BUDGET_GALLERY_P99_MS=12 # gallery pose: p99 frame time, absolute (at least 120 fps)
 BUDGET_AWAY_MS=1         # gallery-away pose (window out of view): p95 may rise at most this much
+# rack glow (U7): brightest rendered pixels over the racks at full power against idle
+GLOW_FULL_OVER_IDLE_MIN=1.4
 REQUIRED_POSES="seat stand crt tooltip rejected drag checklist pause tablet clipboard menu"
 
 DIR=""
 BASELINE=""
 BUDGET_ONLY=""
+ONLY=""
 ALLOW_SKIP=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --budget-only) BUDGET_ONLY=1; shift ;;
+    --only) [ $# -ge 2 ] || { echo "--only needs a pose list" >&2; exit 2; }; ONLY="${2//,/ }"; shift 2 ;;
     --baseline) [ $# -ge 2 ] || { echo "--baseline needs a directory" >&2; exit 2; }; BASELINE="$2"; shift 2 ;;
     --allow-skip) [ $# -ge 2 ] || { echo "--allow-skip needs a value" >&2; exit 2; }; ALLOW_SKIP="$2"; shift 2 ;;
     -h|--help) sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -36,6 +41,7 @@ done
 [ -n "$DIR" ] && [ -d "$DIR" ] || { echo "usage: check-captures.sh <dir> [--allow-skip pose,pose] [--baseline <dir>]" >&2; exit 2; }
 [ -z "$BUDGET_ONLY" ] || [ -n "$BASELINE" ] || { echo "--budget-only needs --baseline" >&2; exit 2; }
 [ -z "$BUDGET_ONLY" ] || REQUIRED_POSES="gallery away"
+[ -z "$ONLY" ] || REQUIRED_POSES="$ONLY"
 [ -z "$BASELINE" ] || [ -d "$BASELINE" ] || { echo "baseline directory not found: $BASELINE" >&2; exit 2; }
 
 mapfile -t jsons < <(find "$DIR" -maxdepth 3 -name captures.json | LC_ALL=C sort)
@@ -45,7 +51,7 @@ fail=0
 for j in "${jsons[@]}"; do
   echo "== $j"
   GLYPH_MIN_PX="$GLYPH_MIN_PX" CONTRAST_MIN="$CONTRAST_MIN" PNG_MIN_BYTES="$PNG_MIN_BYTES" \
-    REQUIRED_POSES="$REQUIRED_POSES" ALLOW_SKIP="$ALLOW_SKIP" python3 -I - "$j" <<'PY'
+    REQUIRED_POSES="$REQUIRED_POSES" ALLOW_SKIP="$ALLOW_SKIP" GLOW_MIN="$GLOW_FULL_OVER_IDLE_MIN" python3 -I - "$j" <<'PY'
 import json, os, sys
 
 path = sys.argv[1]
@@ -84,6 +90,20 @@ for c in data.get("captures", []):
     if "glyphHeightPx" in c:
         line += "  glyph %.1f px  contrast %.2f" % (c["glyphHeightPx"], c.get("contrast", 0))
     print(line)
+
+glow = {c.get("pose"): c for c in data.get("captures", []) if str(c.get("pose", "")).startswith("glow") and "skipped" not in c}
+if glow:
+    glow_min = float(os.environ["GLOW_MIN"])
+    idle, mid, full = (glow.get(k, {}).get("cropLuma") for k in ("glowidle", "glowmid", "glowfull"))
+    if idle is None or full is None:
+        problems.append("rack glow: needs glowidle and glowfull captures with a cropLuma")
+    else:
+        print("  rack glow brightness  idle %.4f  mid %s  full %.4f  (full/idle %.2f, need >= %g)" % (
+            idle, "%.4f" % mid if mid is not None else "n/a", full, full / max(idle, 1e-6), glow_min))
+        if full < glow_min * max(idle, 1e-6):
+            problems.append("rack glow: full-power brightness %.4f is under %g x idle %.4f" % (full, glow_min, idle))
+        if mid is not None and not (idle <= mid <= full):
+            problems.append("rack glow: brightness is not monotonic idle %.4f mid %.4f full %.4f" % (idle, mid, full))
 
 for pose in required:
     if pose not in seen and pose not in allow_skip and not any(p.startswith(pose + " skipped") for p in problems):

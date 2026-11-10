@@ -2,19 +2,24 @@ using UnityEngine;
 using ReactorSim;
 using ReactorSim.Instruments;
 
-// Phase 2 plant equipment binder (N4): drives containment-side motion from PlantSnapshot.
-// Flywheel_PrimaryFlow spins with PrimaryFlowFrac, CoreGlow_Mesh pulses with Power,
-// PORV steam anchor activates when ReliefOpen, RPV CRDM rods track BankInsertion.
+// Phase 2 plant equipment binder (N4): drives hall and containment-side motion from PlantSnapshot.
+// Flywheel_PrimaryFlow spins with PrimaryFlowFrac, the spent-fuel racks glow with power (RackGlow_* objects: cells, haze cones
+// and capped point lights, all through GlowMapping from the power FRACTION), PORV steam anchor activates when ReliefOpen,
+// RPV CRDM rods track BankInsertion. The rack glow is a labelled visual cue, not a physics claim (see GlowMapping).
 public class PlantEquipmentBinder : MonoBehaviour
 {
     public PlantBridge bridge;
 
     private Transform flywheel;
-    private Transform coreGlow;
-    private Material coreGlowMat;
-    private Vector3 coreGlowBaseScale = Vector3.one;
-    private Light coreGlowLight;
-    private float coreGlowLightBase = 1f;
+    private Material rackCellMat;
+    private Material rackHazeMat;
+    private readonly System.Collections.Generic.List<Light> rackLights = new System.Collections.Generic.List<Light>();
+    private readonly System.Collections.Generic.List<float> rackLightBase = new System.Collections.Generic.List<float>();
+    private static readonly Color RackCellColour = new Color(0.25f, 0.55f, 1f);
+    private static readonly Color RackHazeColour = new Color(0.30f, 0.60f, 1f);
+
+    /// <summary>Capture/diagnostics only: forces the power fraction the glow follows (null = follow the plant).</summary>
+    public static double? PowerOverride { get; set; }
     private Transform porvAnchor;
     private ParticleSystem porvSteam;
     private ParticleSystem sgSteam;
@@ -59,15 +64,20 @@ public class PlantEquipmentBinder : MonoBehaviour
         {
             if (t.name.StartsWith("Flywheel_PrimaryFlow") || t.name == "Flywheel")
                 flywheel = t;
-            else if (t.name == "CoreGlow_Mesh")
+            else if (t.name.StartsWith("RackGlow_Cells_"))
             {
-                coreGlow = t;
-                coreGlowBaseScale = t.localScale;
                 var r = t.GetComponent<Renderer>();
-                if (r != null) coreGlowMat = r.material;
-                // The reactor hall carries a blue point light as a child of the glow mesh (ControlRoomSceneBuilder).
-                coreGlowLight = t.GetComponentInChildren<Light>(true);
-                if (coreGlowLight != null) coreGlowLightBase = coreGlowLight.intensity;
+                if (r != null && rackCellMat == null) rackCellMat = r.sharedMaterial;
+            }
+            else if (t.name.StartsWith("RackGlow_Haze_"))
+            {
+                var r = t.GetComponent<Renderer>();
+                if (r != null && rackHazeMat == null) rackHazeMat = r.sharedMaterial;
+            }
+            else if (t.name.StartsWith("RackGlow_Light_"))
+            {
+                var l = t.GetComponent<Light>();
+                if (l != null) { rackLights.Add(l); rackLightBase.Add(l.intensity); }
             }
             else if (t.name.StartsWith("VFX_PORV_SteamJet") || t.name.StartsWith("VFX_SGRelief"))
                 porvAnchor = t;
@@ -86,25 +96,20 @@ public class PlantEquipmentBinder : MonoBehaviour
             float speed = Mathf.Clamp01((float)s.PrimaryFlowFrac) * 360f;
             flywheel.Rotate(0f, 0f, -speed * Time.deltaTime);
         }
-        if (coreGlow != null && coreGlowMat != null)
+        // Power is a fraction of rated (1.0 = rated); GlowMapping turns it into emission, haze and light, with a dim floor at 0.
+        double power = PowerOverride.HasValue ? PowerOverride.Value : s.Power;
+        float shimmer = 0.94f + 0.06f * Mathf.Sin(Time.time * 2.3f);
+        if (rackCellMat != null && rackCellMat.HasProperty("_EmissionColor"))
+            rackCellMat.SetColor("_EmissionColor", RackCellColour * ((float)GlowMapping.RackEmission(power) * shimmer));
+        if (rackHazeMat != null && rackHazeMat.HasProperty("_TintColor"))
         {
-            // Power is normalised (1.0 = rated thermal power); GlowMapping gives a dim floor at 0 and 1.0 at rated power.
-            float g = (float)GlowMapping.Glow(s.Power);
-            float pulse = 0.5f + 0.5f * Mathf.Sin(Time.time * 3f);
-            float shown = g * (0.85f + 0.15f * pulse);
-            var c = coreGlowMat.color;
-            c.a = Mathf.Clamp01(0.15f + 0.6f * shown);
-            coreGlowMat.color = c;
-            if (coreGlowMat.HasProperty("_EmissionColor"))
-            {
-                // Cherenkov blue; emission only has an effect when the material enables _EMISSION (the hall glow does).
-                coreGlowMat.SetColor("_EmissionColor", new Color(0.25f, 0.55f, 1f) * (0.4f + 2.6f * shown));
-            }
-            if (coreGlowLight != null)
-                coreGlowLight.intensity = coreGlowLightBase * (0.15f + 1.35f * shown);
-            float scale = 0.8f + g * 0.4f;
-            coreGlow.localScale = coreGlowBaseScale * scale;
+            Color c = RackHazeColour;
+            c.a = (float)GlowMapping.Haze(power) * shimmer;
+            rackHazeMat.SetColor("_TintColor", c);
         }
+        float lightScale = (float)GlowMapping.LightScale(power) * shimmer;
+        for (int i = 0; i < rackLights.Count; i++)
+            if (rackLights[i] != null) rackLights[i].intensity = rackLightBase[i] * lightScale;
         if (porvAnchor != null)
         {
             bool relief = s.ReliefOpen || s.SecondaryReliefOpen;
