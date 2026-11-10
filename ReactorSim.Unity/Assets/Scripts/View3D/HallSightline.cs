@@ -63,7 +63,7 @@ namespace ReactorSim
         }
 
         public static View Stand() { return new View { name = "stand", eyeHeight = HallDimensions.StandEyeHeight, back = HallDimensions.StandBackFromWall, along = HallDimensions.StandAlongWall }; }
-        public static View Seat() { return new View { name = "seat", eyeHeight = HallDimensions.StandEyeHeight, back = HallDimensions.SeatBackFromWall, along = HallDimensions.SeatAlongWall }; }
+        public static View Seat() { return new View { name = "seat", eyeHeight = HallDimensions.SeatEyeHeight, back = HallDimensions.SeatBackFromWall, along = HallDimensions.SeatAlongWall }; }
 
         /// <summary>Downward angle (degrees) from the viewpoint to a target at the given height above the pool floor over the pool axis.</summary>
         public static double AngleToAxisTargetDeg(View v, double targetAbovePoolFloor)

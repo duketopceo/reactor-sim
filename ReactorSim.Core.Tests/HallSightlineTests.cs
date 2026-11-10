@@ -26,10 +26,27 @@ namespace ReactorSim.Core.Tests
         [Fact]
         public void RimHiddenBelowMatchesAHandCalculationAndMovesTheRightWay()
         {
-            // eye 25.05 m over the floor (22 + 3.0 - 1.6 + 1.65), rim 22.15 m, rim 8.0 m from the stand eye, axis 16.5 m: 22.15 - 2.9 * 9 / 7.5
-            Assert.Equal(22.15 - 2.9 * 9.0 / 7.5, HallSightline.RimHiddenBelow(HallSightline.Stand()), 2);
-            // farther back from the wall means a shallower line over the rim, so the rim hides more of the module
-            Assert.True(HallSightline.RimHiddenBelow(HallSightline.Seat()) > HallSightline.RimHiddenBelow(HallSightline.Stand()));
+            // stand eye 22 + 2.2 - 1.6 + 1.65 = 24.25 m over the floor, rim 22.15 m, rim 4.5 + 13 - 11 = 6.5 m out, pool radius 11 m past it
+            Assert.Equal(22.15 - (24.25 - 22.15) * 11.0 / 6.5, HallSightline.RimHiddenBelow(HallSightline.Stand()), 2);
+            // seated eye 22 + 2.2 - 1.6 + 1.2 = 23.8 m, rim 6.1 + 13 - 11 = 8.1 m out
+            Assert.Equal(22.15 - (23.8 - 22.15) * 11.0 / 8.1, HallSightline.RimHiddenBelow(HallSightline.Seat()), 2);
+        }
+
+        [Fact]
+        public void TheSeatUsesTheRealSeatedEye()
+        {
+            Assert.Equal(1.2, HallSightline.Seat().eyeHeight, 6);
+            Assert.True(HallSightline.ReachMarginDeg(HallSightline.Seat(), HallDimensions.SightTargetHeight) >= HallDimensions.SightMarginDeg);
+        }
+
+        [Fact]
+        public void TheFirstPr6NumbersFailTheSeatedEyeCheck()
+        {
+            // negative control: gallery eye 3.0 m, pool axis 12 m, head top 21.4 m. Seated eye is 2.6 m over the water: reach atan(1.15 / 6.1) = 10.7 deg
+            // against a 3.2 m drop over 18.1 m = 10.0 deg to the head, so the margin is 0.7 deg, under the 3 deg the window must leave.
+            double reach = HallSightline.OpeningDownReachDeg(1.2, 0.05, 6.1);
+            double needed = HallSightline.DownAngleDeg(2.6 + 0.6, 6.1 + 12.0);
+            Assert.True(reach - needed < HallDimensions.SightMarginDeg, $"margin {reach - needed:0.0} deg should be under {HallDimensions.SightMarginDeg} deg");
         }
 
         [Fact]

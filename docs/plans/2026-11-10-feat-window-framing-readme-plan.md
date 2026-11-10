@@ -16,7 +16,7 @@ PR4 renders show the module head low in the window from the stand and the seat. 
 ## Requirements
 
 - R1 A pure check, `HallSightline.RimVisibleHeight`, gives the module height shown over the near rim from the stand and the seat. `HallDimensions.Validate()` requires at least the dome height plus a margin (1.5 m) from both views.
-- R2 Geometry change inside plausible SMR bounds: lower the pool coaming (0.30 to 0.15 m), widen the pool (6.5 to 9.0 m radius) and move its axis back (10 to 12 m from the wall, shifted 1.8 m along the wall) so the rim sits farther along the sight line and the window looks down less steeply, raise the gallery eye (2.2 to 3.0 m over the water), raise the head slightly under the surface (containment height 20.6 to 20.8 m, still 0.6 m under water). The window's downward reach to the head margin rises from 1 to 3 degrees, so the head sits clear of the sill line.
+- R2 Geometry change inside plausible SMR bounds, checked from the REAL seated eye (1.2 m, `HallDimensions.SeatEyeHeight`) as well as the standing eye: pool radius 6.5 to 11.0 m, pool axis 10 to 13 m from the wall (shifted 2.2 m along it), pool coaming 0.30 to 0.15 m, gallery eye 2.2 m over the water (unchanged), containment height 20.6 to 20.85 m (head still 0.55 m under water). The head sits at least 3 degrees inside the window's downward reach (was 1) from both views.
 - R3 The crane bridge moves back (z 9 to 10 m); the crane-clear sight tests keep passing.
 - R4 `HallCheck`, `LayoutCheck`, the budget gates and the clean-room scan stay green.
 - R5 README text and the four docs/media screenshots are regenerated at 1920x1080 from this tree, and the captions describe what is shown.

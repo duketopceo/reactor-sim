@@ -223,9 +223,9 @@ public static class RoomRender
         return ok;
     }
 
-    // U6: two views of the reactor window (the glass pane named Window_Glass). A seated operator cannot look at the window
-    // (it is behind the chair, outside SeatedYawRange), so "window-seat" is taken from the seat position at STANDING eye
-    // height, which is what standing up with the seat toggle gives; "window-stand" is taken from STAND_Center.
+    // U6: two views of the reactor window (the glass pane named Window_Glass). A seated operator cannot turn to the window
+    // (it is behind the chair, outside SeatedYawRange), so "window-seat" is a camera at the seat position at the real SEATED eye
+    // height (the eye HallSightline.Seat() checks) aimed at the glass; "window-stand" is taken from STAND_Center.
     private static bool RenderWindowViews(View?[] baseViews, string outDir)
     {
         var glass = FindInScene("Window_Glass");
@@ -247,7 +247,6 @@ public static class RoomRender
                 continue;
             }
             View v = baseViews[i].Value;
-            if (i == 0) v.pos += Vector3.up * (OperatorMath.StandingEyeHeight - OperatorMath.SeatedEyeHeight);
             Vector3 dir = target - v.pos;
             v.rot = dir.sqrMagnitude > 1e-4f ? Quaternion.LookRotation(dir.normalized, Vector3.up) : Quaternion.identity;
             v.ortho = false;
