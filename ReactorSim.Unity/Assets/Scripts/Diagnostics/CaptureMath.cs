@@ -72,24 +72,20 @@ namespace ReactorSim
             return (hi + 0.05) / (lo + 0.05);
         }
 
-        /// <summary>Mean luminance (0..1, linear) of the brightest 5 percent of the pixels in a crop of an RGBA32 image; 0 for a bad crop.</summary>
-        public static double CropPeakLuminance(byte[] rgba, int imageWidth, int x, int y, int w, int h)
+        /// <summary>Mean luminance (0..1, linear) of all the pixels in a crop of an RGBA32 image; 0 for a bad crop.</summary>
+        public static double CropMeanLuminance(byte[] rgba, int imageWidth, int x, int y, int w, int h)
         {
             if (rgba == null || imageWidth <= 0 || w <= 0 || h <= 0 || x < 0 || y < 0 || x + w > imageWidth) return 0.0;
             int rows = rgba.Length / 4 / imageWidth;
             if (y + h > rows) return 0.0;
-            var lum = new List<double>(w * h);
+            double sum = 0.0;
             for (int j = y; j < y + h; j++)
                 for (int i = x; i < x + w; i++)
                 {
                     int p = (j * imageWidth + i) * 4;
-                    lum.Add(Luminance(rgba[p], rgba[p + 1], rgba[p + 2]));
+                    sum += Luminance(rgba[p], rgba[p + 1], rgba[p + 2]);
                 }
-            lum.Sort();
-            int k = Math.Max(1, lum.Count / 20);
-            double hi = 0.0;
-            for (int i = 0; i < k; i++) hi += lum[lum.Count - 1 - i];
-            return hi / k;
+            return sum / (w * h);
         }
 
         // ---- frame-time percentiles ----
@@ -110,7 +106,7 @@ namespace ReactorSim
         /// <summary>Poses the capture run can show, in the default order. "crt" expands to every CRT screen.</summary>
         public static readonly string[] KnownPoses =
         {
-            "menu", "seat", "stand", "crt", "tooltip", "rejected", "drag", "checklist", "pause", "tablet", "clipboard", "gallery", "away", "hall", "glowidle", "glowmid", "glowfull"
+            "menu", "seat", "stand", "crt", "tooltip", "rejected", "drag", "checklist", "pause", "tablet", "clipboard", "gallery", "away", "hall", "glowoff", "glowidle", "glowmid", "glowfull"
         };
 
         /// <summary>Parses "1600x900". Throws FormatException with the offending text on anything else.</summary>

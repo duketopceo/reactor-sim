@@ -5,7 +5,7 @@
 # itself. With --baseline <dir> (a capture run of the same poses before the hall change) it also grades the hall's runtime
 # budget (KTD9): the gallery and gallery-away captures must both exist in both runs. Exit 0: every check passed. 
 # --budget-only grades only the gallery and gallery-away poses (a run made with -poses gallery,away). --only a,b requires only
-# those poses (for example glowidle,glowfull). When glow poses are present, the rack glow must rise between idle and full power.
+# those poses (for example glowoff,glowidle,glowfull). When glow poses are present, the rack glow must rise from off through idle and mid to full power.
 # Exit 1: a check failed (each failure is named). Exit 2: bad usage or nothing to grade.
 set -uo pipefail
 
@@ -18,8 +18,9 @@ BUDGET_P95_MS=4          # gallery pose: p95 frame time may rise at most this mu
 BUDGET_DRAWS=120         # gallery pose: draw calls may rise at most this much over the baseline
 BUDGET_GALLERY_P99_MS=12 # gallery pose: p99 frame time, absolute (at least 120 fps)
 BUDGET_AWAY_MS=1         # gallery-away pose (window out of view): p95 may rise at most this much
-# rack glow (U7): brightest rendered pixels over the racks at full power against idle
-GLOW_FULL_OVER_IDLE_MIN=1.4
+# rack glow (U7): mean rendered brightness over the racks, measured against a glowoff frame (no glow at all)
+GLOW_FULL_OVER_FLOOR_MIN=4    # (full - off) must be at least this multiple of (idle - off): "a set multiple of the floor"
+GLOW_FULL_DELTA_MIN=0.01      # and at least this much absolute mean luminance (0..1), so a flat render cannot pass
 REQUIRED_POSES="seat stand crt tooltip rejected drag checklist pause tablet clipboard menu"
 
 DIR=""
@@ -51,7 +52,7 @@ fail=0
 for j in "${jsons[@]}"; do
   echo "== $j"
   GLYPH_MIN_PX="$GLYPH_MIN_PX" CONTRAST_MIN="$CONTRAST_MIN" PNG_MIN_BYTES="$PNG_MIN_BYTES" \
-    REQUIRED_POSES="$REQUIRED_POSES" ALLOW_SKIP="$ALLOW_SKIP" GLOW_MIN="$GLOW_FULL_OVER_IDLE_MIN" python3 -I - "$j" <<'PY'
+    REQUIRED_POSES="$REQUIRED_POSES" ALLOW_SKIP="$ALLOW_SKIP" GLOW_MULT="$GLOW_FULL_OVER_FLOOR_MIN" GLOW_DELTA="$GLOW_FULL_DELTA_MIN" python3 -I - "$j" <<'PY'
 import json, os, sys
 
 path = sys.argv[1]
@@ -93,17 +94,23 @@ for c in data.get("captures", []):
 
 glow = {c.get("pose"): c for c in data.get("captures", []) if str(c.get("pose", "")).startswith("glow") and "skipped" not in c}
 if glow:
-    glow_min = float(os.environ["GLOW_MIN"])
-    idle, mid, full = (glow.get(k, {}).get("cropLuma") for k in ("glowidle", "glowmid", "glowfull"))
-    if idle is None or full is None:
-        problems.append("rack glow: needs glowidle and glowfull captures with a cropLuma")
+    mult, delta_min = float(os.environ["GLOW_MULT"]), float(os.environ["GLOW_DELTA"])
+    off, idle, mid, full = (glow.get(k, {}).get("cropMean") for k in ("glowoff", "glowidle", "glowmid", "glowfull"))
+    if None in (off, idle, full):
+        problems.append("rack glow: needs glowoff, glowidle and glowfull captures with a cropMean")
     else:
-        print("  rack glow brightness  idle %.4f  mid %s  full %.4f  (full/idle %.2f, need >= %g)" % (
-            idle, "%.4f" % mid if mid is not None else "n/a", full, full / max(idle, 1e-6), glow_min))
-        if full < glow_min * max(idle, 1e-6):
-            problems.append("rack glow: full-power brightness %.4f is under %g x idle %.4f" % (full, glow_min, idle))
-        if mid is not None and not (idle <= mid <= full):
-            problems.append("rack glow: brightness is not monotonic idle %.4f mid %.4f full %.4f" % (idle, mid, full))
+        d_idle, d_full = idle - off, full - off
+        d_mid = (mid - off) if mid is not None else None
+        print("  rack glow mean brightness over off:  idle %+.4f  mid %s  full %+.4f  (full/idle %.1f, need >= %g and full >= %g)" % (
+            d_idle, ("%+.4f" % d_mid) if d_mid is not None else "n/a", d_full, d_full / max(d_idle, 1e-6), mult, delta_min))
+        if d_full < delta_min:
+            problems.append("rack glow: full-power brightness is only %+.4f over the glow-off frame (need %g)" % (d_full, delta_min))
+        if d_full < mult * max(d_idle, 0.0):
+            problems.append("rack glow: full-power gain %+.4f is under %g x the idle gain %+.4f" % (d_full, mult, d_idle))
+        if d_idle < -1e-6:
+            problems.append("rack glow: idle is darker than the glow-off frame (%+.4f)" % d_idle)
+        if d_mid is not None and not (d_idle - 1e-6 <= d_mid <= d_full + 1e-6):
+            problems.append("rack glow: brightness is not monotonic idle %+.4f mid %+.4f full %+.4f" % (d_idle, d_mid, d_full))
 
 for pose in required:
     if pose not in seen and pose not in allow_skip and not any(p.startswith(pose + " skipped") for p in problems):

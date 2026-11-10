@@ -45,25 +45,29 @@ expect 1 "out-of-view cost over 1 ms fails" "$tmp/away" --baseline "$tmp/base" -
 expect 1 "unavailable draw counter fails" "$tmp/nodraw" --baseline "$tmp/base" --budget-only
 expect 2 "budget-only without a baseline is a usage error" "$tmp/inside" --budget-only
 
-# rack glow cases: mkglow <dir> <idle> <mid> <full>
+# rack glow cases: mkglow <dir> <off> <idle> <mid> <full>
 mkglow() {
   local d="$1/1600x900"
   mkdir -p "$d"
   head -c 30000 /dev/zero > "$d/g.png"
   cat > "$d/captures.json" <<EOF
 {"captures":[
- {"pose":"glowidle","label":"glowidle","file":"g.png","frameMsP95":5,"frameMsP99":6,"drawCalls":100,"cropLuma":$2},
- {"pose":"glowmid","label":"glowmid","file":"g.png","frameMsP95":5,"frameMsP99":6,"drawCalls":100,"cropLuma":$3},
- {"pose":"glowfull","label":"glowfull","file":"g.png","frameMsP95":5,"frameMsP99":6,"drawCalls":100,"cropLuma":$4}
+ {"pose":"glowoff","label":"glowoff","file":"g.png","frameMsP95":5,"frameMsP99":6,"drawCalls":100,"cropMean":$2},
+ {"pose":"glowidle","label":"glowidle","file":"g.png","frameMsP95":5,"frameMsP99":6,"drawCalls":100,"cropMean":$3},
+ {"pose":"glowmid","label":"glowmid","file":"g.png","frameMsP95":5,"frameMsP99":6,"drawCalls":100,"cropMean":$4},
+ {"pose":"glowfull","label":"glowfull","file":"g.png","frameMsP95":5,"frameMsP99":6,"drawCalls":100,"cropMean":$5}
 ]}
 EOF
 }
-mkglow "$tmp/glowok" 0.10 0.20 0.35
-mkglow "$tmp/glowflat" 0.10 0.11 0.12
-mkglow "$tmp/glowbackwards" 0.30 0.10 0.40
-expect 0 "rack glow that rises passes" "$tmp/glowok" --only glowidle,glowmid,glowfull
-expect 1 "rack glow that barely changes fails" "$tmp/glowflat" --only glowidle,glowmid,glowfull
-expect 1 "rack glow that is not monotonic fails" "$tmp/glowbackwards" --only glowidle,glowmid,glowfull
+mkglow "$tmp/glowok" 0.100 0.104 0.120 0.160       # gains 0.004 / 0.020 / 0.060
+mkglow "$tmp/glowflat" 0.100 0.101 0.102 0.103     # full gain only 0.003
+mkglow "$tmp/glowweak" 0.100 0.120 0.130 0.150     # full gain 0.05 but idle gain 0.02: under 4x
+mkglow "$tmp/glowbackwards" 0.100 0.104 0.090 0.160
+GLOWPOSES=glowoff,glowidle,glowmid,glowfull
+expect 0 "rack glow that rises from off passes" "$tmp/glowok" --only $GLOWPOSES
+expect 1 "rack glow that barely changes fails" "$tmp/glowflat" --only $GLOWPOSES
+expect 1 "rack glow under four times the idle gain fails" "$tmp/glowweak" --only $GLOWPOSES
+expect 1 "rack glow that is not monotonic fails" "$tmp/glowbackwards" --only $GLOWPOSES
 
 [ "$failures" -eq 0 ] && echo "check-captures budget self-test: PASS" || echo "check-captures budget self-test: FAILED ($failures)"
 exit "$failures"

@@ -45,7 +45,7 @@ public class CaptureMode : MonoBehaviour
             string poseArg = ArgValue(args, "-poses");
             List<string> list = poseArg != null
                 ? CaptureMath.ParsePoses(poseArg)
-                : CaptureMath.ParsePoses("menu,seat,stand,crt,tooltip,rejected,drag,checklist,pause,tablet,clipboard,gallery,away,hall,glowidle,glowmid,glowfull");
+                : CaptureMath.ParsePoses("menu,seat,stand,crt,tooltip,rejected,drag,checklist,pause,tablet,clipboard,gallery,away,hall,glowoff,glowidle,glowmid,glowfull");
             var go = new GameObject("CaptureMode");
             DontDestroyOnLoad(go);
             var c = go.AddComponent<CaptureMode>();
@@ -198,6 +198,11 @@ public class CaptureMode : MonoBehaviour
                 op.CaptureLookAt(glass.bounds.center, 60f);
                 yield return Shot("gallery", "gallery", 30, 0.6f, null);
                 break;
+            case "glowoff":
+                PlantEquipmentBinder.GlowOff = true;      // reference frame: no rack emission, haze or light at all
+                yield return GlowShot(pose, 0.0);
+                PlantEquipmentBinder.GlowOff = false;
+                break;
             case "glowidle":
                 yield return GlowShot(pose, 0.0);
                 break;
@@ -239,7 +244,7 @@ public class CaptureMode : MonoBehaviour
     }
 
     // The spent-fuel racks seen from the window with the plant power forced to one fraction (capture only; the rack glow follows
-    // plant power as a labelled cue). The JSON carries cropLuma, the brightness of the brightest pixels over the racks, so the
+    // plant power as a labelled cue). The JSON carries cropMean, the mean brightness over the racks, so the
     // grader can check the glow really changes in the rendered image.
     private IEnumerator GlowShot(string pose, double power)
     {
@@ -334,7 +339,7 @@ public class CaptureMode : MonoBehaviour
         Debug.Log("[Capture] " + file);
     }
 
-    // Brightest-pixel luminance inside the screen rectangle that covers the given renderers.
+    // Mean luminance inside the screen rectangle that covers the given renderers.
     private static void AppendCropLuma(StringBuilder sb, List<Renderer> renderers, Texture2D tex)
     {
         var cam = Camera.main;
@@ -363,7 +368,7 @@ public class CaptureMode : MonoBehaviour
                 int o = (j * w + i) * 4;
                 crop[o] = c.r; crop[o + 1] = c.g; crop[o + 2] = c.b; crop[o + 3] = 255;
             }
-        sb.Append(",\"cropLuma\":").Append(InputLogFormat.Num(CaptureMath.CropPeakLuminance(crop, w, 0, 0, w, h)));
+        sb.Append(",\"cropMean\":").Append(InputLogFormat.Num(CaptureMath.CropMeanLuminance(crop, w, 0, 0, w, h)));
         sb.Append(",\"cropW\":").Append(w).Append(",\"cropH\":").Append(h);
     }
 

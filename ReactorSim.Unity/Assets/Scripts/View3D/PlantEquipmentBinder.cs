@@ -20,6 +20,8 @@ public class PlantEquipmentBinder : MonoBehaviour
 
     /// <summary>Capture/diagnostics only: forces the power fraction the glow follows (null = follow the plant).</summary>
     public static double? PowerOverride { get; set; }
+    /// <summary>Capture only: switches the rack emission, haze and lights fully off (a reference frame), ignoring the dim floor.</summary>
+    public static bool GlowOff { get; set; }
     private Transform porvAnchor;
     private ParticleSystem porvSteam;
     private ParticleSystem sgSteam;
@@ -98,7 +100,7 @@ public class PlantEquipmentBinder : MonoBehaviour
         }
         // Power is a fraction of rated (1.0 = rated); GlowMapping turns it into emission, haze and light, with a dim floor at 0.
         double power = PowerOverride.HasValue ? PowerOverride.Value : s.Power;
-        float shimmer = 0.94f + 0.06f * Mathf.Sin(Time.time * 2.3f);
+        float shimmer = GlowOff ? 0f : 0.94f + 0.06f * Mathf.Sin(Time.time * 2.3f);
         if (rackCellMat != null && rackCellMat.HasProperty("_EmissionColor"))
             rackCellMat.SetColor("_EmissionColor", RackCellColour * ((float)GlowMapping.RackEmission(power) * shimmer));
         if (rackHazeMat != null && rackHazeMat.HasProperty("_TintColor"))
