@@ -78,7 +78,7 @@ public static class FuelRackMesh
             inner.Add(new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * (poolRadius - width));
         }
         b.AddBand(inner, outer, ledgeHeight, true);
-        b.AddArcShell(poolRadius - width, 0f, ledgeHeight, fromAngle, toAngle, steps, false);      // ledge face towards the pool centre
+        b.AddArcShell(poolRadius - width, 0f, ledgeHeight, fromAngle, toAngle, steps, true);       // ledge face towards the pool centre
         b.Attach(parent, "Pool_Ledge", tile);
     }
 }

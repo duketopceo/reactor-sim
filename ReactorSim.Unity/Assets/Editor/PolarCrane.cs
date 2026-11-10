@@ -19,7 +19,7 @@ public static class PolarCrane
         b.Attach(parent, "Crane_RailRing", dark);
 
         // bridge across the hall at z = zb: two girders on end trucks, deck plates, walkway rail
-        float zb = 2.2f, half = Mathf.Sqrt(rr * rr - zb * zb) - 0.5f;
+        float zb = 2.2f, half = Mathf.Sqrt(rr * rr - (zb + 2.3f) * (zb + 2.3f)) - 0.9f;   // trucks stay inside the wall
         var g = new MeshBuilder();
         float yTop = railY + 0.9f;
         for (int s = -1; s <= 1; s += 2)

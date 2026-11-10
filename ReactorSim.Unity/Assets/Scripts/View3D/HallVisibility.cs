@@ -15,9 +15,6 @@ public class HallVisibility : MonoBehaviour
     private bool lastVisible = true;
     private readonly double[] matrix = new double[16];
 
-    /// <summary>When true the hall stays on whatever the camera sees (diagnostics); false hands control to the frustum test.</summary>
-    public static bool ForceVisible { get; set; }
-
     /// <summary>The hall root, found even while it is switched off (GameObject.Find skips inactive objects).</summary>
     public static GameObject FindHall()
     {
@@ -34,7 +31,7 @@ public class HallVisibility : MonoBehaviour
         if (hallRoot == null) return;
         Camera cam = viewCamera != null ? viewCamera : Camera.main;
         bool visible = true;
-        if (!ForceVisible && cam != null)
+        if (cam != null)
         {
             Matrix4x4 vp = cam.projectionMatrix * cam.worldToCameraMatrix;
             for (int r = 0; r < 4; r++)

@@ -68,7 +68,8 @@ public static class HallBuilder
         var chordWall = new MeshBuilder();
         for (int i = 0; i + 1 < hallEdge.Count; i++)
         {
-            bool chord = ClipRadius(ang[i], D, Rh) < Rh - 0.001f && ClipRadius(ang[i + 1], D, Rh) < Rh - 0.001f;
+            float midAngle = 0.5f * (ang[i] + ang[i + 1]);
+            bool chord = ClipRadius(midAngle, D, Rh) < Rh - 0.001f;
             var seg = new List<Vector2> { hallEdge[i], hallEdge[i + 1] };
             if (chord) chordWall.AddWallStrip(seg, 0f, roomFloorLocal, true);
             else arcWall.AddWallStrip(seg, 0f, ceilY, true);

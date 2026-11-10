@@ -125,6 +125,13 @@ public class CaptureMode : MonoBehaviour
         Application.Quit(exitCode);
     }
 
+    // The glow overrides are static; never leave them set when the capture run ends early.
+    private void OnDestroy()
+    {
+        PlantEquipmentBinder.PowerOverride = null;
+        PlantEquipmentBinder.GlowOff = false;
+    }
+
     // ---- poses ---------------------------------------------------------------------------------------------------
 
     private IEnumerator RunPose(string pose)

@@ -54,7 +54,7 @@ public static class SmrModuleMesh
         var pumps = new MeshBuilder();
         for (int i = 0; i < HallDimensions.PumpHousingCount; i++)
         {
-            float a = SlotCentre + Mathf.Deg2Rad * (-62f + 41.3f * i);
+            float a = SlotCentre + Mathf.Deg2Rad * (-39f + 26f * i);
             var d = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
             Vector3 foot = d * (R + 0.34f) + Vector3.up * (vt - 5.6f);
             pumps.AddTube(foot, foot + Vector3.up * 2.6f, 0.34f, 16, true);                                 // motor housing
