@@ -42,22 +42,25 @@ public static class RuntimeInventoryStore
 /// <summary>
 /// Hover tooltip (U17, R18): label, live value with units, setpoint where one exists, limits and a one-line description
 /// for the control or indicator under the cursor. The text comes from ControlTooltipModel (pure, tested); the binder
-/// supplies control state it alone knows (pending drags, guard and SCRAM cover). Draws with IMGUI at the cursor; the
-/// font follows the text-scale setting.
+/// supplies control state it alone knows (pending drags, guard and SCRAM cover). Drawn as a uGUI + TextMeshPro box that follows
+/// the cursor; its size follows the text-scale setting through the type ramp.
 /// </summary>
 public class ControlTooltip : MonoBehaviour
 {
     public ControlRoom3DBinder binder;
 
-    private GUIStyle style;
-    private int styleSize;
+    /// <summary>Capture runs only: draw the tooltip at this position (pixels from the top-left) instead of at the (absent) cursor.</summary>
+    public static Vector2? AnchorOverride;
 
-    // Built once per frame (on the Layout event) and reused for Repaint and input events of the same frame.
-    private int builtFrame = -1;
-    private DiegeticInteractable builtFor;
-    private TooltipText builtTooltip;
-    private string builtText;
-    private float builtWidth, builtHeight;
+    private const float BoxWidth = 460f;      // reference pixels
+    private const float CursorGap = 18f;      // screen pixels
+    private const float EdgeGap = 4f;
+
+    private Canvas canvas;
+    private RectTransform box;
+    private TMPro.TMP_Text label;
+    private DiegeticInteractable shownFor;
+    private string shownText;
 
     private void Awake()
     {
@@ -66,44 +69,47 @@ public class ControlTooltip : MonoBehaviour
         if (RuntimeInventoryStore.Inventory == null) return;   // load once, up front
     }
 
-    private void EnsureStyle()
+    private void Build()
     {
-        int size = UserSettings.Scaled(ReactorSim.Ui.Theme.FontCaption);
-        if (style != null && styleSize == size) return;
-        styleSize = size;
-        style = ThemeColors.BoxStyle(ReactorSim.Ui.Theme.SurfaceTooltip, size, ReactorSim.Ui.Theme.TextBody);
-        style.richText = false;
-        style.padding = new RectOffset(10, 10, 6, 6);
+        canvas = RuntimeUi.CreateCanvas("TooltipCanvas", 20, transform);
+        canvas.GetComponent<UnityEngine.UI.GraphicRaycaster>().enabled = false;   // never takes a click
+        box = RuntimeUi.MakeToast(canvas.transform, "Tooltip", new Vector2(0f, 1f), Vector2.zero, BoxWidth,
+            ReactorSim.Ui.TextRole.Caption, TextAnchor.UpperLeft, ThemeColors.TextBody, out label);
+        box.gameObject.SetActive(false);
     }
 
-    private void OnGUI()
+    private void LateUpdate()
     {
-        if (binder == null || binder.bridge == null || binder.bridge.Sim == null || PauseMenu.IsOpen) return;
+        TooltipText tip = null;
         var h = DiegeticInteractable.Hovered;
-        if (h == null) return;
-        var s = binder.bridge.GetSnapshot();
-        if (s == null) return;
-        if (builtFrame != Time.frameCount || builtFor != h)
+        if (binder != null && binder.bridge != null && binder.bridge.Sim != null && !PauseMenu.IsOpen && h != null)
         {
-            builtFrame = Time.frameCount;
-            builtFor = h;
-            builtTooltip = binder.BuildTooltip(h, s, RuntimeInventoryStore.Inventory);
-            if (builtTooltip != null)
-            {
-                EnsureStyle();
-                builtText = builtTooltip.ToText();
-                builtWidth = Mathf.Min(Screen.width - 8f, 440f * UserSettings.TextScale);
-                builtHeight = style.CalcHeight(new GUIContent(builtText), builtWidth);
-            }
+            var s = binder.bridge.GetSnapshot();
+            if (s != null) tip = binder.BuildTooltip(h, s, RuntimeInventoryStore.Inventory);
         }
-        if (builtTooltip == null) return;
-        EnsureStyle();
-        string text = builtText;
-        float width = builtWidth;
-        float height = builtHeight;
-        Vector2 m = Event.current.mousePosition;
-        float x = Mathf.Clamp(m.x + 18f, 4f, Mathf.Max(4f, Screen.width - width - 4f));
-        float y = Mathf.Clamp(m.y + 18f, 4f, Mathf.Max(4f, Screen.height - height - 4f));
-        GUI.Box(new Rect(x, y, width, height), text, style);
+        if (tip == null)
+        {
+            if (box != null && box.gameObject.activeSelf) box.gameObject.SetActive(false);
+            return;
+        }
+        if (box == null) Build();
+
+        string text = tip.ToText();
+        if (shownText != text || shownFor != h)
+        {
+            shownText = text;
+            shownFor = h;
+            label.text = text;
+        }
+        if (!box.gameObject.activeSelf) box.gameObject.SetActive(true);
+        UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(box);
+
+        // Cursor in screen pixels from the bottom-left; the box hangs below and right of it and stays on screen.
+        Vector2 m = AnchorOverride.HasValue ? new Vector2(AnchorOverride.Value.x, Screen.height - AnchorOverride.Value.y) : (Vector2)Input.mousePosition;
+        float k = canvas.scaleFactor;
+        float w = box.rect.width * k, hgt = box.rect.height * k;
+        float x = Mathf.Clamp(m.x + CursorGap, EdgeGap, Mathf.Max(EdgeGap, Screen.width - w - EdgeGap));
+        float top = Mathf.Clamp(m.y - CursorGap, Mathf.Min(hgt + EdgeGap, Screen.height - EdgeGap), Screen.height - EdgeGap);
+        box.anchoredPosition = new Vector2(x / k, (top - Screen.height) / k);
     }
 }

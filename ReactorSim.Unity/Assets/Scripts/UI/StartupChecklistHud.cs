@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
 using ReactorSim;
 using ReactorSim.Clipboard;
 using ReactorSim.Ui;
@@ -12,7 +14,9 @@ using ReactorSim.Ui;
 /// and ShowMeOutline with the desk ProcedureClipboard. Expanding frees the cursor through RoomInputGate; P or Esc
 /// closes. The panel hides while the operator tablet or pause menu is open, shows an "On the grid" state at
 /// completion and a caution line naming the step that unticked when the current step moves backward (SCRAM, trip).
-/// All colors come from Theme tokens over a backing panel. The display model is pure (ClipboardView.Hud).
+/// Drawn with uGUI and TextMeshPro on the shared RuntimeUi kit (type ramp, themed panel, focus states); the panel keeps
+/// its place at the top left and its size follows the text-scale setting. All colors come from Theme tokens over a
+/// backing panel. The display model is pure (ClipboardView.Hud).
 /// </summary>
 public class StartupChecklistHud : MonoBehaviour
 {
@@ -34,14 +38,21 @@ public class StartupChecklistHud : MonoBehaviour
     private int previousIndex = ClipboardView.NoPrevious;
     private string cautionNote;
     private float cautionUntil;
-    private Vector2 scroll;
     private int bridgeLookupFrame = -1;
     private int tabletLookupFrame = -1;
     private readonly RoomInputGate inputGate = new RoomInputGate();
     private readonly ShowMeOutline outline = new ShowMeOutline();
 
-    private GUIStyle panelStyle, headStyle, bodyStyle, dimStyle, cautionStyle, okStyle, currentStyle, toggleStyle, btnStyle;
-    private int styleSettingsVersion = -1;
+    // uGUI, built on first use
+    private Canvas canvas;
+    private Image panelImage;
+    private ThemedPanelWidth panelWidth;
+    private GameObject compactBox, fullBox;
+    private TMP_Text cPhase, cStep, cAction, cControl, cReading, cCaution, cHint;
+    private TMP_Text fHeader, fCaution;
+    private RectTransform fContent;
+    private readonly List<TMP_Text> fRows = new List<TMP_Text>();
+    private Toggle fShowMe;
 
     /// <summary>Closes every open full list, restoring the input it suspended (call before another overlay suspends).</summary>
     public static void CollapseAll()
@@ -80,7 +91,6 @@ public class StartupChecklistHud : MonoBehaviour
     {
         expanded = true;
         IsExpanded = true;
-        scroll = Vector2.zero;
         inputGate.Suspend();
     }
 
@@ -120,7 +130,7 @@ public class StartupChecklistHud : MonoBehaviour
             model = null;
         }
 
-        if (expanded && Input.GetKeyDown(KeyCode.Escape)) escPending = true;
+        if (expanded && Input.GetKeyDown(KeyCode.Escape) && !DiegeticInteractable.InputConsumedThisFrame) escPending = true;
         if (Input.GetKeyDown(KeyCode.P) && Enabled && model != null && !OverlayOpen)
         {
             if (expanded) Collapse();
@@ -139,6 +149,7 @@ public class StartupChecklistHud : MonoBehaviour
             IsExpanded = false;
         }
         if (!expanded && inputGate.HasSuspended && !PauseMenu.IsOpen) inputGate.Restore();
+        LateUpdateView();
     }
 
     private void OnDisable()
@@ -146,57 +157,68 @@ public class StartupChecklistHud : MonoBehaviour
         expanded = false;
         IsExpanded = false;
         inputGate.Restore();
+        outline.Hide();
+        if (canvas != null) canvas.gameObject.SetActive(false);
     }
 
-    // ---- drawing ---------------------------------------------------------------------------------------------
+    // ---- drawing (uGUI) ---------------------------------------------------------------------------------------
 
-    private void MakeStyles()
+    private const float CompactWidth = 470f, FullWidth = 620f;
+
+    private void Build()
     {
-        if (panelStyle != null && styleSettingsVersion == UserSettings.Version) return;
-        styleSettingsVersion = UserSettings.Version;
-        int body = UserSettings.Scaled(Theme.FontCaption);
-        int head = UserSettings.Scaled(Theme.FontBody);
-        panelStyle = ThemeColors.BoxStyle(Theme.SurfaceTooltip, body, Theme.TextBody);
-        panelStyle.padding = new RectOffset(12, 12, 10, 10);
-        headStyle = ThemeColors.LabelStyle(head, Theme.TextBody, true);
-        bodyStyle = ThemeColors.LabelStyle(body, Theme.TextBody);
-        dimStyle = ThemeColors.LabelStyle(body, Theme.TextDim);
-        cautionStyle = ThemeColors.LabelStyle(body, Theme.StatusCaution, true);
-        okStyle = ThemeColors.LabelStyle(body, Theme.StatusOk);
-        currentStyle = ThemeColors.LabelStyle(body, Theme.TextBody, true);
-        toggleStyle = new GUIStyle(GUI.skin.toggle) { fontSize = body, wordWrap = true };
-        btnStyle = new GUIStyle(GUI.skin.button) { fontSize = body };
-        SetText(toggleStyle);
-        SetText(btnStyle);
+        if (canvas != null) return;
+        RuntimeUi.EnsureEventSystem();
+        canvas = RuntimeUi.CreateCanvas("ChecklistCanvas", 40, transform);
+        // Top left, clear of the tooltip and hint regions and below MissionHud's band.
+        var panel = RuntimeUi.Panel(canvas.transform, "Panel", CompactWidth, ThemeColors.SurfaceTooltip, new Vector2(0f, 1f),
+            new Vector2(0f, 1f), new RectOffset(Theme.Space3, Theme.Space3, Theme.Space3, Theme.Space3), Theme.Space1);
+        panel.anchoredPosition = new Vector2(10f, -196f);
+        panelImage = panel.GetComponent<Image>();
+        panelWidth = panel.GetComponent<ThemedPanelWidth>();
+
+        compactBox = Box(panel, "Compact");
+        cPhase = RuntimeUi.MakeLabel(compactBox.transform, "", TextRole.Caption, TextAnchor.MiddleLeft, ThemeColors.TextDim);
+        cStep = RuntimeUi.MakeLabel(compactBox.transform, "", TextRole.Heading, TextAnchor.MiddleLeft, ThemeColors.TextHeading);
+        cStep.fontStyle = FontStyles.Bold;
+        cAction = RuntimeUi.MakeLabel(compactBox.transform, "", TextRole.Body, TextAnchor.MiddleLeft, ThemeColors.TextBody);
+        cAction.fontStyle = FontStyles.Bold;
+        cControl = RuntimeUi.MakeLabel(compactBox.transform, "", TextRole.Caption, TextAnchor.MiddleLeft, ThemeColors.TextBody);
+        cReading = RuntimeUi.MakeLabel(compactBox.transform, "", TextRole.Numeric, TextAnchor.MiddleLeft, ThemeColors.TextBody);
+        cCaution = RuntimeUi.MakeLabel(compactBox.transform, "", TextRole.Caption, TextAnchor.MiddleLeft, ThemeColors.StatusCaution);
+        cCaution.fontStyle = FontStyles.Bold;
+        cHint = RuntimeUi.MakeLabel(compactBox.transform, "P - full list", TextRole.Caption, TextAnchor.MiddleLeft, ThemeColors.TextDim);
+
+        fullBox = Box(panel, "Full");
+        fHeader = RuntimeUi.MakeLabel(fullBox.transform, "", TextRole.Heading, TextAnchor.MiddleLeft, ThemeColors.TextHeading);
+        fHeader.fontStyle = FontStyles.Bold;
+        fCaution = RuntimeUi.MakeLabel(fullBox.transform, "", TextRole.Caption, TextAnchor.MiddleLeft, ThemeColors.StatusCaution);
+        fCaution.fontStyle = FontStyles.Bold;
+        RuntimeUi.MakeDivider(fullBox.transform);
+        fContent = RuntimeUi.MakeScrollView(fullBox.transform, 520f);
+        fShowMe = RuntimeUi.MakeToggle(fullBox.transform, "Show me the next control", showMe, v => showMe = v);
+        RuntimeUi.MakeButton(fullBox.transform, "Close (P or Esc)", Collapse, 44f);
+        fullBox.SetActive(false);
     }
 
-    private static void SetText(GUIStyle s)
+    private static GameObject Box(RectTransform parent, string name)
     {
-        var c = ThemeColors.ToColor(Theme.TextBody);
-        s.normal.textColor = c;
-        s.hover.textColor = c;
-        s.active.textColor = c;
-        s.focused.textColor = c;
-        s.onNormal.textColor = c;
-        s.onHover.textColor = c;
-        s.onActive.textColor = c;
-        s.onFocused.textColor = c;
+        var go = new GameObject(name, typeof(RectTransform), typeof(VerticalLayoutGroup));
+        go.transform.SetParent(parent, false);
+        var v = go.GetComponent<VerticalLayoutGroup>();
+        v.spacing = Theme.Space1;
+        v.childControlWidth = true;
+        v.childControlHeight = true;
+        v.childForceExpandWidth = true;
+        v.childForceExpandHeight = false;
+        return go;
     }
 
-    private void OnGUI()
+    private static void Set(TMP_Text t, string text)
     {
-        if (!Enabled || model == null || procedure == null || state == null) return;
-        if (OverlayOpen) return;
-        MakeStyles();
-
-        float s = Mathf.Max(1f, Screen.height / 1080f);
-        var saved = GUI.matrix;
-        GUI.matrix = Matrix4x4.Scale(new Vector3(s, s, 1f));
-        // "Show me" stays on after the list closes, like the desk clipboard's, so the player can walk to the control.
-        if (showMe && Event.current.type == EventType.Repaint) outline.Draw(model.HighlightRows, s);
-        if (expanded) DrawFull();
-        else DrawCompact();
-        GUI.matrix = saved;
+        bool has = !string.IsNullOrEmpty(text);
+        if (t.gameObject.activeSelf != has) t.gameObject.SetActive(has);
+        if (has && t.text != text) t.text = text;
     }
 
     private bool CautionActive()
@@ -204,53 +226,79 @@ public class StartupChecklistHud : MonoBehaviour
         return !string.IsNullOrEmpty(cautionNote) && Time.unscaledTime < cautionUntil;
     }
 
-    // Compact panel, capped at 470 x 330 (clear of the tooltip and hint regions, below MissionHud's 10..190 band).
-    private void DrawCompact()
+    // Runs after Update so the model for this frame is final; also keeps the "Show me" outline on the camera's new pose.
+    private void LateUpdateView()
     {
-        GUILayout.BeginArea(new Rect(10f, 196f, 470f, 330f));
-        GUILayout.BeginVertical(panelStyle);
+        bool visible = Enabled && model != null && procedure != null && state != null && !OverlayOpen;
+        if (!visible)
+        {
+            if (canvas != null) canvas.gameObject.SetActive(false);
+            outline.Hide();
+            return;
+        }
+        Build();
+        canvas.gameObject.SetActive(true);
+        // "Show me" stays on after the list closes, like the desk clipboard's, so the player can walk to the control.
+        if (showMe) outline.Show(model.HighlightRows); else outline.Hide();
+
+        if (compactBox.activeSelf == expanded) compactBox.SetActive(!expanded);
+        if (fullBox.activeSelf != expanded)
+        {
+            fullBox.SetActive(expanded);
+            panelWidth.SetDesignWidth(expanded ? FullWidth : CompactWidth);
+        }
+        panelImage.raycastTarget = expanded;
+        if (expanded) RefreshFull(); else RefreshCompact();
+    }
+
+    private void RefreshCompact()
+    {
         if (model.Complete)
         {
-            GUILayout.Label(model.Mark + " " + model.Action, headStyle);
-            GUILayout.Label("All " + model.StepCount + " steps ticked.", okStyle);
+            Set(cPhase, "");
+            Set(cStep, model.Mark + " " + model.Action);
+            Set(cAction, "All " + model.StepCount + " steps ticked.");
+            cAction.color = ThemeColors.StatusOk;
+            Set(cControl, "");
+            Set(cReading, "");
         }
         else
         {
-            if (model.Phase.Length > 0) GUILayout.Label(model.Phase, dimStyle);
-            GUILayout.Label(model.Mark + " Step " + model.StepNumber + " of " + model.StepCount, headStyle);
-            GUILayout.Label(model.Action, currentStyle);
-            if (model.Control.Length > 0) GUILayout.Label("Control: " + model.Control, bodyStyle);
-            if (model.Reading.Length > 0) GUILayout.Label(model.Reading, bodyStyle);
+            Set(cPhase, model.Phase);
+            Set(cStep, model.Mark + " Step " + model.StepNumber + " of " + model.StepCount);
+            Set(cAction, model.Action);
+            cAction.color = ThemeColors.TextBody;
+            Set(cControl, model.Control.Length > 0 ? "Control: " + model.Control : "");
+            Set(cReading, model.Reading);
         }
-        if (CautionActive()) GUILayout.Label(cautionNote, cautionStyle);
-        GUILayout.Label("P - full list", dimStyle);
-        GUILayout.EndVertical();
-        GUILayout.EndArea();
+        Set(cCaution, CautionActive() ? cautionNote : "");
+        Set(cHint, "P - full list");
     }
 
-    // Full list, capped at 620 x 760: ticks per step, the current step's control and reading, and "Show me".
-    private void DrawFull()
+    private void RefreshFull()
     {
-        GUILayout.BeginArea(new Rect(10f, 196f, 620f, 760f));
-        GUILayout.BeginVertical(panelStyle);
-        GUILayout.Label(model.Complete ? model.Action : ClipboardView.Header(procedure, state), headStyle);
-        if (CautionActive()) GUILayout.Label(cautionNote, cautionStyle);
-        scroll = GUILayout.BeginScrollView(scroll, GUILayout.Height(520f));
+        Set(fHeader, model.Complete ? model.Action : ClipboardView.Header(procedure, state));
+        Set(fCaution, CautionActive() ? cautionNote : "");
+        if (fShowMe.isOn != showMe) fShowMe.SetIsOnWithoutNotify(showMe);
+
+        int n = 0;
         foreach (var line in ClipboardView.Lines(procedure, state, snap))
         {
-            var style = line.Current ? currentStyle : (line.Ticked ? okStyle : bodyStyle);
-            GUILayout.Label(line.Mark + "  " + line.Number + ". " + line.Text, style);
+            while (fRows.Count <= n)
+                fRows.Add(RuntimeUi.MakeLabel(fContent, "", TextRole.Caption, TextAnchor.UpperLeft, ThemeColors.TextBody));
+            var row = fRows[n++];
+            row.gameObject.SetActive(true);
+            string text = line.Mark + "  " + line.Number + ". " + line.Text;
             if (line.Current)
             {
-                if (line.Control.Length > 0) GUILayout.Label("      Control: " + line.Control, bodyStyle);
+                if (line.Control.Length > 0) text += "\n      Control: " + line.Control;
                 string reading = ClipboardView.Reading(line.LiveValue, line.Target);
-                if (reading.Length > 0) GUILayout.Label("      " + reading, bodyStyle);
+                if (reading.Length > 0) text += "\n      " + reading;
             }
+            if (row.text != text) row.text = text;
+            row.color = line.Ticked && !line.Current ? ThemeColors.StatusOk : ThemeColors.TextBody;
+            row.fontStyle = line.Current ? FontStyles.Bold : FontStyles.Normal;
         }
-        GUILayout.EndScrollView();
-        showMe = GUILayout.Toggle(showMe, "  Show me the next control", toggleStyle);
-        if (GUILayout.Button("Close (P or Esc)", btnStyle, GUILayout.Height(32f))) Collapse();
-        GUILayout.EndVertical();
-        GUILayout.EndArea();
+        for (int i = n; i < fRows.Count; i++) fRows[i].gameObject.SetActive(false);
     }
 }

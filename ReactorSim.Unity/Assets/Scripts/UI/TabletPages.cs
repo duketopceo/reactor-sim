@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using ReactorSim.Controls;
 using ReactorSim.Instruments;
+using ReactorSim.Ui;
 
 // Pure logic (no UnityEngine): the page models behind the operator tablet (U14, R14). OperatorTablet draws them.
 // Linked into ReactorSim.Core.Tests.
@@ -32,13 +33,15 @@ namespace ReactorSim.Tablet
         public string Format(PlantSnapshot s)
         {
             double v = Read(s);
-            if (double.IsNaN(v)) return "--";
+            if (!ReadoutFormat.IsFinite(v)) return ReadoutFormat.Dash;
             double a = Math.Abs(v);
-            string num = a >= 1e5 || (a > 0.0 && a < 0.01) ? v.ToString("0.##e+0", CultureInfo.InvariantCulture)
-                : a >= 100.0 ? v.ToString("0", CultureInfo.InvariantCulture)
-                : v.ToString(a >= 10.0 ? "0.0" : "0.00", CultureInfo.InvariantCulture);
             string u = Units;
-            return u.Length > 0 ? num + " " + u : num;
+            if (a >= 1e5 || (a > 0.0 && a < 0.01))
+            {
+                string sci = v.ToString("0.##e+0", CultureInfo.InvariantCulture);
+                return u.Length > 0 ? sci + " " + u : sci;
+            }
+            return ReadoutFormat.Value(v, a >= 100.0 ? 0 : (a >= 10.0 ? 1 : 2), u);
         }
     }
 

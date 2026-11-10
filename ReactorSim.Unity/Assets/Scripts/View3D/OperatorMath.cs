@@ -18,6 +18,17 @@ public static class OperatorMath
     public const float MinPitch = -60f;   // looking up
     public const float MaxPitch = 55f;    // looking down
     public const float WalkSpeed = 1.6f;
+    // Shipped movement defaults; StreamingAssets/input-tuning.json overrides them (InputTuning) so the owner tunes without a rebuild.
+    /// <summary>Walk speed multiplier while the sprint key is held.</summary>
+    public const float SprintMultiplier = 1.8f;
+    /// <summary>Seconds to reach full walking speed from standing still.</summary>
+    public const float AccelSeconds = 0.15f;
+    /// <summary>Seconds to stop from full walking speed.</summary>
+    public const float DecelSeconds = 0.10f;
+    /// <summary>CharacterController step offset (m): small lips and cable covers are stepped over, not snagged on.</summary>
+    public const float StepOffset = 0.2f;
+    /// <summary>Legacy "Mouse X"/"Mouse Y" axes carry the pixel delta times the InputManager sensitivity (0.1); this undoes it.</summary>
+    public const float MouseAxisToPixels = 10f;
     /// <summary>Chair swivel rate while Q or E is held (seated; stays inside SeatedYawRange).</summary>
     public const float SwivelDegPerSec = 90f;
 
@@ -58,7 +69,7 @@ public static class OperatorMath
     // ---- player settings (pause menu): ranges shared by the UI and the persistence layer ----
     public const float TextScaleMin = 0.8f, TextScaleMax = 1.5f, TextScaleDefault = 1f;
     public const float FovMin = 50f, FovMax = 90f, FovDefault = 70f;
-    public const float SensitivityMin = 0.4f, SensitivityMax = 2.5f, SensitivityDefault = 1f;
+    public const float SensitivityMin = 0.2f, SensitivityMax = 4f, SensitivityDefault = 1f;
 
     public static float ClampTextScale(float v) { return Clamp(v, TextScaleMin, TextScaleMax, TextScaleDefault); }
     public static float ClampFov(float v) { return Clamp(v, FovMin, FovMax, FovDefault); }
@@ -115,6 +126,61 @@ public static class OperatorMath
     public static float EffectiveWalkSpeed(bool seated, bool dragging, float speed)
     {
         return (seated || dragging) ? 0f : speed;
+    }
+
+    /// <summary>
+    /// Moves the planar velocity (vx, vz) toward the target velocity (tx, tz) with a linear ramp: reaching topSpeed takes
+    /// accelSeconds when speeding up (or turning) and stopping from topSpeed takes decelSeconds. Zero ramp times jump straight
+    /// to the target. Never overshoots.
+    /// </summary>
+    public static void RampVelocity(float vx, float vz, float tx, float tz, float dt, float topSpeed,
+        float accelSeconds, float decelSeconds, out float nx, out float nz)
+    {
+        float dx = tx - vx, dz = tz - vz;
+        float dist = (float)Math.Sqrt(dx * dx + dz * dz);
+        bool speedingUp = tx * tx + tz * tz >= vx * vx + vz * vz;
+        float ramp = speedingUp ? accelSeconds : decelSeconds;
+        if (dist <= 1e-6f) { nx = tx; nz = tz; return; }
+        if (!(dt > 0f)) { nx = vx; nz = vz; return; }
+        float maxStep = ramp > 0f ? topSpeed / ramp * dt : float.MaxValue;
+        if (dist <= maxStep) { nx = tx; nz = tz; return; }
+        float k = maxStep / dist;
+        nx = vx + dx * k;
+        nz = vz + dz * k;
+    }
+
+    /// <summary>Walking speed for this frame: the walk speed, times the sprint multiplier while sprinting.</summary>
+    public static float TargetSpeed(float walkSpeed, float sprintMultiplier, bool sprinting)
+    {
+        return sprinting ? walkSpeed * Math.Max(1f, sprintMultiplier) : walkSpeed;
+    }
+
+    /// <summary>A walking step stalls when the body moved under a quarter of the distance it was asked to (snagged on geometry).</summary>
+    public const float StallRatio = 0.25f;
+    /// <summary>A walk path is a detour when it is longer than this multiple of the straight line.</summary>
+    public const float DetourRatio = 1.35f;
+
+    public static bool IsStall(float intendedMetres, float achievedMetres)
+    {
+        return intendedMetres > 1e-4f && achievedMetres < intendedMetres * StallRatio;
+    }
+
+    public static bool IsDetour(float travelledMetres, float straightMetres)
+    {
+        return straightMetres > 1e-3f && travelledMetres > straightMetres * DetourRatio;
+    }
+
+    /// <summary>Pitch change (degrees) for a mouse Y delta; invert flips it. Positive pitch looks down.</summary>
+    public static float PitchDelta(float mouseY, float speed, bool invertY)
+    {
+        return (invertY ? 1f : -1f) * mouseY * speed;
+    }
+
+    /// <summary>The on-screen prompt for the single sit/stand key, or null when nothing can be done (standing, no chair near).</summary>
+    public static string SeatPrompt(bool seated, bool chairInRange)
+    {
+        if (seated) return "F  stand up";
+        return chairInRange ? "F  sit down" : null;
     }
 
     public static bool InInteractionRange(float distance)

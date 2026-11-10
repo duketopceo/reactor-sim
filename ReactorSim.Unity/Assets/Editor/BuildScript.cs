@@ -7,7 +7,8 @@ using UnityEngine;
 
 // Batchmode player build:
 //   "<Unity.exe>" -batchmode -nographics -projectPath ReactorSim.Unity
-//       -executeMethod BuildScript.BuildWindows -buildTarget StandaloneWindows64 -quit -logFile out/unity-build.log
+//       -executeMethod BuildScript.BuildWindows -buildTarget StandaloneWindows64 [-buildVersion x.y.z] -quit -logFile out/unity-build.log
+// -buildVersion stamps the release tag; the log carries "[BuildScript] version=<x.y.z> source=arg|fallback".
 // Output: <repo root>/out/build/ReactorSim.exe (the Unity project sits one level below the repo root).
 public static class BuildScript
 {
@@ -25,8 +26,18 @@ public static class BuildScript
             return;
         }
 
+        // Release builds pass -buildVersion <x.y.z> (the tag); otherwise the current bundleVersion's base is kept.
+        string version, versionSource;
+        try { version = BuildVersionArgs.Resolve(Environment.GetCommandLineArgs(), PlayerSettings.bundleVersion.Split('+')[0], out versionSource); }
+        catch (FormatException ex)
+        {
+            Finish(false, "[BuildScript] FAIL " + ex.Message);
+            return;
+        }
+        Debug.Log("[BuildScript] version=" + version + " source=" + versionSource);
+
         Directory.CreateDirectory(outDir);
-        PlayerSettings.bundleVersion = PlayerSettings.bundleVersion.Split('+')[0] + "+" + stamp;
+        PlayerSettings.bundleVersion = version + "+" + stamp;
 
         var options = new BuildPlayerOptions
         {

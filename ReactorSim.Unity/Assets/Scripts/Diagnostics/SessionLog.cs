@@ -19,9 +19,13 @@ public class SessionLog : MonoBehaviour
 
     public string Directory { get { return recorder != null ? recorder.Directory : null; } }
 
+    /// <summary>The running session's log, for InputLog to find the folder; null between sessions.</summary>
+    public static SessionLog Current { get; private set; }
+
     public void Begin(PlantBridge owner, string mode)
     {
         bridge = owner;
+        Current = this;
         try
         {
             string root = Path.Combine(Application.persistentDataPath, "sessions");
@@ -50,6 +54,7 @@ public class SessionLog : MonoBehaviour
 
     private void Finish()
     {
+        if (Current == this) { InputLog.Close(); Current = null; }
         if (recorder == null) return;
         try { lock (bridge.SimLock) { recorder.Finish(); } }
         catch (Exception ex) { Debug.LogWarning("[SessionLog] finish failed: " + ex.Message); }

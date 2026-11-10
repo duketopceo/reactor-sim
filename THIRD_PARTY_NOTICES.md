@@ -8,6 +8,21 @@ Reactor Sim's own code and assets are MIT licensed (see [LICENSE](LICENSE)). The
 Licensed under the SIL Open Font License 1.1. The full license text and copyright notices are kept beside the font:
 `ReactorSim.Unity/Assets/TextMesh Pro/Fonts/LiberationSans - OFL.txt`.
 
+## Inter (font)
+
+`ReactorSim.Unity/Assets/Fonts/Inter-Regular.ttf` and `Inter-Bold.ttf`, from Inter 4.1
+(https://github.com/rsms/inter), the proportional UI face. Copyright (c) 2016 The Inter Project Authors.
+Licensed under the SIL Open Font License 1.1. The license text is kept beside the fonts:
+`ReactorSim.Unity/Assets/Fonts/Inter-LICENSE.txt`. The SDF font assets generated from them by
+`TmpBootstrap.GenerateFonts` are derived from the same fonts and carry the same license.
+
+## IBM Plex Mono (font)
+
+`ReactorSim.Unity/Assets/Fonts/IBMPlexMono-Regular.ttf`, from IBM Plex Mono 1.1.0
+(https://github.com/IBM/plex), the monospace face for screens and numeric readouts. Copyright (c) 2017 IBM Corp.
+with Reserved Font Name "Plex". Licensed under the SIL Open Font License 1.1. The license text is kept beside the
+font: `ReactorSim.Unity/Assets/Fonts/IBMPlexMono-LICENSE.txt`. The generated SDF font asset carries the same license.
+
 ## Unity packages and TextMesh Pro
 
 The `ReactorSim.Unity` project depends on Unity Technologies packages (see `ReactorSim.Unity/Packages/manifest.json`)

@@ -108,6 +108,7 @@ public static class ControlRoomSceneBuilder
                     if (existing == null) existing = t.gameObject.AddComponent<CrtScreenRenderer>();
                     existing.bridge = bridge;
                     existing.screenName = t.name;
+                    ApplyScreenMaterial(t.GetComponent<MeshRenderer>());
                 }
             }
             if (!t.name.StartsWith("INT_")) continue;
@@ -115,7 +116,8 @@ public static class ControlRoomSceneBuilder
             var parsed = PivotNameParser.Parse(t.name);
             if (parsed.Status == ParseStatus.VisualChild) continue; // a mesh under a control pivot, not a control
             // Ok controls and malformed names both get an interactable so a malformed name is reported at play.
-            FitCollider(t, 0.04f);
+            // Hit area: at least HitArea.MinPixels on screen at the default field of view and the playtest window height (R7).
+            FitCollider(t, (float)HitArea.MinSideMetres(OperatorMath.FovDefault, 900.0));
             var inter = t.gameObject.AddComponent<DiegeticInteractable>();
             inter.binder = binder;
             DesignData.Row row;
@@ -542,6 +544,29 @@ public static class ControlRoomSceneBuilder
             m.SetColor("_EmissionColor", new Color(0.25f, 0.55f, 1f) * 0.4f);
         }
         return m;
+    }
+
+    // One emissive screen material shared by every CRT_* face (KTD4). Black albedo means room lights and shadows add
+    // nothing; the emission carries the dark screen colour, so the phosphor text on top keeps its contrast in any light.
+    private static Material screenMaterial;
+
+    private static void ApplyScreenMaterial(MeshRenderer r)
+    {
+        if (r == null) return;
+        if (screenMaterial == null)
+        {
+            screenMaterial = MakeMaterial("CRT_Screen", Color.black, false, false);
+            if (screenMaterial.HasProperty("_Glossiness")) screenMaterial.SetFloat("_Glossiness", 0f);
+            if (screenMaterial.HasProperty("_SpecularHighlights")) screenMaterial.SetFloat("_SpecularHighlights", 0f);
+            if (screenMaterial.HasProperty("_GlossyReflections")) screenMaterial.SetFloat("_GlossyReflections", 0f);
+            if (screenMaterial.HasProperty("_EmissionColor"))
+            {
+                screenMaterial.EnableKeyword("_EMISSION");
+                screenMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+                screenMaterial.SetColor("_EmissionColor", ThemeColors.SurfaceScreen);
+            }
+        }
+        r.sharedMaterial = screenMaterial;
     }
 
     // The old SeatCamera component is gone; scenes saved with it carry a missing-script component.

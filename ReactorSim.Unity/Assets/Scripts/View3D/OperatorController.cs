@@ -1,14 +1,16 @@
 using UnityEngine;
+using ReactorSim;
 
 // First-person operator (U7, KTD4); replaces SeatCamera. The camera is the eye of a body-less CharacterController
 // capsule that spawns seated at SPAWN_A1. The cursor is free by default so hover and drag act on controls.
-//   WASD               walk (not while seated or while a control is being dragged)
-//   E                  sit on the chair being looked at, within 1.5 m (standing)
-//   F                  stand up from the chair (seated)
+//   WASD               walk (not while seated or while a control is being dragged), with a short acceleration ramp
+//   Shift              sprint while walking
+//   F                  sit on the chair being looked at, within 1.5 m (standing); stand up from the chair (seated)
 //   1-6                quick travel: stand at STAND_<section> (reactor, primary, safety, steam, turbine, electrical),
 //                      facing the board
 //   Q / E (seated)     swivel the chair left / right, within the seated yaw clamp
-//   hold right mouse   look around (suppressed while a control is being dragged; yaw limited while seated)
+//   hold right mouse   look around (suppressed while a control is being dragged; yaw limited while seated; the pointer returns
+//                      to where it was; the invert-Y setting flips pitch)
 //   mouse wheel        zoom; zooming in drifts the view toward the hovered control
 //   C or middle mouse  recentre view and zoom
 // Camera shake (CameraShake) is composed on top in LateUpdate.
@@ -36,7 +38,10 @@ public class OperatorController : MonoBehaviour
     private int settingsVersion = -1;
 
     private bool seated;
-    private bool swivelEArmed = true;
+    private float velX, velZ;   // planar walking velocity (m/s), ramped toward the wanted velocity
+    private int lookBeganFrame;
+    private float walkTime, walkIntended, walkAchieved;
+    private int walkStalls;
     private float floorY;
     private float eye;
     private float baseYaw, yaw, pitch;
@@ -44,7 +49,8 @@ public class OperatorController : MonoBehaviour
     private float focusUntil;
     private bool looking;
     private int chairInRange = -1;
-    private GUIStyle hintStyle;
+    private GameObject hintBox;
+    private TMPro.TMP_Text hintLabel;
 
     public bool Seated { get { return seated; } }
 
@@ -52,6 +58,7 @@ public class OperatorController : MonoBehaviour
     {
         cam = GetComponent<Camera>();
         shake = GetComponent<CameraShake>();
+        walkSpeed = (float)UserSettings.Tuning.WalkSpeed;
         FindAnchors();
         CreateBody();
         Spawn();
@@ -84,7 +91,7 @@ public class OperatorController : MonoBehaviour
         body.radius = 0.3f;
         body.height = 1.75f;
         body.center = new Vector3(0f, 0.875f, 0f);
-        body.stepOffset = 0.1f;
+        body.stepOffset = OperatorMath.StepOffset;
         body.skinWidth = 0.03f;
     }
 
@@ -156,17 +163,15 @@ public class OperatorController : MonoBehaviour
             defaultFov = UserSettings.Fov;
             fovTarget = defaultFov;
         }
+        CursorPin.Tick();
         UpdateLook();
         UpdateZoom();
         UpdateChairHint();
-        if (seated)
-        {
-            if (Input.GetKeyDown(KeyCode.F)) ToggleSeat();
-            UpdateSwivel();
-        }
-        else if (Input.GetKeyDown(KeyCode.E)) ToggleSeat();
+        if (Input.GetKeyDown(KeyCode.F)) ToggleSeat();
+        if (seated) UpdateSwivel();
         UpdateQuickTravel();
         UpdateWalk();
+        UpdateHint();
 
         if (Input.GetKeyDown(KeyCode.C) || Input.GetMouseButtonDown(2))
         {
@@ -180,14 +185,23 @@ public class OperatorController : MonoBehaviour
 
     private void UpdateLook()
     {
-        bool wantLook = Input.GetMouseButton(1) && !DiegeticInteractable.DragActive;
-        if (wantLook && !looking) SetCursorLocked(true);
-        if (!wantLook && looking) SetCursorLocked(false);
+        // A right-click that cancelled a drag must not start a look; the suppression lasts until the button is released.
+        if (!Input.GetMouseButton(1)) DiegeticInteractable.ReleaseLookSuppress();
+        bool wantLook = Input.GetMouseButton(1) && !DiegeticInteractable.DragActive
+            && !DiegeticInteractable.SuppressLook && !DiegeticInteractable.InputConsumedThisFrame;
+        if (wantLook && !looking)
+        {
+            CursorPin.Lock();
+            lookBeganFrame = Time.frameCount;
+        }
+        if (!wantLook && looking) CursorPin.Unlock();
         looking = wantLook;
         if (!looking) return;
+        // Locking warps the cursor to the window centre; that frame's mouse delta is not the hand's.
+        if (Time.frameCount <= lookBeganFrame + 1) return;
         float speed = lookSpeed * UserSettings.MouseSensitivity;
         yaw += Input.GetAxis("Mouse X") * speed;
-        pitch -= Input.GetAxis("Mouse Y") * speed;
+        pitch += OperatorMath.PitchDelta(Input.GetAxis("Mouse Y"), speed, UserSettings.InvertY);
         yaw = OperatorMath.ClampYaw(yaw, baseYaw, YawRange);
         pitch = OperatorMath.ClampPitch(pitch);
     }
@@ -248,7 +262,6 @@ public class OperatorController : MonoBehaviour
         if (chairInRange < 0) return;
         var seat = seats[chairInRange];
         seated = true;
-        swivelEArmed = false;
         StandAt(seat);
     }
 
@@ -277,9 +290,7 @@ public class OperatorController : MonoBehaviour
 
     private void UpdateSwivel()
     {
-        // E also sits down: ignore it as swivel-right until the key that seated us has been released.
-        if (!Input.GetKey(KeyCode.E)) swivelEArmed = true;
-        int dir = (swivelEArmed && Input.GetKey(KeyCode.E) ? 1 : 0) - (Input.GetKey(KeyCode.Q) ? 1 : 0);
+        int dir = (Input.GetKey(KeyCode.E) ? 1 : 0) - (Input.GetKey(KeyCode.Q) ? 1 : 0);
         if (dir == 0 || DiegeticInteractable.DragActive) return;
         yaw = OperatorMath.Swivel(yaw, baseYaw, dir, Time.unscaledDeltaTime, YawRange);
     }
@@ -288,16 +299,82 @@ public class OperatorController : MonoBehaviour
 
     private void UpdateWalk()
     {
-        float speed = OperatorMath.EffectiveWalkSpeed(seated, DiegeticInteractable.DragActive, walkSpeed);
-        if (speed <= 0f) return;
+        var tuning = UserSettings.Tuning;
+        float top = OperatorMath.EffectiveWalkSpeed(seated, DiegeticInteractable.DragActive, walkSpeed);
+        if (top <= 0f)
+        {
+            velX = velZ = 0f;
+            return;
+        }
         float h = Input.GetAxisRaw("Horizontal");
         float v = Input.GetAxisRaw("Vertical");
-        if (h == 0f && v == 0f) return;
+        bool sprint = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        float wanted = OperatorMath.TargetSpeed(top, (float)tuning.SprintMultiplier, sprint);
         Quaternion flat = Quaternion.Euler(0f, yaw, 0f);
         Vector3 move = flat * Vector3.forward * v + flat * Vector3.right * h;
         if (move.sqrMagnitude > 1f) move.Normalize();
-        body.SimpleMove(move * speed);
+        OperatorMath.RampVelocity(velX, velZ, move.x * wanted, move.z * wanted, Time.deltaTime, wanted,
+            (float)tuning.AccelSeconds, (float)tuning.DecelSeconds, out velX, out velZ);
+        if (velX * velX + velZ * velZ < 1e-6f) { velX = velZ = 0f; return; }
+
+        Vector3 before = bodyT.position;
+        body.SimpleMove(new Vector3(velX, 0f, velZ));
+        LogWalk(before);
     }
+
+    // Walking samples every half second: where the body is, how far it was asked to go and how far it got (a snag shows as
+    // achieved far below intended).
+    private void LogWalk(Vector3 before)
+    {
+        Vector3 d = bodyT.position - before;
+        d.y = 0f;
+        float intended = Mathf.Sqrt(velX * velX + velZ * velZ) * Time.deltaTime;
+        float achieved = d.magnitude;
+        walkTime += Time.deltaTime;
+        walkIntended += intended;
+        walkAchieved += achieved;
+        if (OperatorMath.IsStall(intended, achieved)) walkStalls++;
+        if (walkTime < 0.5f) return;
+        InputLog.Event(InputLogFormat.Walk,
+            "x", InputLogFormat.Num(bodyT.position.x), "z", InputLogFormat.Num(bodyT.position.z),
+            "speed", InputLogFormat.Num(walkAchieved / walkTime), "intended_m", InputLogFormat.Num(walkIntended),
+            "achieved_m", InputLogFormat.Num(walkAchieved), "stalls", walkStalls.ToString());
+        walkTime = walkIntended = walkAchieved = 0f;
+        walkStalls = 0;
+    }
+
+    // ---- capture runs (CaptureMode) ----------------------------------------------------------------------------
+
+    /// <summary>Sits on the first chair (the spawn pose).</summary>
+    public void CaptureSeat()
+    {
+        if (seats[0] == null) return;
+        seated = true;
+        StandAt(seats[0]);
+        fovTarget = defaultFov;
+    }
+
+    /// <summary>Stands at the quick-travel stop nearest a world point, then looks at it with the given field of view.</summary>
+    public void CaptureLookAt(Vector3 point, float fov)
+    {
+        int best = -1;
+        float bestD = float.MaxValue;
+        for (int i = 0; i < stands.Length; i++)
+        {
+            if (stands[i] == null) continue;
+            Vector3 f = stands[i].position - point;
+            f.y = 0f;
+            if (f.sqrMagnitude < bestD) { bestD = f.sqrMagnitude; best = i; }
+        }
+        if (best >= 0) TravelTo(best + 1);
+        Vector3 d = point - EyePosition();
+        yaw = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg;
+        pitch = OperatorMath.ClampPitch(-Mathf.Atan2(d.y, new Vector2(d.x, d.z).magnitude) * Mathf.Rad2Deg);
+        fovTarget = Mathf.Clamp(fov, minFov, maxFov);
+    }
+
+    /// <summary>Current vertical field of view (degrees) and eye position, for the capture measurements.</summary>
+    public float CurrentFov { get { return cam != null ? cam.fieldOfView : defaultFov; } }
 
     // ---- camera ----------------------------------------------------------------------------------------------
 
@@ -321,32 +398,26 @@ public class OperatorController : MonoBehaviour
         transform.rotation = Quaternion.Euler(pitch, yaw, roll);
     }
 
-    private static void SetCursorLocked(bool locked)
+    // Bottom-centre hint (uGUI + TextMeshPro): the seat prompt and the controls reminder.
+    private void UpdateHint()
     {
-        Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
-        Cursor.visible = !locked;
-    }
-
-    private void OnGUI()
-    {
-        string hint = null;
-        if (seated) hint = "Q/E  swivel      F  stand up      1-6  go to a section";
-        else if (chairInRange >= 0) hint = "E  sit down";
-        if (hint == null) return;
-        if (hintStyle == null)
+        string seatPrompt = OperatorMath.SeatPrompt(seated, chairInRange >= 0);
+        string hint = seated ? "Q/E  swivel      " + seatPrompt + "      1-6  go to a section" : seatPrompt;
+        if (hintBox == null)
         {
-            hintStyle = ThemeColors.BoxStyle(ReactorSim.Ui.Theme.SurfaceTooltip, ReactorSim.Ui.Theme.FontCaption, ReactorSim.Ui.Theme.TextBody);
-            hintStyle.alignment = TextAnchor.MiddleCenter;
-            hintStyle.padding = new RectOffset(10, 10, 4, 4);
+            if (hint == null) return;
+            var canvas = RuntimeUi.CreateCanvas("OperatorHintCanvas", 15, transform);
+            canvas.GetComponent<UnityEngine.UI.GraphicRaycaster>().enabled = false;
+            hintBox = RuntimeUi.MakeToast(canvas.transform, "Hint", new Vector2(0.5f, 0f), new Vector2(0f, 70f), 0f,
+                ReactorSim.Ui.TextRole.Caption, TextAnchor.MiddleCenter, ThemeColors.TextBody, out hintLabel).gameObject;
         }
-        hintStyle.fontSize = UserSettings.Scaled(ReactorSim.Ui.Theme.FontCaption);
-        var size = hintStyle.CalcSize(new GUIContent(hint));
-        GUI.Box(new Rect((Screen.width - size.x) * 0.5f, Screen.height - size.y - 70f, size.x, size.y), hint, hintStyle);
+        if (hintBox.activeSelf != (hint != null)) hintBox.SetActive(hint != null);
+        if (hint != null && hintLabel.text != hint) hintLabel.text = hint;
     }
 
     private void OnDisable()
     {
-        if (looking) SetCursorLocked(false);
+        if (looking) CursorPin.Unlock();
         looking = false;
     }
 }
