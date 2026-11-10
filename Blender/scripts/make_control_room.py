@@ -73,6 +73,9 @@ def build():
 
     m_light = make_mat("M_LightPanel", (0.90, 0.90, 0.85), emission_color=(1.0, 0.97, 0.90), emission_strength=4.0)
     m_line = make_mat("M_FloorLine", (0.85, 0.65, 0.0), roughness=0.6, emission_color=(0.85, 0.65, 0.0), emission_strength=0.3)
+    # bench tops step darker and warmer than the panel faces so the two read apart (room material contrast, PR5)
+    m_bench_top = make_mat("M_BenchTop", (0.30, 0.26, 0.21), metallic=0.05, roughness=0.70)
+    m_wall_stripe = make_mat("M_WallStripe", (0.62, 0.45, 0.12), roughness=0.60)
     m_pad_neutral = make_mat("M_PadNeutral", (0.45, 0.45, 0.47), roughness=0.6)
     m_mimic = {}
     for sec in layout["sections"]:
@@ -124,6 +127,46 @@ def build():
     add_box("Door_Leaf", (dx, 0.045, 1.05), (1.00, 0.05, 2.10), M["M_ConsoleBeige"], col_room, parent=root)
     add_box("Door_PushBar", (dx, 0.085, 1.0), (0.70, 0.03, 0.04), M["M_BrushedSteel"], col_room, parent=root)
 
+    # ---- south-wall detail beside the door (the viewing window takes the other side): a primary-loop mimic panel with
+    # a title plate, a cable conduit run with drops, and a chair-rail stripe. Original layout, plain boxes and cylinders.
+    wx0, wx1 = 0.6, dx - 0.9
+    wall_y = 0.0
+    add_box("WallStripe", ((wx0 + wx1) / 2, wall_y + 0.012, 1.05), (wx1 - wx0, 0.024, 0.07), m_wall_stripe, col_room, parent=root)
+    add_box("WallBase", ((wx0 + wx1) / 2, wall_y + 0.02, 0.06), (wx1 - wx0, 0.04, 0.12), M["M_DarkRubber"], col_room, parent=root)
+    mx, mz, mw, mh = (wx0 + wx1) / 2, 1.75, 1.7, 0.95
+    add_box("WallMimic_Plate", (mx, wall_y + 0.025, mz), (mw, 0.05, mh), M["M_PanelSlate"], col_sign, parent=root, bevel=0.01)
+    add_box("WallMimic_Frame_T", (mx, wall_y + 0.055, mz + mh / 2), (mw + 0.06, 0.03, 0.04), M["M_BrushedSteel"], col_sign, parent=root)
+    add_box("WallMimic_Frame_B", (mx, wall_y + 0.055, mz - mh / 2), (mw + 0.06, 0.03, 0.04), M["M_BrushedSteel"], col_sign, parent=root)
+    add_box("WallMimic_Frame_L", (mx - mw / 2, wall_y + 0.055, mz), (0.04, 0.03, mh), M["M_BrushedSteel"], col_sign, parent=root)
+    add_box("WallMimic_Frame_R", (mx + mw / 2, wall_y + 0.055, mz), (0.04, 0.03, mh), M["M_BrushedSteel"], col_sign, parent=root)
+    sec_ids = [sec["id"] for sec in layout["sections"]]
+    mat_a = m_mimic[sec_ids[0]]
+    mat_b = m_mimic[sec_ids[min(1, len(sec_ids) - 1)]]
+    # primary loop: vessel block, hot leg, steam generator block, cold leg back (boxes on the plate face)
+    fy = wall_y + 0.056
+    add_box("WallMimic_Vessel", (mx - 0.55, fy, mz - 0.05), (0.26, 0.012, 0.42), mat_a, col_sign, parent=root)
+    add_box("WallMimic_SG", (mx + 0.50, fy, mz + 0.05), (0.26, 0.012, 0.52), mat_b, col_sign, parent=root)
+    add_box("WallMimic_HotLeg", (mx - 0.02, fy, mz + 0.22), (0.80, 0.012, 0.035), mat_a, col_sign, parent=root)
+    add_box("WallMimic_ColdLeg", (mx - 0.02, fy, mz - 0.26), (0.80, 0.012, 0.035), mat_b, col_sign, parent=root)
+    add_box("WallMimic_Pump", (mx - 0.02, fy, mz - 0.26), (0.10, 0.014, 0.10), M["M_BrushedSteel"], col_sign, parent=root)
+    for i in range(4):
+        add_box("WallMimic_Lamp_%d" % i, (mx - 0.60 + i * 0.12, fy, mz + mh / 2 - 0.10), (0.05, 0.012, 0.05),
+                m_pad_neutral if i % 2 else m_mimic[sec_ids[0]], col_sign, parent=root)
+    sign = build_kit("K22", "wallsign_mimic", label="PRIMARY LOOP", parent=root, mount="vertical",
+                     location=(mx, wall_y + 0.06, mz + mh / 2 + 0.22))
+    sign.name = "WALLSIGN_PrimaryLoop"
+    # conduit: a run near the ceiling and two drops, with clamps
+    cz = H - 0.35
+    add_cylinder("Conduit_Run", ((wx0 + wx1) / 2, wall_y + 0.05, cz), 0.035, wx1 - wx0, M["M_BrushedSteel"], col_room, parent=root,
+                 vertices=16, rotation=(0.0, math.radians(90.0), 0.0))
+    for i, cxp in enumerate((wx0 + 0.25, wx1 - 0.25)):
+        add_cylinder("Conduit_Drop_%d" % i, (cxp, wall_y + 0.05, cz / 2 + 0.06), 0.035, cz - 0.12, M["M_BrushedSteel"], col_room,
+                     parent=root, vertices=16)
+        add_box("Conduit_Elbow_%d" % i, (cxp, wall_y + 0.05, cz), (0.09, 0.09, 0.09), M["M_BrushedSteel"], col_room, parent=root)
+    for i in range(5):
+        add_box("Conduit_Clamp_%d" % i, (wx0 + 0.9 + i * ((wx1 - wx0 - 1.8) / 4), wall_y + 0.05, cz), (0.05, 0.09, 0.09),
+                M["M_DarkRubber"], col_room, parent=root)
+
     # ---- horseshoe: console bodies, collision, mimic stripes, floor lines -------------------------------------
     frames = {}
     profile = RL.body_profile(layout)
@@ -132,8 +175,12 @@ def build():
         pe = add_empty("Panel_" + p.name, (p.cx, p.cy, 0.0), col_board, root)
         pe.rotation_euler = (0.0, 0.0, p.yaw)
         frames[p.key] = pe
-        add_mesh("Console_" + p.name, RL.prism_verts(profile, p.width), RL.prism_faces(len(profile)),
-                 M["M_ConsoleBeige"], col_board, parent=pe)
+        console = add_mesh("Console_" + p.name, RL.prism_verts(profile, p.width), RL.prism_faces(len(profile)),
+                           M["M_ConsoleBeige"], col_board, parent=pe)
+        console.data.materials.append(m_bench_top)
+        # prism side face i joins profile points i and i+1 (faces 0 and 1 are the end caps): the sloped bench is the edge
+        # from the front lip (hd, front_h) to the panel foot (0, back_h), profile points 3 -> 4.
+        console.data.polygons[2 + 3].material_index = 1
         # collision: the vertical body, and the bench as a box under its front-edge height
         mark_collision(add_box("COL_Panel_" + p.name, (0, -RL.BACK_DEPTH / 2, top / 2), (p.width, RL.BACK_DEPTH, top), None, col_col, parent=pe))
         mark_collision(add_box("COL_Bench_" + p.name, (0, bg["hd"] / 2, bg["front_h"] / 2), (p.width, bg["hd"], bg["front_h"]), None, col_col, parent=pe))
