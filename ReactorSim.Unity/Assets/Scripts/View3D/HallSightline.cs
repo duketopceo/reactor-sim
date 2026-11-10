@@ -86,6 +86,25 @@ namespace ReactorSim
         }
 
         /// <summary>
+        /// Height of the module (metres above the pool floor) at which the sight line from the viewpoint grazes the near pool rim and
+        /// meets the pool axis. Everything on the axis above this height is seen over the rim; below it the rim hides the module.
+        /// </summary>
+        public static double RimHiddenBelow(View v)
+        {
+            double eye = HallDimensions.EyeAbovePoolFloor((float)v.eyeHeight);
+            double rimTop = HallDimensions.WaterDepth + HallDimensions.DeckAboveWater;
+            double toAxis = v.back + HallDimensions.PoolAxisFromWall;
+            double toRim = toAxis - HallDimensions.PoolRadius;
+            return rimTop - (eye - rimTop) * HallDimensions.PoolRadius / Math.Max(1e-9, toRim);
+        }
+
+        /// <summary>Metres of the module, measured down from its head, that show above the near pool rim (negative = the head is hidden).</summary>
+        public static double RimVisibleHeight(View v)
+        {
+            return HallDimensions.ContainmentTop - RimHiddenBelow(v);
+        }
+
+        /// <summary>
         /// What the window has to show: the module head, from the stand and from the seat,
         /// through the middle of the opening. Empty means the claim holds.
         /// </summary>
@@ -98,6 +117,9 @@ namespace ReactorSim
             double seatMargin = ReachMarginDeg(seat, HallDimensions.SightTargetHeight);
             if (standMargin < m) bad.Add("from the stand the window cannot look down to the module head (margin " + standMargin.ToString("0.0") + " deg)");
             if (seatMargin < m) bad.Add("from the seat the window cannot look down to the module head (margin " + seatMargin.ToString("0.0") + " deg)");
+            double needVisible = HallDimensions.HeadDomeHeight + HallDimensions.HeadVisibleMargin;
+            foreach (View v in new[] { stand, seat })
+                if (RimVisibleHeight(v) < needVisible) bad.Add("from the " + v.name + " the pool rim hides the module head (" + RimVisibleHeight(v).ToString("0.00") + " m shows, " + needVisible.ToString("0.00") + " m needed)");
             foreach (View v in new[] { stand, seat })
                 if (EdgeMargin(v) < HallDimensions.SightEdgeMargin) bad.Add("from the " + v.name + " the module sits too close to the window edge (" + EdgeMargin(v).ToString("0.00") + " m)");
             return bad;

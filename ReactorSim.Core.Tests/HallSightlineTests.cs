@@ -16,6 +16,23 @@ namespace ReactorSim.Core.Tests
         }
 
         [Fact]
+        public void TheModuleHeadClearsThePoolRimFromTheStandAndTheSeat()
+        {
+            double need = HallDimensions.HeadDomeHeight + HallDimensions.HeadVisibleMargin;
+            Assert.True(HallSightline.RimVisibleHeight(HallSightline.Stand()) >= need);
+            Assert.True(HallSightline.RimVisibleHeight(HallSightline.Seat()) >= need);
+        }
+
+        [Fact]
+        public void ThePr4PoolAndGalleryNumbersLeftTheHeadBehindTheRim()
+        {
+            // PR4: rim 0.3 m over the water, pool radius 6.5 m, eye 2.2 m over the water, head top 21.2 m over the floor. Same maths, old inputs.
+            double eye = 22.0 + 2.2, rimTop = 22.3, toAxis = 6.1 + 10.0, toRim = toAxis - 6.5;
+            double hiddenBelow = rimTop - (eye - rimTop) * 6.5 / toRim;
+            Assert.True(21.2 - hiddenBelow < HallDimensions.HeadDomeHeight, "the PR4 seat view shows less than the head dome over the rim");
+        }
+
+        [Fact]
         public void TheOldPr2NumbersFailTheSameCheck()
         {
             // PR2: sill 0.35 m, gallery eye 9 m over the water, pool axis 11 m from the wall, stand 4.5 m back
