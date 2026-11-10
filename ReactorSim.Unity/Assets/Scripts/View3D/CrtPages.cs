@@ -292,8 +292,8 @@ namespace ReactorSim.Instruments
                     Body(p, "CLOCK " + ClockReadout.Format(clock));
                     break;
                 default:
-                    p = Begin("SCREEN", s, clock);
-                    Body(p, "SCRAM " + (s.Scrammed ? "YES" : "NO"));
+                    p = Begin("STANDBY", s, clock);
+                    Body(p, "NO SIGNAL");
                     break;
             }
             return p;

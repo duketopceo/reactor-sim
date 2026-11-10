@@ -3,6 +3,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using ReactorSim.Controls;
 using ReactorSim.Instruments;
+using ReactorSim.Ui;
 using ReactorSim.View3D;
 using System.Collections.Generic;
 
@@ -150,6 +151,8 @@ public static class ControlRoomSceneBuilder
                 : "backend binding pending (" + kv.Value["phase"] + ")";
             oos++;
         }
+        DarkenGlowingScreens(crRoot);
+        ApplyRoomLooks(crRoot);
         Debug.Log("[Phase2SceneBuilder] " + collisionBoxes + " collision proxies, " + oos + " out-of-service rows tagged.");
 
         // U14: indicators have no collider of their own. Each bound gauge row's CTL_ root gets a hover-only collider
@@ -450,6 +453,11 @@ public static class ControlRoomSceneBuilder
     private static void ApplyScreenMaterial(MeshRenderer r)
     {
         if (r == null) return;
+        r.sharedMaterial = ScreenMaterial();
+    }
+
+    private static Material ScreenMaterial()
+    {
         if (screenMaterial == null)
         {
             screenMaterial = MakeMaterial("CRT_Screen", Color.black, false, false);
@@ -463,7 +471,7 @@ public static class ControlRoomSceneBuilder
                 screenMaterial.SetColor("_EmissionColor", ThemeColors.SurfaceScreen);
             }
         }
-        r.sharedMaterial = screenMaterial;
+        return screenMaterial;
     }
 
     // The old SeatCamera component is gone; scenes saved with it carry a missing-script component.
@@ -474,6 +482,78 @@ public static class ControlRoomSceneBuilder
     public const float RoomLightRange = RoomLighting.KeyRange;
 
     // Cool, dim ambient under the warm ceiling key (RoomLighting). The hall keeps its own layer-masked lights.
+    // Any mesh still carrying the exported glowing screen material (a monitor face that is not a CRT_ page, a counter window)
+    // gets the dark screen material, so no screen can render as a flat blown-out rectangle.
+    private static void DarkenGlowingScreens(GameObject root)
+    {
+        int n = 0;
+        foreach (var r in root.GetComponentsInChildren<MeshRenderer>(true))
+        {
+            var mats = r.sharedMaterials;
+            bool glowing = false;
+            for (int i = 0; i < mats.Length; i++)
+            {
+                if (mats[i] == null || mats[i].name.IndexOf("CrtScreen", System.StringComparison.OrdinalIgnoreCase) < 0) continue;
+                mats[i] = ScreenMaterial();
+                glowing = true;
+            }
+            if (!glowing) continue;
+            r.sharedMaterials = mats;
+            n++;
+        }
+        Debug.Log("[Phase2SceneBuilder] " + n + " screen faces set to the dark screen material.");
+    }
+
+    // Warm task lights over each console bench and value steps between console, wall, ceiling and floor (RoomLighting).
+    private static void ApplyRoomLooks(GameObject root)
+    {
+        var bounds = new Bounds(root.transform.position, Vector3.zero);
+        bool any = false;
+        foreach (var r in root.GetComponentsInChildren<Renderer>(true))
+        {
+            if (!any) { bounds = r.bounds; any = true; } else bounds.Encapsulate(r.bounds);
+        }
+        Vector3 centre = bounds.center;
+        int tasks = 0, tinted = 0;
+        foreach (var r in root.GetComponentsInChildren<MeshRenderer>(true))
+        {
+            string n = r.gameObject.name;
+            if (n.StartsWith("Console_"))
+            {
+                Vector3 towards = new Vector3(centre.x - r.bounds.center.x, 0f, centre.z - r.bounds.center.z).normalized;
+                var go = new GameObject("TaskLight_" + n.Substring("Console_".Length));
+                go.transform.SetParent(root.transform, false);
+                go.transform.position = r.bounds.center + Vector3.up * (r.bounds.extents.y + RoomLighting.TaskHeightM)
+                    + towards * RoomLighting.TaskTowardRoomM;
+                var l = go.AddComponent<Light>();
+                l.type = LightType.Point;
+                l.color = ThemeColors.ToColor(RoomLighting.TaskColor);
+                l.intensity = RoomLighting.TaskIntensity;
+                l.range = RoomLighting.TaskRange;
+                l.shadows = LightShadows.None;
+                l.cullingMask = ~(1 << HallLayer);
+                tasks++;
+                continue;
+            }
+            Rgba? tint = null;
+            if (n.StartsWith("Wall_")) tint = RoomLighting.WallTint;
+            else if (n == "Ceiling") tint = RoomLighting.CeilingTint;
+            else if (n == "Floor") tint = RoomLighting.FloorTint;
+            if (!tint.HasValue) continue;
+            var mats = r.sharedMaterials;
+            for (int i = 0; i < mats.Length; i++)
+            {
+                if (mats[i] == null || !mats[i].HasProperty("_Color")) continue;
+                var copy = new Material(mats[i]) { name = mats[i].name + "_" + n };
+                copy.color = copy.color * ThemeColors.ToColor(tint.Value);
+                mats[i] = copy;
+                tinted++;
+            }
+            r.sharedMaterials = mats;
+        }
+        Debug.Log("[Phase2SceneBuilder] " + tasks + " task lights, " + tinted + " room surfaces stepped.");
+    }
+
     private static void ApplyRoomAmbient()
     {
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;

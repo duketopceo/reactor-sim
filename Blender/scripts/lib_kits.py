@@ -161,12 +161,12 @@ def make_text(col, name, text, size, mat, parent, location, max_width=None, extr
 
 
 def _label_plate(ctx, text, mount):
-    """Plate below the kit (above it on the bench), as wide as the kit but at least MIN_PLATE_W (the grid cell
-    width); the text scales down to fit the plate, it never widens it."""
+    """Plate below the kit (on the bench: in front of it, toward the operator, so the kit cannot hide the text), as wide
+    as the kit but at least MIN_PLATE_W (the grid cell width); the text scales down to fit the plate, it never widens it."""
     h, gap = LABEL_PLATE["height"], LABEL_PLATE["gap"]
     t = 0.01  # K22 depth
     w = max(ctx.fw, MIN_PLATE_W)
-    z = (ctx.fh / 2.0 + gap + h / 2.0) * (1.0 if mount == "bench" else -1.0)
+    z = -(ctx.fh / 2.0 + gap + h / 2.0)
     plate = ctx.box("LabelPlate", (0, t / 2.0, z), (w, t, h), ctx.m["M_PanelSlate"])
     plate["aux"] = 1
     make_text(ctx.col, ctx.nm("LabelText"), text, ctx.label_size or LABEL_TEXT_SIZE, ctx.m["M_GaugeFace"], ctx.root,

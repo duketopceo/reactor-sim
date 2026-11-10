@@ -31,6 +31,24 @@ namespace ReactorSim.Core.Tests
         }
 
         [Fact]
+        public void TaskLights_AreWarmerThanTheAmbient_AndShortRanged()
+        {
+            Assert.True(RoomLighting.TaskColor.R > RoomLighting.TaskColor.B);
+            Assert.InRange(RoomLighting.TaskRange, 1.5f, 4f);
+            Assert.True(RoomLighting.TaskIntensity < RoomLighting.KeyIntensity);
+        }
+
+        [Fact]
+        public void SurfaceSteps_SeparateConsoleWallCeilingAndFloor()
+        {
+            double wall = RoomLighting.Luma(RoomLighting.WallTint), ceiling = RoomLighting.Luma(RoomLighting.CeilingTint),
+                floor = RoomLighting.Luma(RoomLighting.FloorTint);
+            Assert.True(wall < 0.85, "walls must step down from the consoles (1.0)");
+            Assert.True(ceiling < wall && floor < wall, "ceiling and floor go darker than the walls");
+            Assert.True(RoomLighting.WallTint.B > RoomLighting.WallTint.R, "walls lean cool");
+        }
+
+        [Fact]
         public void EmissionLadder_PutsLampsAboveScreens()
         {
             Assert.True(RoomLighting.LampEmission > RoomLighting.ScreenEmission);

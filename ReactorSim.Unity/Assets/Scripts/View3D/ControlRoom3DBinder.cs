@@ -146,6 +146,7 @@ public class ControlRoom3DBinder : MonoBehaviour
                 counters.Add(new CounterBinding { Pivot = t, Source = src, Text = CounterDisplay.Attach(t) });
                 continue;
             }
+            if (gauge) GaugeNumerals.Attach(t, src);   // circular dials get min / mid / max numerals and the unit
             gauges.Add(new GaugeBinding
             {
                 Pivot = t,
@@ -238,7 +239,7 @@ public class ControlRoom3DBinder : MonoBehaviour
             float frac = (float)NeedleMath.Fraction(v, g.Source.Min, g.Source.Max);
             if (g.IsBar) SlidePivot(g, frac);
             // Clockwise as seen from the operator (looking down -KitFaceNormal): frac 0 lower-left, 1 lower-right.
-            else g.Pivot.localRotation = Quaternion.AngleAxis(-GaugeGeometry.NeedleDeg(frac), KitFaceNormal);
+            else g.Pivot.localRotation = Quaternion.AngleAxis(GaugeGeometry.NeedleDeg(frac), KitFaceNormal);
         }
     }
 

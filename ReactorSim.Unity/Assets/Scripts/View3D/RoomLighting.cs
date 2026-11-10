@@ -18,6 +18,19 @@ namespace ReactorSim.View3D
         public static readonly Rgba AmbientGround = new Rgba(0.04, 0.04, 0.045);
         public const float AmbientIntensity = 1.0f;
 
+        // Warm task lights over each console bench: small range so only nearby surfaces take them (pixel-light budget).
+        public static readonly Rgba TaskColor = new Rgba(1.00, 0.78, 0.50);
+        public const float TaskIntensity = 0.55f;
+        public const float TaskRange = 2.4f;
+        public const float TaskHeightM = 0.9f;      // above the console's top edge
+        public const float TaskTowardRoomM = 0.5f;  // pulled toward the room centre, over the bench
+
+        // Surface value steps (albedo multipliers) that separate the room: the consoles and bench tops keep full value, the
+        // walls step down and cool, the ceiling and the floor go darker still.
+        public static readonly Rgba WallTint = new Rgba(0.70, 0.76, 0.86);
+        public static readonly Rgba CeilingTint = new Rgba(0.45, 0.48, 0.55);
+        public static readonly Rgba FloorTint = new Rgba(0.50, 0.50, 0.52);
+
         // Emission ladder for self-lit surfaces: panel surfaces take no emission, screens carry a dark glow, lamps a bright one.
         public const double ScreenEmission = 1.0;
         public const double LampEmission = 2.5;

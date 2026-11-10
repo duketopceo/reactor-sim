@@ -417,7 +417,9 @@ def place_rows(layout, kits, rows):
                 fh = kit["face_h"]
                 lx = -(uc - pw / 2.0)
                 if surf == "bench":
-                    s = v_lo + fh / 2.0                      # near-aligned: label plate sits behind (up-slope of) the kit
+                    # far-aligned: the label plate sits in FRONT of the kit (toward the operator), where a knob or lever
+                    # on the slope cannot hide its text; the plate takes the near end of the cell
+                    s = v_lo + layout["label_plate"]["height"] + layout["label_plate"]["gap"] + fh / 2.0
                     ly = bg["hd"] - s * math.cos(bg["slope"])
                     lz = bg["front_h"] + s * math.sin(bg["slope"])
                     pitch = 90.0 - layout["bench"]["slope_deg"]
