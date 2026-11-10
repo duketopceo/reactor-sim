@@ -14,8 +14,8 @@ namespace ReactorSim
         public static readonly float PoolRadius = 6.5f;
         public static readonly float HallRadius = 15.0f;             // circular hall, concrete wall
         // Standing eye height over the water surface. Low on purpose: from the standing and seated spots the window can only
-        // look down about 15 degrees, so the water the player should see has to lie inside that reach (see HallSightline).
-        public static readonly float GalleryEyeAboveWater = 3.2f;
+        // look down about 15 to 20 degrees, so the water the player should see has to lie inside that reach (see HallSightline).
+        public static readonly float GalleryEyeAboveWater = 2.2f;
         public static readonly float EyeAboveRoomFloor = 1.6f;
         /// <summary>Control-room floor above the pool floor.</summary>
         public static readonly float RoomFloorAbovePoolFloor = WaterDepth + GalleryEyeAboveWater - EyeAboveRoomFloor;

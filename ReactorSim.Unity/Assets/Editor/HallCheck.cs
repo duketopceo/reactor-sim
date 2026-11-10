@@ -151,7 +151,7 @@ public static class HallCheck
         float sill = g.min.y - roomFloorWorld, width = Mathf.Max(g.size.x, g.size.z);
         int f = Report(Mathf.Abs(sill - HallDimensions.WindowSill) < 0.02f, $"the window sill is {sill:0.00} m (expected {HallDimensions.WindowSill:0.00})");
         f += Report(width >= HallDimensions.WindowWidth - 0.05f, $"the window is {width:0.00} m wide (expected {HallDimensions.WindowWidth:0.00})");
-        f += Report(HallSightline.CheckWindowReach().Count == 0, "the stand sees the module head and the seat sees the water over it through the window");
+        f += Report(HallSightline.CheckWindowReach().Count == 0, "the stand and the seat both see the module head through the window");
 
         var lo = new double[] { double.MaxValue, double.MaxValue, double.MaxValue };
         var hi = new double[] { double.MinValue, double.MinValue, double.MinValue };

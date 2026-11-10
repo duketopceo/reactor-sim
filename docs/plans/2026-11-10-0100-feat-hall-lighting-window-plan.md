@@ -27,7 +27,7 @@ execution: code
 
 ## Key Technical Decisions
 
-- **KTD1. Lower the gallery, keep the pool.** `GalleryEyeAboveWater` 9.0 -> 3.2 m and `PoolAxisFromWall` 11.0 -> 8.5 m. The 22 m depth, the true-scale module and the pool radius are unchanged. Required downward angle to the module centre becomes atan(4.05/13.0) = 17.3 deg to the module head from the stand and atan(3.25/14.6) = 12.5 deg to the water over it from the seat, inside the new opening's reach (below).
+- **KTD1. Lower the gallery, keep the pool.** `GalleryEyeAboveWater` 9.0 -> 2.2 m (first try 3.2 m: renders showed the module head still cut by the sill) and `PoolAxisFromWall` 11.0 -> 8.5 m. The 22 m depth, the true-scale module and the pool radius are unchanged. Required downward angle to the module centre becomes atan(3.05/13.0) = 13.2 deg to the module head from the stand and atan(3.05/14.6) = 11.8 deg from the seat, inside the new opening's reach (below).
 - **KTD2. Taller, lower window.** Sill 0.35 -> 0.05 m, height 1.9 -> 2.3 m (clamped so the header keeps 0.3 m of wall). Reach: stand 19.5 deg, seat 14.7 deg. A pure helper (`HallSightline`) states and tests the claim, and a capture proves it.
 - **KTD3. Pure maths lives in `Scripts/View3D`, linked into the test project.** `HallSightline` (angles, opening reach, segment-vs-box clearance) and `HallExposure` (linear luminance, exposure ceiling, contrast ratio). The Editor builder and `HallCheck` read the same constants.
 - **KTD4. Glow cue is emissive-first.** Cells use an HDR emission scaled by `GlowMapping.RackEmission`; haze cones carry opacity from `GlowMapping.Haze`; ONE real rack light (`RackGlow_Light_0`) is scaled by `GlowMapping.LightScale`. Hall real lights become 2 warm high-bays + 1 rack light = 3, under `MaxRealtimeLights = 4` (the default pixel-light count). `GlowMapping` constants and behaviour are unchanged.
@@ -70,6 +70,6 @@ execution: code
 
 ## Risks
 
-- Seated reach is thin (12.5 deg needed, 14.7 deg available); if captures show the module cut by the sill the fallback is a lower `GalleryEyeAboveWater` (2.8 m) with the same pure check.
+- Seated reach is thin (11.8 deg needed, 14.7 deg available); if captures show the module cut by the sill the fallback is a lower `GalleryEyeAboveWater` (1.8 m) with the same pure check.
 - Shallow viewing angle means the deep body of the module is hidden by water; the head, pump shoulders and steam stubs must carry the read. The owner chose pool depth; it is not reopened here.
 - `ReactorSim.Core.Tests.csproj` may conflict textually with PR3; resolve by keeping both sets of lines.

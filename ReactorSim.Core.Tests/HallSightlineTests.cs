@@ -8,11 +8,11 @@ namespace ReactorSim.Core.Tests
     public class HallSightlineTests
     {
         [Fact]
-        public void CurrentDimensionsLetTheStandSeeTheModuleHeadAndTheSeatSeeTheWaterOverIt()
+        public void CurrentDimensionsLetTheStandAndTheSeatSeeTheModuleHead()
         {
             Assert.Empty(HallSightline.CheckWindowReach());
             Assert.True(HallSightline.ReachMarginDeg(HallSightline.Stand(), HallDimensions.SightTargetHeight) >= HallDimensions.SightMarginDeg);
-            Assert.True(HallSightline.ReachMarginDeg(HallSightline.Seat(), HallDimensions.WaterDepth) >= HallDimensions.SightMarginDeg);
+            Assert.True(HallSightline.ReachMarginDeg(HallSightline.Seat(), HallDimensions.SightTargetHeight) >= HallDimensions.SightMarginDeg);
         }
 
         [Fact]
