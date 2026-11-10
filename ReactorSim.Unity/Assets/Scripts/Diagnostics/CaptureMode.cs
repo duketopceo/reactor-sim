@@ -214,9 +214,13 @@ public class CaptureMode : MonoBehaviour
                 if (glassAway == null) { Skip(pose, "no window in the scene"); break; }
                 Vector3 window = glassAway.bounds.center;
                 op.CaptureLookAt(window, 60f);
-                yield return Frames(5);
+                yield return Frames(30);
                 Vector3 eye = Camera.main != null ? Camera.main.transform.position : window;
-                op.CaptureLookAt(eye + new Vector3(eye.x - window.x, 0f, eye.z - window.z), 60f);
+                Vector3 away = new Vector3(eye.x - window.x, 0f, eye.z - window.z).normalized;
+                // turned about and down at the floor: the window is behind the camera and the view holds almost nothing, the same
+                // in every run, so the difference between two runs is the cost of the hall while it cannot be seen
+                op.CaptureAt(new Vector3(eye.x, 0f, eye.z), eye + away * 1.0f + Vector3.down * 4f, 60f);
+                yield return Frames(30);
                 yield return Shot("away", "gallery-away", 30, 0.6f, null);
                 break;
             case "hall":
@@ -307,7 +311,7 @@ public class CaptureMode : MonoBehaviour
         yield return Frames(settleFrames);
         if (settleSeconds > 0f) yield return new WaitForSecondsRealtime(settleSeconds);
         FrameMetrics.Reset();
-        yield return Frames(120);   // frames the percentiles are taken over (a short window is dominated by one slow frame)
+        yield return Frames(400);   // frames the percentiles are taken over (a short window is dominated by one slow frame)
         yield return new WaitForEndOfFrame();
 
         var tex = ScreenCapture.CaptureScreenshotAsTexture();
