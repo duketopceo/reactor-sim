@@ -18,6 +18,9 @@ public sealed class RoomInputGate
         suspended.Clear();
         foreach (var c in Object.FindObjectsByType<OperatorController>(FindObjectsSortMode.None)) SuspendOne(c);
         foreach (var c in Object.FindObjectsByType<DiegeticInteractable>(FindObjectsSortMode.None)) SuspendOne(c);
+        // After the loops: disabling OperatorController releases its look hold, which schedules a restore that its own Tick
+        // (now disabled) would never run.
+        CursorPin.CancelRestore();
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.None;
     }

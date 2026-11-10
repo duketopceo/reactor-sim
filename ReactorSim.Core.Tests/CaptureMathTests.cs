@@ -210,6 +210,7 @@ namespace ReactorSim.Core.Tests
         [InlineData("1.2")]
         [InlineData("1.2.3.4")]
         [InlineData("1.2.x")]
+        [InlineData("1.2.3\n")]
         [InlineData("1.2.3-rc1")]
         [InlineData("")]
         [InlineData("-quit")]
@@ -225,6 +226,41 @@ namespace ReactorSim.Core.Tests
         {
             string source;
             Assert.Throws<FormatException>(() => BuildVersionArgs.Resolve(new[] { "-quit", "-buildVersion" }, "1.0.0", out source));
+        }
+
+        [Theory]
+        [InlineData("1.2", true)]
+        [InlineData("1.2.3", true)]
+        [InlineData("1.2.3\n", false)]
+        [InlineData("1.2\n", false)]
+        [InlineData("1", false)]
+        [InlineData("1.2.3.4", false)]
+        [InlineData("", false)]
+        public void BuildVersion_FallbackBase_AcceptsXYOrXYZ(string value, bool ok)
+        {
+            string source;
+            if (ok) Assert.Equal(value, BuildVersionArgs.Resolve(null, value, out source));
+            else Assert.Throws<FormatException>(() => BuildVersionArgs.Resolve(null, value, out source));
+        }
+
+        [Fact]
+        public void InputLogNum_IsInvariantUnderACommaDecimalCulture()
+        {
+            var saved = System.Threading.Thread.CurrentThread.CurrentCulture;
+            try
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = CommaCulture();
+                Assert.Equal("0.5231", InputLogFormat.Num(0.5231));
+            }
+            finally { System.Threading.Thread.CurrentThread.CurrentCulture = saved; }
+        }
+
+        internal static System.Globalization.CultureInfo CommaCulture()
+        {
+            var c = (System.Globalization.CultureInfo)System.Globalization.CultureInfo.InvariantCulture.Clone();
+            c.NumberFormat.NumberDecimalSeparator = ",";
+            c.NumberFormat.NumberGroupSeparator = ".";
+            return c;
         }
     }
 }

@@ -113,7 +113,7 @@ public class DiegeticInteractable : MonoBehaviour
                 return "Out of service" + (outOfServiceReason.Length > 0 ? ": " + outOfServiceReason : "");
             if (pinnable) return "";   // indicators are read, not operated: range does not matter
             if (!InRange)
-                return "Too far - walk closer (within " + OperatorMath.InteractionRange.ToString("0.#") + " m)";
+                return "Too far - walk closer (within " + OperatorMath.InteractionRange.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " m)";
             if (guarded && Spec != null && Spec.Style == ControlStyle.Button)
                 return Time.unscaledTime < guardLiftedUntil ? "Guard lifted - click again to operate" : "Guarded - click to lift the guard";
             return "";

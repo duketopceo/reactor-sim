@@ -20,36 +20,36 @@ public static class CursorPin
     private static bool hasSaved;
 #endif
 
-    // Unity applies a lock change at the end of the frame, so the pointer is restored two frames after the unlock.
-    private static int restoreAtFrame = -1;
+    private static readonly CursorLockModel model = new CursorLockModel();
 
-    public static bool Locked { get; private set; }
+    public static bool Locked { get { return model.Locked; } }
 
+    /// <summary>Takes a hold on the cursor. Holds nest: mouse-look and a dial drag can overlap.</summary>
     public static void Lock()
     {
-        if (Locked) return;
-        restoreAtFrame = -1;
+        if (!model.Acquire()) return;
 #if UNITY_STANDALONE_WIN && !UNITY_EDITOR
         hasSaved = GetCursorPos(out saved);
 #endif
-        Locked = true;
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
 
+    /// <summary>Drops a hold; the cursor frees and the pointer restore is scheduled when the last one goes.</summary>
     public static void Unlock()
     {
-        if (!Locked) return;
-        Locked = false;
+        if (!model.Release(Time.frameCount)) return;
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
-        restoreAtFrame = Time.frameCount + 2;
     }
+
+    /// <summary>Drops a scheduled pointer restore. Tick runs from OperatorController.Update, so a gate that disables the
+    /// controller must cancel it or the pointer snaps back later, over the overlay.</summary>
+    public static void CancelRestore() { model.CancelRestore(); }
 
     public static void Tick()
     {
-        if (restoreAtFrame < 0 || Time.frameCount < restoreAtFrame) return;
-        restoreAtFrame = -1;
+        if (!model.RestoreDue(Time.frameCount)) return;
 #if UNITY_STANDALONE_WIN && !UNITY_EDITOR
         if (hasSaved && Application.isFocused) SetCursorPos(saved.x, saved.y);
 #endif

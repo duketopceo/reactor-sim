@@ -7,6 +7,20 @@ namespace ReactorSim.Tests
     public class ReadoutFormatTests
     {
         [Fact]
+        public void Number_IsInvariantUnderACommaDecimalCulture()
+        {
+            var saved = System.Threading.Thread.CurrentThread.CurrentCulture;
+            try
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = ReactorSim.Core.Tests.CaptureMathTests.CommaCulture();
+                Assert.Equal("1234.5", ReadoutFormat.Number(1234.5, 1));
+                Assert.Equal("-0.25", ReadoutFormat.Number(-0.25, 2));
+                Assert.Equal("155.0 bar", ReadoutFormat.PressureBar(155.0));
+            }
+            finally { System.Threading.Thread.CurrentThread.CurrentCulture = saved; }
+        }
+
+        [Fact]
         public void Units_AttachWithFixedDecimals()
         {
             Assert.Equal("155.0 bar", ReadoutFormat.PressureBar(155.0));

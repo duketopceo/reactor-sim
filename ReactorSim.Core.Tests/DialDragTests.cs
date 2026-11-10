@@ -224,6 +224,18 @@ namespace ReactorSim.Core.Tests
         // ---- hit area ----
 
         [Fact]
+        public void InputTuning_Parse_IsInvariantUnderACommaDecimalCulture()
+        {
+            var saved = System.Threading.Thread.CurrentThread.CurrentCulture;
+            try
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = CaptureMathTests.CommaCulture();
+                Assert.Equal(1.6, InputTuning.Parse("{\"walkSpeed\": 1.6}").WalkSpeed);
+            }
+            finally { System.Threading.Thread.CurrentThread.CurrentCulture = saved; }
+        }
+
+        [Fact]
         public void HitArea_TwentyEightPixelsAt13mAnd70Deg900px_IsAboutSixCentimetres()
         {
             // 28 px * 2 * 1.3 m * tan 35 deg / 900 = 0.0566 m

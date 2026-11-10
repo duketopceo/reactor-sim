@@ -39,6 +39,7 @@
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\Diagnostics\CaptureMath.cs" Link="Unity\CaptureMath.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\DialDrag.cs" Link="Unity\DialDrag.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\InputTuning.cs" Link="Unity\InputTuning.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\CursorLockModel.cs" Link="Unity\CursorLockModel.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Editor\BuildVersionArgs.cs" Link="Unity\BuildVersionArgs.cs" />
   </ItemGroup>
 

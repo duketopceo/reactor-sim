@@ -87,11 +87,11 @@ public class InputProbe : MonoBehaviour
         if (Time.unscaledTime >= next)
         {
             next = Time.unscaledTime + 5f;
-            Debug.Log("[InputProbe] fps=" + (frames / 5f).ToString("F1") + " worst=" + (worstFrame * 1000f).ToString("F0") + "ms"
-                + " frame p50/p95/p99=" + CaptureMath.Percentile(window, 50).ToString("F1") + "/" + CaptureMath.Percentile(window, 95).ToString("F1")
-                + "/" + CaptureMath.Percentile(window, 99).ToString("F1") + "ms draws=" + FrameMetrics.DrawCalls
+            Debug.Log("[InputProbe] fps=" + (frames / 5f).ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + " worst=" + (worstFrame * 1000f).ToString("F0", System.Globalization.CultureInfo.InvariantCulture) + "ms"
+                + " frame p50/p95/p99=" + CaptureMath.Percentile(window, 50).ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + "/" + CaptureMath.Percentile(window, 95).ToString("F1", System.Globalization.CultureInfo.InvariantCulture)
+                + "/" + CaptureMath.Percentile(window, 99).ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + "ms draws=" + FrameMetrics.DrawCalls
                 + " focused=" + Application.isFocused
-                + " legacy keys=" + legacyKeys + " clicks=" + legacyClicks + " mouse=" + m.ToString("F0") + " travel=" + mouseTravel.ToString("F0")
+                + " legacy keys=" + legacyKeys + " clicks=" + legacyClicks + " mouse=" + m.ToString("F0", System.Globalization.CultureInfo.InvariantCulture) + " travel=" + mouseTravel.ToString("F0", System.Globalization.CultureInfo.InvariantCulture)
                 + " | window-events keys=" + guiKeys + " clicks=" + guiClicks
                 + " | cursor=" + Cursor.lockState + " screen=" + Screen.width + "x" + Screen.height + " mode=" + Screen.fullScreenMode);
             frames = 0;

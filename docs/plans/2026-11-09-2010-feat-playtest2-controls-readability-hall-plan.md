@@ -11,7 +11,7 @@ execution: code
 
 ## Goal Capsule
 
-- **Target repo:** the public Reactor Sim repository once it exists (published from a clean-room snapshot after PR #18); this work will be migrated there. The plan holds no machine names, user names or home paths: the Windows build machine is `$REACTOR_SIM_WIN_HOST` and its user home is `%USERPROFILE%`.
+- **Target repo:** this repository (the public Reactor Sim repo). The plan holds no machine names, user names or home paths: the Windows build machine is `$REACTOR_SIM_WIN_HOST` and its user home is `%USERPROFILE%`.
 - **Objective:** The owner plays the sandbox at the Windows build's real window size, turns every control with a deliberate click-hold-drag, reads every screen, label and menu without strain, walks the room without fighting it, and sees through the control-room window a believable small modular reactor in a deep pool.
 - **Means:** An in-game capture and telemetry harness first, so each fix is judged on real in-engine screenshots and logged input (KTD1). Then a dial-interaction rework, a movement tune, a pixel-budgeted screen and typography pass, and last a true-scale SMR pool hall (KTD2, KTD4, KTD5, KTD6, KTD8).
 - **Authority:** Product Contract wins on behavior, KTDs win on mechanism. The five Key Decisions are settled by the owner and are not reopened. This plan supersedes the hall geometry of R2 and R3 in `docs/plans/2026-11-08-2336-feat-startup-window-legibility-plan.md` and keeps its theme token layer.
@@ -19,7 +19,7 @@ execution: code
   - Pure logic (drag maths, movement maths, readout formatting, contrast, pixel-budget maths) is UnityEngine-free, linked into `ReactorSim.Core.Tests`, and runs through `bash scripts/ci.sh` on any Linux box.
   - Scene regeneration, graphics-enabled capture runs, the Windows build and visual review run only on the Windows/Unity build machine (reached with `ssh $REACTOR_SIM_WIN_HOST`; Unity 6000.6.7f1, Blender 5.2, a POSIX shell) in a separate worktree. Never touch the owner's main checkout there, never kill processes, one Unity instance at a time. The machine is often offline, so these are owner-or-build-machine steps, never a hard CI dependency.
   - No `ReactorSim.Core` change is planned. If one becomes necessary, follow it with `bash scripts/sync-core-to-unity.sh` and commit the regenerated plugin files.
-  - Rebase after PR #18 (`chore/public-snapshot-prep`) merges: it changes core constants (rated power, ticks per minute, rod speed, rod count) and scrubs provenance. Nothing here may hard-code those values, and nothing may name or reuse any third-party game, its data or its research.
+  - Rebase after any pending change to core constants (rated power, ticks per minute, rod speed, rod count) lands. Nothing here may hard-code those values, and nothing may name or reuse any third-party game, its data or its research.
 - **Stop conditions:**
   - Stop and report if a capture run cannot produce a UI-overlay screenshot on the Windows/Unity build machine (U1). Every later legibility claim depends on it.
   - Stop and report if the hall cannot meet the frame-time budget in KTD9 without removing the pool depth the owner chose.
@@ -150,7 +150,7 @@ Playtest evidence from `out/playtest` logs fetched read-only from the Windows/Un
 - KTD7. **The module is a pumped integral PWR variant.** Steam generators and the pressurizer are inside the vessel and the reactor coolant pumps are canned motors on the vessel. This keeps the sim's `PrimaryFlow` (pump) control honest. There is no external primary loop, so "primary piping" is rendered as the coolant-system connections that exist on an integral design: chemical and volume control, safety injection and venting penetrations, and the pump motor housings. Short steam and feedwater stubs leave through the containment head and end at the hall wall; the secondary runs beyond are planned only. (session-settled: user-approved for the integral SMR depiction — chosen over a loop-type or stylized view: honest to the modelled physics.) Conflict call-out: the owner's phrase "primary piping" does not map to a loop on an integral module; the plan renders the connections above and records this instead of drawing a loop that would contradict the chosen design. Cites R17, R19.
 - KTD8. **The containment is shown as a cutaway.** A real containment vessel is an opaque steel shell around the reactor vessel. The hall renders it with a vertical cutaway slot and a translucent upper skin so the reactor vessel and pump housings stay visible from the gallery, and labels it as a cutaway in `docs/PLAYTEST.md`. Conflict call-out: this is a depiction choice, not a claim about the real structure. Rejected alternative: opaque containment, which would hide the vessel the owner asked to see. Cites R17, R18.
 - KTD9. **The runtime budget is relative to a measured baseline.** U1 records the baseline frame-time percentiles and draw-call count at 1920x1080 on the Windows/Unity build machine with the current hall. The new hall may cost at most 4 ms of frame time at p95 and at most 120 draw calls, hold at least 120 fps (p99 no worse than 12 ms) in the gallery pose, and cost no more than 1 ms when out of view. Tools: static batching, GPU instancing for racks and bolts, single-pass lit materials, at most 6 real-time lights, LOD groups on the module, crane and racks, and a visibility component that switches the hall root and its lights off when the window is not in the camera frustum. Limits are fixed before the unit starts and are revisited only with the owner. Cites R21.
-- KTD10. **Two PRs, controls and UI first.** PR 1 is U1 to U5 (harness, dials, movement, screens, typography and menus) and touches no `ReactorSim.Core` file, so it does not conflict with PR #18. PR 2 is U6 to U7 (hall); U7 rebases on PR #18 because rated power feeds the glow mapping fraction, while U6 geometry needs nothing from it. (session-settled: user-directed ordering — chosen over hall first.)
+- KTD10. **Two PRs, controls and UI first.** PR 1 is U1 to U5 (harness, dials, movement, screens, typography and menus) and touches no `ReactorSim.Core` file, so it does not conflict with the core-constants change. PR 2 is U6 to U7 (hall); U7 rebases on the core-constants change because rated power feeds the glow mapping fraction, while U6 geometry needs nothing from it. (session-settled: user-directed ordering — chosen over hall first.)
 - KTD11. **Cherenkov glow reuses `GlowMapping`.** Rack glow takes the same power-to-intensity mapping and dim floor as the current core disc through `PlantEquipmentBinder`, driven as an instanced emissive property per rack plus a few capped point lights and additive cone sprites for the water haze. No volumetric lighting. Decay-heat physics does not drive spent-fuel glow in reality, so the scaling with plant power is a labelled cue. (session-settled: user-approved — owner chose glow from spent-fuel racks that follows power as a cue.) Cites R20.
 
 ### High-Level Technical Design
@@ -190,7 +190,7 @@ Hall layout intent (metres, directional). The gallery sits above the pool. The w
 
 - The sandbox continues to run on the Standard pipeline. No pipeline migration is planned.
 - The owner's playtest window stays near 1600x900 and the capture sizes cover that and 1920x1080.
-- Rod speed, rod count and rated power change under PR #18. This plan reads them only through existing snapshot fields and `GlowMapping`.
+- Rod speed, rod count and rated power change under the core-constants change. This plan reads them only through existing snapshot fields and `GlowMapping`.
 - The CRT screens keep their Blender meshes and positions.
 
 ---
@@ -205,7 +205,7 @@ Hall layout intent (metres, directional). The gallery sits above the pool. The w
 | U4 | Fonts, screen pixel budget and page redesign | `Editor/TmpBootstrap.cs`, `CrtScreenRenderer.cs`, `CrtPages.cs`, `PixelBudget.cs` | U1 |
 | U5 | Type system, formatter and UI panels | `Theme.cs`, `RuntimeUi.cs`, HUD and menu scripts | U1, U4 (fonts) |
 | U6 | SMR pool hall build | `Editor/ControlRoomSceneBuilder.cs`, new `Editor/Hall*.cs` | U1, PR 1 merged |
-| U7 | Hall glow binding, budget gate and docs | `PlantEquipmentBinder.cs`, `GlowMapping.cs`, `docs/PLAYTEST.md` | U6, PR #18 merged (rebase) |
+| U7 | Hall glow binding, budget gate and docs | `PlantEquipmentBinder.cs`, `GlowMapping.cs`, `docs/PLAYTEST.md` | U6, core-constants change merged (rebase) |
 
 ### U1. Capture mode and input telemetry
 
@@ -304,7 +304,7 @@ Hall layout intent (metres, directional). The gallery sits above the pool. The w
 
 - **Goal:** A true-scale integral SMR module in a deep pool seen from a gallery window.
 - **Requirements:** R17, R18, R19, R22, KTD7, KTD8, KTD9.
-- **Dependencies:** U1 baseline, PR 1 merged. Geometry reads no core constant, so U6 does not wait on PR #18.
+- **Dependencies:** U1 baseline, PR 1 merged. Geometry reads no core constant, so U6 does not wait on the core-constants change.
 - **Files:**
   - Modify `ReactorSim.Unity/Assets/Editor/ControlRoomSceneBuilder.cs` (widen window, lower sill, rail, gallery eye height, remove old hall).
   - Create `Editor/HallBuilder.cs`, `Editor/SmrModuleMesh.cs` (replaces `ReactorVesselMesh`), `Editor/ContainmentMesh.cs`, `Editor/PipeSweep.cs` (polyline tubes with elbows, reuses `MeshBuilder`), `Editor/PolarCrane.cs`, `Editor/CableTray.cs`.
@@ -323,11 +323,11 @@ Hall layout intent (metres, directional). The gallery sits above the pool. The w
 
 - **Goal:** Racks glow with power, the runtime budget is proven, and the playtest docs match.
 - **Requirements:** R20, R21, KTD9, KTD11.
-- **Dependencies:** U6; rebase on PR #18 once it merges, because the glow reads a power fraction against rated power.
+- **Dependencies:** U6; rebase on the core-constants change once it merges, because the glow reads a power fraction against rated power.
 - **Files:**
   - Create `Editor/FuelRackMesh.cs` (instanced rack cells); modify `Scripts/View3D/PlantEquipmentBinder.cs` and `GlowMapping.cs` (rack glow property, capped lights, haze sprites), `docs/PLAYTEST.md`, `docs/STARTUP.md` only if the window pose changed.
   - Test: `ReactorSim.Core.Tests/GlowMappingTests.cs`.
-- **Approach:** Racks are two or three arrays of simple cells in the pool, one instanced material, with an emissive property set per frame from `GlowMapping` by power fraction (never a literal rated-power number, so PR #18's values flow through). Capture runs at idle, 30 percent and full power show the cue changing. The budget gate compares U1's baseline with the gallery capture.
+- **Approach:** Racks are two or three arrays of simple cells in the pool, one instanced material, with an emissive property set per frame from `GlowMapping` by power fraction (never a literal rated-power number, so the new constants flow through). Capture runs at idle, 30 percent and full power show the cue changing. The budget gate compares U1's baseline with the gallery capture.
 - **Test scenarios:**
   - Glow at zero power equals the dim floor and is nonzero; it rises monotonically with power fraction and saturates at 1.
   - Glow input is a power fraction, so a different rated power gives the same output for the same fraction.
@@ -358,11 +358,11 @@ Rules: check each command's own exit code, never pipe a gate through `tail`. The
 - The owner has seen the captures for U4, U5 and U6 and accepted them.
 - No third-party game name, data or path appears in the diff. No `ReactorSim.Core` change, or if one was needed, the plugin sync is committed.
 - Abandoned experiments (rejected fonts, discarded hall layouts, dead debug overlays) are removed from the diff.
-- Both PRs state what changed, why, how tested, known risks, and that PR 2 rebased after PR #18.
+- Both PRs state what changed, why, how tested, known risks, and that PR 2 rebased after the core-constants change.
 
 ## Risks and Dependencies
 
-- **Sequencing dependency:** PR #18 changes core constants and public-snapshot provenance. PR 1 touches no Core file and can merge first. PR 2 rebases after #18 merges and uses only power fraction and snapshot fields.
+- **Sequencing dependency:** A pending change to core constants may land. PR 1 touches no Core file and can merge first. PR 2 rebases after the core-constants change merges and uses only power fraction and snapshot fields.
 - **Capture mode may not work headless.** It needs a GPU session on the Windows/Unity build machine. Mitigation: stop condition in the Goal Capsule, and the owner can run the same flag locally.
 - **Pixel budget may force fewer lines than the owner likes.** Mitigation: the focused view and a per-screen page list agreed in U4 review.
 - **Deep-pool visibility.** A pool 20 m deep seen from a gallery shows only the upper few metres unless the water is clear and lit. Mitigation: the gallery height, water tint ramp and the rack and module lighting are tuned against captures; if it still reads poorly the fallback is a taller viewing window, reopening the window geometry with the owner.
