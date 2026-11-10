@@ -66,8 +66,8 @@ public static class FuelRackMesh
         var l = lg.AddComponent<Light>();
         l.type = LightType.Point;
         l.color = new Color(0.30f, 0.58f, 1f);
-        l.range = 11f;
-        l.intensity = 3.2f;
+        l.range = 14f;
+        l.intensity = 6.0f;
         l.shadows = LightShadows.None;
     }
 
