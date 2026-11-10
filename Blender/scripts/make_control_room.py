@@ -127,9 +127,9 @@ def build():
     add_box("Door_Leaf", (dx, 0.045, 1.05), (1.00, 0.05, 2.10), M["M_ConsoleBeige"], col_room, parent=root)
     add_box("Door_PushBar", (dx, 0.085, 1.0), (0.70, 0.03, 0.04), M["M_BrushedSteel"], col_room, parent=root)
 
-    # ---- south-wall detail beside the door (the viewing window takes the other side): a primary-loop mimic panel with
+    # ---- south-wall detail beside the door (the viewing window sits on the other side): a primary-loop mimic panel with
     # a title plate, a cable conduit run with drops, and a chair-rail stripe. Original layout, plain boxes and cylinders.
-    wx0, wx1 = 0.6, dx - 0.9
+    wx0, wx1 = dx + 0.9, W - 0.6
     wall_y = 0.0
     add_box("WallStripe", ((wx0 + wx1) / 2, wall_y + 0.012, 1.05), (wx1 - wx0, 0.024, 0.07), m_wall_stripe, col_room, parent=root)
     add_box("WallBase", ((wx0 + wx1) / 2, wall_y + 0.02, 0.06), (wx1 - wx0, 0.04, 0.12), M["M_DarkRubber"], col_room, parent=root)

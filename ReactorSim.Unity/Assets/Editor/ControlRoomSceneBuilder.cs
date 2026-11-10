@@ -151,8 +151,8 @@ public static class ControlRoomSceneBuilder
                 : "backend binding pending (" + kv.Value["phase"] + ")";
             oos++;
         }
+        AttachStandbyScreens(crRoot, bridge);   // before the darkening: it finds the faces by their exported screen material
         DarkenGlowingScreens(crRoot);
-        AttachStandbyScreens(crRoot, bridge);
         ApplyRoomLooks(crRoot);
         Debug.Log("[Phase2SceneBuilder] " + collisionBoxes + " collision proxies, " + oos + " out-of-service rows tagged.");
 
@@ -482,8 +482,9 @@ public static class ControlRoomSceneBuilder
     public const float RoomLightIntensity = RoomLighting.KeyIntensity;
     public const float RoomLightRange = RoomLighting.KeyRange;
 
-    // A monitor face that no CRT_ page owns (kit mesh "Screen") would be an empty dark pane: it gets a renderer on the
-    // standby page instead, so every screen in the room shows something deliberate.
+    // A monitor face that no CRT_ page owns (an out-of-service screen kit: its mesh keeps the exported screen material but
+    // has no CRT_ name) would be an empty dark pane: it gets a renderer on the standby page instead, so every screen in
+    // the room shows something deliberate. Counter windows ("Digit...") keep their own display.
     public const string StandbyScreenName = "STANDBY";
     private static void AttachStandbyScreens(GameObject root, PlantBridge bridge)
     {
@@ -491,8 +492,12 @@ public static class ControlRoomSceneBuilder
         foreach (var r in root.GetComponentsInChildren<MeshRenderer>(true))
         {
             string nm = r.gameObject.name;
-            if (nm != "Screen" && !nm.StartsWith("Screen.")) continue;
+            if (nm.StartsWith("CRT_") || nm.StartsWith("Digit")) continue;
             if (r.GetComponentInParent<CrtScreenRenderer>() != null) continue;
+            bool screen = false;
+            foreach (var m in r.sharedMaterials)
+                if (m != null && m.name.IndexOf("CrtScreen", System.StringComparison.OrdinalIgnoreCase) >= 0) { screen = true; break; }
+            if (!screen) continue;
             var crt = r.gameObject.AddComponent<CrtScreenRenderer>();
             crt.bridge = bridge;
             crt.screenName = StandbyScreenName;

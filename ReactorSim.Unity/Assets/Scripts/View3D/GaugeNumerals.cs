@@ -94,7 +94,7 @@ public static class GaugeNumerals
         {
             lo = Mathf.Max(-limit, lo);
             hi = Mathf.Min(limit, hi);
-            side = Vector3.left * (BarFaceWidthM * 0.32f);
+            side = Vector3.left * (BarFaceWidthM * 0.14f);
         }
         float size = BarFaceWidthM * 0.11f;
         Make(parent, kit, marks[0].Text, off + side + ControlRoom3DBinder.KitFaceUp * lo, faceRot, size, BarFaceWidthM, k, ls, ThemeColors.TextInkOnPaper);

@@ -11,8 +11,8 @@ namespace ReactorSim.Core.Tests
         {
             float a, r;
             GaugeScale.NumeralSpot(0f, -135f, 135f, out a, out r);
-            Assert.Equal(-157f, a);
-            Assert.Equal(0.30f, r);
+            Assert.Equal(-163f, a);
+            Assert.Equal(0.32f, r);
             float lo = a;
             GaugeScale.NumeralSpot(1f, -135f, 135f, out a, out r);
             Assert.True(a > 135f + 20f);

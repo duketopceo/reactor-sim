@@ -33,9 +33,9 @@ namespace ReactorSim.Instruments
         /// ends, low in the bottom gap, so the needle at rest never covers the minimum.</summary>
         public static void NumeralSpot(float frac, float sweepMinDeg, float sweepMaxDeg, out float angleDeg, out float radiusFrac)
         {
-            const float EndPushDeg = 22f;
-            if (frac <= 0f) { angleDeg = sweepMinDeg - EndPushDeg; radiusFrac = 0.30f; }
-            else if (frac >= 1f) { angleDeg = sweepMaxDeg + EndPushDeg; radiusFrac = 0.30f; }
+            const float EndPushDeg = 28f;
+            if (frac <= 0f) { angleDeg = sweepMinDeg - EndPushDeg; radiusFrac = 0.32f; }
+            else if (frac >= 1f) { angleDeg = sweepMaxDeg + EndPushDeg; radiusFrac = 0.32f; }
             else { angleDeg = sweepMinDeg + (sweepMaxDeg - sweepMinDeg) * frac; radiusFrac = 0.235f; }
         }
 
