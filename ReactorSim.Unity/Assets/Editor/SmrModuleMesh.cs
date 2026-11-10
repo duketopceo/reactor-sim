@@ -49,7 +49,6 @@ public static class SmrModuleMesh
         vessel.AddTube(new Vector3(0, 0f, 0), new Vector3(0, vb + 0.2f, 0), 1.15f, 24, false);             // support skirt
         vessel.AddTube(new Vector3(0, 0f, 0), new Vector3(0, 0.12f, 0), 1.6f, 24, true);                   // skirt base plate
         vessel.Attach(lod0.transform, "Smr_Vessel", m.vessel);
-        int trisVessel = vessel.TriangleCount;
 
         // ---- canned recirculation pump motors on the vessel shoulder (visible through the slot) ----
         var pumps = new MeshBuilder();

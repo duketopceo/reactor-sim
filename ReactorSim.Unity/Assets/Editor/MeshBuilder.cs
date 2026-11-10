@@ -160,8 +160,9 @@ public sealed class MeshBuilder
     }
 
     /// <summary>Axis-aligned box with flat-shaded faces.</summary>
-    public void AddBox(Vector3 min, Vector3 max)
+    public void AddBox(Vector3 a, Vector3 b)
     {
+        Vector3 min = Vector3.Min(a, b), max = Vector3.Max(a, b);   // callers may pass the corners in either order
         Vector3[] c =
         {
             new Vector3(min.x, min.y, min.z), new Vector3(max.x, min.y, min.z), new Vector3(max.x, max.y, min.z), new Vector3(min.x, max.y, min.z),

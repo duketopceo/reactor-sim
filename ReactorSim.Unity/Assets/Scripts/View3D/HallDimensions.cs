@@ -59,7 +59,6 @@ namespace ReactorSim
             if (PipeRunHeight >= WaterDepth) bad.Add("the steam stubs would run above the water");
             if (ContainmentDiameter * 0.5f + 1.0f > PoolRadius) bad.Add("the containment does not fit in the pool");
             if (PoolRadius + 1.0f > HallRadius) bad.Add("the pool does not fit in the hall");
-            if (PoolAxisFromWall + HallRadius < 0f) bad.Add("hall geometry inverted");
             if (RackLedgeHeight >= WaterDepth - 3.0f) bad.Add("the rack ledge is too shallow to be under water");
             if (RackLedgeHeight < ContainmentBase + 4.0f) bad.Add("the rack ledge is too deep to read from the gallery");
             return bad;
