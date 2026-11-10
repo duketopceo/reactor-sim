@@ -1,6 +1,7 @@
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using ReactorSim;
 using ReactorSim.Controls;
 using ReactorSim.Instruments;
 using ReactorSim.Ui;
@@ -307,11 +308,14 @@ public static class ControlRoomSceneBuilder
     // (door frame +-0.6 m), so the opening is offset 3.0 m toward the longer side of the wall, leaving 1.4 m of wall
     // between the door frame and the opening. Pieces are children of the ControlRoom root so LayoutCheck sees their
     // colliders; the hall itself is a separate root with no colliders at all.
-    private const float WindowWidth = 3.2f, WindowSill = 0.35f, WindowHeight = 1.9f, WindowOffsetFromDoor = 2.6f;
+    // The opening is sized by HallDimensions (HallSightline checks the stand and seat can see the pool through it): wide, with the
+    // glass nearly down to the floor so the standing eye can look steeply enough down.
+    private static readonly float WindowWidth = HallDimensions.WindowWidth, WindowSill = HallDimensions.WindowSill,
+        WindowHeight = HallDimensions.WindowHeight, WindowOffsetFromDoor = HallDimensions.WindowOffsetFromDoor;
     // The standing viewpoint (STAND_Center) and the seat sit 3.5 m apart along the wall, so a pool straight behind the
     // window looks well off to one side from the stand. The pool is moved toward the stand sightline (VesselShiftX, from the
     // window centre) and pulled close to the wall (PoolDepth) so one position reads reasonably centred from both.
-    private const float VesselShiftX = 0.25f;
+    private static readonly float VesselShiftX = HallDimensions.VesselShiftX;
     private const int IgnoreRaycastLayer = 2;
     // Unnamed user layer for the reactor hall (culling only; no TagManager change). Hall lights light only this layer,
     // room lights skip it.
@@ -349,6 +353,11 @@ public static class ControlRoomSceneBuilder
         if (Mathf.Abs(wx - doorX) - WindowWidth * 0.5f < 0.9f)
             Debug.LogWarning($"[Phase2SceneBuilder] the window edge is {Mathf.Abs(wx - doorX) - WindowWidth * 0.5f:0.00} m from the door centre (door frame is 0.6 m).");
         float ySill = y0 + WindowSill, yHead = ySill + WindowHeight;
+        if (yHead > yTop - HallDimensions.HeaderMinWall)
+        {
+            Debug.LogWarning($"[Phase2SceneBuilder] the window head {yHead - y0:0.00} m leaves under {HallDimensions.HeaderMinWall} m of wall (wall is {yTop - y0:0.00} m); lowered.");
+            yHead = yTop - HallDimensions.HeaderMinWall;
+        }
 
         // The old wall box and its collision proxy go dark; they belong to the FBX instance so they are hidden, not destroyed.
         wallR.enabled = false;
@@ -380,15 +389,14 @@ public static class ControlRoomSceneBuilder
 
         // Glass: translucent, solid for movement, never a click target (Ignore Raycast, so OnMouse rays pass to controls).
         var glass = WindowBox(win.transform, "Window_Glass", xl, xr, ySill, yHead, zMid, 0.04f,
-                              MakeMaterial("M_WindowGlass", new Color(0.75f, 0.88f, 1f, 0.10f), true, false), true);
+                              MakeMaterial("M_WindowGlass", new Color(0.75f, 0.88f, 1f, 0.05f), true, false), true);
         glass.GetComponent<BoxCollider>().size = new Vector3(1f, 1f, 1.5f); // a little thicker than the pane so nothing slips past
 
-        // Gallery rail on the hall side of the glass: a top rail and a mid rail with posts (visual only).
+        // Gallery rail on the hall side of the glass: one top rail with posts (visual only; a mid rail cut across the view of the module).
         float zRail = zOuter - inward * 0.35f;
         Material railMat = MakeMaterial("M_GalleryRail", new Color(0.62f, 0.65f, 0.7f), false, false);
         WindowBox(win.transform, "Rail_Top", xl, xr, y0 + 1.0f, y0 + 1.05f, zRail, 0.05f, railMat, false);
-        WindowBox(win.transform, "Rail_Mid", xl, xr, y0 + 0.62f, y0 + 0.66f, zRail, 0.04f, railMat, false);
-        int posts = Mathf.CeilToInt((xr - xl) / 0.8f);
+        int posts = Mathf.CeilToInt((xr - xl) / 1.3f);
         for (int i = 0; i <= posts; i++)
         {
             float px = Mathf.Lerp(xl + 0.03f, xr - 0.03f, (float)i / posts);

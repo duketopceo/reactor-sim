@@ -105,8 +105,12 @@ not exist, and exits 2 when the host is unreachable. It only reads from the Wind
 
 ## Reactor hall (the window in the south wall)
 
-The window looks down from a gallery about 9 m over the water into a circular hall with a 22 m deep pool. Walk up to the
-rail (within about a metre) to see the pool; from across the room the window shows the far wall and the crane.
+The window looks down from a gallery about 2 m over the water into a circular hall with a 22 m deep pool. It is 4 m wide
+and runs from nearly the floor to 2.35 m, because from the standing spot (4.5 m back) and the seat (6 m back) it can only look
+about 19 and 15 degrees down; the pool is placed so the module head sits inside that reach from both (checked by
+`HallSightline`, a pure test, and by `HallCheck`). From the stand and the seat you see the module's head, the pump shoulders and
+the steam lines under the surface. The deep body of the vessel fades into the water, which is why it is only seen close
+to the rail. The crane is parked behind the pool, out of the line of sight.
 
 - **The module.** A small modular reactor of the pumped integral type: a 2.7 m wide, 18.8 m tall reactor vessel standing in
   a 4.5 m wide containment shell, in the pool with the containment head just under the water. The steam generators and the
@@ -117,14 +121,27 @@ rail (within about a metre) to see the pool; from across the room the window sho
 - **Cutaway.** The containment is drawn as a cutaway: an opaque steel shell with a vertical slot facing the window, closed in
   its upper part by a translucent skin, so you can see the vessel and pump housings. This is a depiction choice; a real
   containment is an opaque shell.
+- **Light and colour.** Two warm high-bay lamps light the deck and walls; the water, which is the only strongly blue thing,
+  goes from teal near the surface to deep blue below; the vessel is brushed stainless, the containment cream, the crane safety
+  yellow, the concrete warm grey. Colours and light levels are in `HallPalette` and checked by `HallExposureTests` (nothing blown
+  out, nothing black).
 - **The glow is a cue.** The blue glow over the spent-fuel racks on the pool ledge follows reactor power (dim at shutdown, bright
-  at rated power). Real spent-fuel Cherenkov light comes from the fuel's own decay, not from current reactor power, so this
+  at rated power). It is carried by the rack cells' emission and the haze above them, with one shared real light, so it does not
+  depend on how many pixel lights the renderer allows. Real spent-fuel Cherenkov light comes from the fuel's own decay, not from current reactor power, so this
   scaling is a visual cue for the player, not a physics claim.
 - **Performance.** The hall switches itself off when the window is out of view. Its budget (checked against a baseline run, see
   below, for every captured size) is at most 4 ms of added frame time at p95, at most 120 added draw calls, a p99 of 12 ms or
   less in the gallery pose, and at most 1 ms of added p95 while the window is out of view.
 
 ### Capturing the hall
+
+Renders for review (editor, needs a graphics session; the hall is forced on for the render camera):
+
+```
+ROOM_RENDER=1 ROOM_RENDER_SIZE=1920x1080 UNITY_EXE=... bash scripts/ci.sh      # out/render/unity-window-stand.png, unity-window-seat.png
+```
+
+`-roomRenderSize 1920x1080` as a Unity argument does the same; the default stays 1600x900.
 
 On the Windows machine (graphics session):
 

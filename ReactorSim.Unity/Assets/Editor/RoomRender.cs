@@ -8,7 +8,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 // Renders the control room from named viewpoints IN PLAY MODE (so PlantBridge, CRT pages and the operator have
-// initialised) and writes <repo>/out/render/unity-<name>.png (1600x900). KTD7: this is the render the gates trust.
+// initialised) and writes <repo>/out/render/unity-<name>.png (1600x900, or ROOM_RENDER_SIZE=WxH / -roomRenderSize WxH). KTD7: this is the render the gates trust.
 //   "<Unity.exe>" -batchmode -projectPath ReactorSim.Unity -executeMethod RoomRender.Run -logFile out/unity-RoomRender.log
 // Needs a graphics device: do NOT pass -nographics. Do NOT pass -quit either: the work finishes asynchronously
 // (play mode), and the method exits the editor itself with 0 (all PNGs good) or 1 (any failure).
@@ -19,7 +19,8 @@ using UnityEngine.SceneManagement;
 public static class RoomRender
 {
     private const string ScenePath = "Assets/Scenes/Bootstrap.unity";
-    private const int Width = 1600, Height = 900;
+    // Size defaults to 1600x900; ROOM_RENDER_SIZE=1920x1080 (or the flag -roomRenderSize 1920x1080) renders at another size, for review captures.
+    private static readonly int Width = EnvSize(0, 1600), Height = EnvSize(1, 900);
     private const double WarmupSeconds = 2.0;
     private const double TimeoutSeconds = 180.0;
 
@@ -35,6 +36,15 @@ public static class RoomRender
     private static bool playSeen;
     private static int startFrame;
     private static double startRealtime;
+
+    private static int EnvSize(int part, int fallback)
+    {
+        string text = Environment.GetEnvironmentVariable("ROOM_RENDER_SIZE") ?? "";
+        string[] args = Environment.GetCommandLineArgs();
+        for (int i = 0; i + 1 < args.Length; i++) if (args[i] == "-roomRenderSize") text = args[i + 1];   // same thing as a player-style flag
+        string[] wh = text.Split('x');
+        return wh.Length == 2 && int.TryParse(wh[part], out int n) && n >= 320 && n <= 4096 ? n : fallback;
+    }
 
     static RoomRender()
     {
@@ -267,6 +277,11 @@ public static class RoomRender
     private static bool RenderView(View v, string path, string label)
     {
         var go = new GameObject("RoomRender_Cam_" + label);
+        // HallVisibility gates the hall on Camera.main (the operator's camera, which may face away from the window); this camera is
+        // a different one, so without this the hall root is off and the window renders the clear colour.
+        GameObject hall = HallVisibility.FindHall();
+        bool hallWasOn = hall != null && hall.activeSelf;
+        if (hall != null) hall.SetActive(true);
         var rt = new RenderTexture(Width, Height, 24, RenderTextureFormat.ARGB32);
         Texture2D tex = null;
         var prev = RenderTexture.active;
@@ -310,6 +325,7 @@ public static class RoomRender
         }
         finally
         {
+            if (hall != null) hall.SetActive(hallWasOn);
             RenderTexture.active = prev;
             var c = go.GetComponent<Camera>();
             if (c != null) c.targetTexture = null;

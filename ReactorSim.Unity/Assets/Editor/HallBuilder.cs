@@ -6,8 +6,8 @@ using ReactorSim;
 // Builds the reactor hall behind the control-room window (U6): a circular hall with a deep pool, the integral SMR module (see
 // SmrModuleMesh) standing in it, tinted water as stacked translucent layers, a polar crane, cable trays and hall lights.
 // Everything is collider-free original geometry on HallLayer under one "ReactorHall" root, plus a separate frustum gate object
-// (HallVisibility) that switches the root off when the window is out of view. The room is 29 m above the pool floor, so the
-// window looks down about 9 m onto the water.
+// (HallVisibility) that switches the root off when the window is out of view. The room floor sits just above the hall deck (see
+// HallDimensions.GalleryEyeAboveWater), so the window looks down only a couple of metres onto the water.
 //
 // Local hall space: origin on the pool axis at the pool floor, y up, the control-room window towards -z. The root is placed and
 // turned so that local -z points at the room. All numbers come from HallDimensions.
@@ -24,7 +24,7 @@ public static class HallBuilder
 
         float D = HallDimensions.PoolAxisFromWall, Rh = HallDimensions.HallRadius, Rp = HallDimensions.PoolRadius;
         float water = HallDimensions.WaterDepth, deckY = water + HallDimensions.DeckAboveWater;
-        float roomFloorLocal = HallDimensions.RoomFloorAbovePoolFloor, ceilY = roomFloorLocal + 6f;
+        float roomFloorLocal = HallDimensions.RoomFloorAbovePoolFloor, ceilY = deckY + HallDimensions.HallCeilingAboveDeck;
 
         var root = new GameObject(RootName);
         root.transform.position = new Vector3(cx, roomFloorY - roomFloorLocal, zOuter + dir * D);
@@ -32,25 +32,33 @@ public static class HallBuilder
         Transform T = root.transform;
 
         // ---- materials ----
-        Material concrete = makeMaterial("M_HallConcrete", new Color(0.38f, 0.40f, 0.43f), false, false);
-        Material deck = makeMaterial("M_HallDeck", new Color(0.26f, 0.28f, 0.30f), false, false);
-        Material tile = makeMaterial("M_PoolTile", new Color(0.55f, 0.66f, 0.72f), false, false);
-        Material steel = makeMaterial("M_HallSteel", new Color(0.58f, 0.62f, 0.68f), false, false);
-        Material dark = makeMaterial("M_HallSteelDark", new Color(0.30f, 0.32f, 0.36f), false, false);
-        Material paint = makeMaterial("M_ContainmentPaint", new Color(0.72f, 0.76f, 0.80f), false, false);
+        // Warm greys for the building, brushed stainless for the vessel (metallic but not a mirror: nothing in the hall for it to
+        // reflect), cream paint on the containment, safety yellow on the crane; the water is the only strongly blue thing. The
+        // colours and the light levels live in HallPalette, where HallExposureTests checks they neither blow out nor go black.
+        Material concrete = makeMaterial("M_HallConcrete", Rgb(HallPalette.Concrete), false, false);
+        concrete.EnableKeyword("_EMISSION");
+        concrete.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+        float ce = HallPalette.ConcreteEmission;
+        if (concrete.HasProperty("_EmissionColor")) concrete.SetColor("_EmissionColor", new Color(ce, ce, ce * 1.1f));
+        Material deck = makeMaterial("M_HallDeck", Rgb(HallPalette.Deck), false, false);
+        Material tile = makeMaterial("M_PoolTile", Rgb(HallPalette.PoolTile), false, false);
+        Material steel = makeMaterial("M_HallSteel", Rgb(HallPalette.Stainless), false, false);
+        Material dark = makeMaterial("M_HallSteelDark", Rgb(HallPalette.DarkSteel), false, false);
+        Material paint = makeMaterial("M_ContainmentPaint", Rgb(HallPalette.ContainmentPaint), false, false);
+        Material cranePaint = makeMaterial("M_CranePaint", Rgb(HallPalette.CranePaint), false, false);
         Material skin = makeMaterial("M_ContainmentSkin", new Color(0.62f, 0.78f, 0.88f, 0.22f), true, false);
-        foreach (var m in new[] { steel, dark, paint })
-        {
-            if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", 0.7f);
-            if (m.HasProperty("_Glossiness")) m.SetFloat("_Glossiness", 0.5f);
-        }
-        // Water: one tint colour for every layer, so the order the layers blend in does not matter, and an emissive baseline so
-        // the pool reads blue at zero power and under any lighting.
-        Material waterVolume = makeMaterial("M_PoolVolume", new Color(0.03f, 0.26f, 0.44f, 0.04f), true, false);
-        Material waterSurface = makeMaterial("M_PoolSurface", new Color(0.10f, 0.45f, 0.72f, 0.10f), true, false);
+        Tune(steel, 0.55f, 0.65f);
+        Tune(dark, 0.45f, 0.45f);
+        Tune(paint, 0.0f, 0.2f);
+        Tune(cranePaint, 0.1f, 0.4f);
+        // Water: the surface carries an emissive baseline so the pool reads blue at zero power and under any lighting; the
+        // volume is two tints (teal near the surface, deep blue below) so depth shows as a colour change, not only as darkness.
+        Material waterVolumeShallow = makeMaterial("M_PoolVolumeShallow", Rgb(HallPalette.ShallowWater, 0.05f), true, false);
+        Material waterVolumeDeep = makeMaterial("M_PoolVolumeDeep", Rgb(HallPalette.DeepWater, 0.08f), true, false);
+        Material waterSurface = makeMaterial("M_PoolSurface", new Color(0.10f, 0.50f, 0.70f, 0.10f), true, false);
         waterSurface.EnableKeyword("_EMISSION");
         waterSurface.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
-        if (waterSurface.HasProperty("_EmissionColor")) waterSurface.SetColor("_EmissionColor", new Color(0.01f, 0.06f, 0.14f));
+        if (waterSurface.HasProperty("_EmissionColor")) waterSurface.SetColor("_EmissionColor", new Color(0.01f, 0.07f, 0.13f));
 
         // ---- shell: hall wall, deck, ceiling, floor, pool wall ----
         var ang = Angles(D, Rh);
@@ -95,14 +103,17 @@ public static class HallBuilder
         var wSurface = new MeshBuilder();
         wSurface.AddFan(Vector2.zero, poolCircle, water, true);
         wSurface.Attach(T, "Pool_Surface", waterSurface);
-        var wVolume = new MeshBuilder();
-        const int layers = 10;
-        for (int k = 1; k <= layers; k++) wVolume.AddFan(Vector2.zero, ScaleAll(poolCircle, 0.995f), water - k * (water / (layers + 1f)), true);
-        wVolume.Attach(T, "Pool_Volume", waterVolume);
+        var wShallow = new MeshBuilder();
+        var wDeep = new MeshBuilder();
+        const int layers = 10, shallowLayers = 4;
+        for (int k = 1; k <= layers; k++)
+            (k <= shallowLayers ? wShallow : wDeep).AddFan(Vector2.zero, ScaleAll(poolCircle, 0.995f), water - k * (water / (layers + 1f)), true);
+        wShallow.Attach(T, "Pool_VolumeShallow", waterVolumeShallow);
+        wDeep.Attach(T, "Pool_VolumeDeep", waterVolumeDeep);
 
         // ---- the module, crane, trays ----
         SmrModuleMesh.Build(T, new SmrModuleMesh.Materials { vessel = steel, dark = dark, containment = paint, skin = skin });
-        PolarCrane.Build(T, steel, dark, roomFloorLocal - 2.4f, Rh, D);
+        PolarCrane.Build(T, cranePaint, dark, deckY + HallDimensions.CraneRailAboveDeck, Rh, D);
         CableTray.Build(T, dark, Rh - 0.45f, deckY + 3.6f, 0.15f * Mathf.PI, 0.85f * Mathf.PI);
 
         // ---- spent-fuel racks on a ledge on the far wall; their glow follows plant power (U7) ----
@@ -131,8 +142,10 @@ public static class HallBuilder
         focus.transform.SetParent(T, false);
         focus.transform.localPosition = new Vector3(0f, water - 3f, 0f);
 
-        // ---- lights: three cool point lights over the pool, hall layer only ----
-        Vector3[] lightAt = { new Vector3(-4f, deckY + 4f, -2f), new Vector3(4f, deckY + 4f, -2f), new Vector3(0f, deckY + 4f, 5f) };
+        // ---- lights, hall layer only. Two warm high-bay lamps over the deck and ONE cool rack light (below): three real lights,
+        // under the default pixel-light count of 4, so no object is lit by a sorted-out subset. The racks' glow cue is carried by
+        // emission and haze, which need no light at all.
+        Vector3[] lightAt = { new Vector3(-4.5f, deckY + HallPalette.HighBayHeightAboveDeck, 2f), new Vector3(4.5f, deckY + HallPalette.HighBayHeightAboveDeck, 2f) };
         for (int i = 0; i < lightAt.Length; i++)
         {
             var lg = new GameObject("HallLight_" + i);
@@ -140,11 +153,12 @@ public static class HallBuilder
             lg.transform.localPosition = lightAt[i];
             var l = lg.AddComponent<Light>();
             l.type = LightType.Point;
-            l.color = new Color(0.72f, 0.84f, 1f);
-            l.range = 24f;
-            l.intensity = 1.5f;
+            l.color = Rgb(HallPalette.HighBayColour);
+            l.range = HallPalette.HighBayRange;
+            l.intensity = HallPalette.HighBayIntensity;
             l.shadows = LightShadows.None;
         }
+        FuelRackMesh.BuildSharedLight(T, new Vector3(0f, ledge + HallDimensions.RackCellHeight + 1.6f, Rp - 2.3f));
 
         FinishHall(root, windowBounds);
         return root;
@@ -169,6 +183,17 @@ public static class HallBuilder
         var vis = gate.AddComponent<HallVisibility>();
         vis.hallRoot = root;
         vis.windowBounds = windowBounds;
+    }
+
+    // ---- colour helpers ----
+
+    private static Color Rgb(float[] c, float alpha = 1f) { return new Color(c[0], c[1], c[2], alpha); }
+
+    // Standard-shader metal and gloss for a hall surface (guarded: other shaders may lack the properties).
+    private static void Tune(Material m, float metallic, float smoothness)
+    {
+        if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", metallic);
+        if (m.HasProperty("_Glossiness")) m.SetFloat("_Glossiness", smoothness);
     }
 
     // ---- boundary helpers ----
