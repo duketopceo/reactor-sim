@@ -36,6 +36,13 @@ namespace ReactorSim.Core.Tests
         }
 
         [Fact]
+        public void EndNumeralsOnTheSmallDialAreAtLeastTwoCentimetresHigh()
+        {
+            const float smallFaceM = 0.22f;   // K01 face width (GaugeNumerals.SmallFaceM)
+            Assert.True(GaugeScale.EndFontFrac * smallFaceM >= 0.0195f, "end numerals on the 0.22 m dial are " + GaugeScale.EndFontFrac * smallFaceM + " m high");
+        }
+
+        [Fact]
         public void NeedleTouches_DetectsAnOverlapOnTheRestLine()
         {
             // a box on the needle's own line at the minimum must be reported (the original defect)

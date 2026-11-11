@@ -43,6 +43,15 @@ namespace ReactorSim.Tests
         }
 
         [Fact]
+        public void EveryNumberedStandbyFaceShowsTheSameStandbyPage()
+        {
+            var s = Cold();
+            string want = Build("STANDBY", s).ToText();
+            foreach (var name in new[] { "STANDBY_01", "STANDBY_02", "STANDBY_12" })
+                Assert.Equal(want, Build(name, s).ToText());
+        }
+
+        [Fact]
         public void StandbyPage_ForAnUnassignedScreen_ShowsOnlyStandbyContent_WithinTheBudget()
         {
             foreach (var s in States())

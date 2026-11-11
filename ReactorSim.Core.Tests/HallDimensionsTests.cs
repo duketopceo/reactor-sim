@@ -39,9 +39,10 @@ namespace ReactorSim.Core.Tests
         [Fact]
         public void GalleryEyeIsLowEnoughForTheWindowToLookDownAtThePool()
         {
-            // 2.2 m over the water: the stand and seat reach (about 19 and 15 degrees) covers the module head
-            Assert.Equal(2.2f, HallDimensions.GalleryEyeAboveWater);
-            Assert.Equal(HallDimensions.WaterDepth + 2.2f - 1.6f, HallDimensions.RoomFloorAbovePoolFloor, 4);
+            // 2.25 m over the water (the standing eye is 1.65 m over the room floor, so the room floor sits 0.6 m over the water): the stand and seat reach (about 19 and 15 degrees) covers the module head
+            Assert.Equal(2.25f, HallDimensions.GalleryEyeAboveWater);
+            Assert.Equal(HallDimensions.WaterDepth + 2.25f - OperatorMath.StandingEyeHeight, HallDimensions.RoomFloorAbovePoolFloor, 4);
+            Assert.Equal(OperatorMath.StandingEyeHeight, HallDimensions.EyeAboveRoomFloor);
             Assert.True(HallDimensions.PoolAxisFromWall - HallDimensions.PoolRadius > 1.0f, "the deck must stay between the wall and the pool edge");
         }
 

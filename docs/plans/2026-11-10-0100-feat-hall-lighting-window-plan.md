@@ -9,6 +9,8 @@ execution: code
 
 # Reactor Hall Lighting and Window Visibility (PR4) - Plan
 
+> **Superseded in part by [the PR6 plan](2026-11-10-feat-window-framing-readme-plan.md).** The window and pool geometry below (pool radius, pool axis distance, gallery eye height, coaming, containment height, crane bridge position) was retuned in PR6; the current numbers live in `HallDimensions.cs`. The diagnosis and the lighting work stay as written.
+
 ## Goal Capsule
 
 - **Target repo:** this repository (public Reactor Sim). No machine names or home paths in the plan: the Windows build machine is `$REACTOR_SIM_WIN_HOST`.

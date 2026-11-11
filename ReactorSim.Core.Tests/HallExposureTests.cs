@@ -6,19 +6,28 @@ namespace ReactorSim.Core.Tests
     // first-order estimate (see HallExposure); the render is the final judge, these keep the choices from drifting.
     public class HallExposureTests
     {
-        // distance from a surface to each of the two high-bay lamps (metres), measured from the builder's light positions
+        // each sample is a hall-space point (pool axis at the origin, y above the pool floor, +z away from the window); the distances to
+        // the two lamps come from HallPalette.HighBayPositions and HallDimensions, so a retuned hall moves the samples with it
         private struct Sample { public string name; public float[] albedo; public double d1, d2; public double emission; }
+
+        private static Sample At(string name, float[] albedo, double x, double y, double z, double emission = 0.0)
+        {
+            return new Sample { name = name, albedo = albedo, d1 = HallPalette.DistanceToLamp(0, x, y, z), d2 = HallPalette.DistanceToLamp(1, x, y, z), emission = emission };
+        }
 
         private static Sample[] Samples()
         {
+            double deckY = HallDimensions.WaterDepth + HallDimensions.DeckAboveWater;
+            double r = HallDimensions.ContainmentDiameter * 0.5;
+            double nearDeckZ = -(HallDimensions.PoolRadius + (HallDimensions.PoolAxisFromWall - HallDimensions.PoolRadius) * 0.5); // middle of the deck strip by the window
             return new[]
             {
-                new Sample { name = "stainless vessel head under the lamps", albedo = HallPalette.Stainless, d1 = 7.0, d2 = 9.0 },
-                new Sample { name = "containment paint", albedo = HallPalette.ContainmentPaint, d1 = 8.0, d2 = 9.5 },
-                new Sample { name = "crane girder in safety yellow", albedo = HallPalette.CranePaint, d1 = 6.0, d2 = 9.0 },
-                new Sample { name = "hall deck near the window", albedo = HallPalette.Deck, d1 = 11.0, d2 = 13.0 },
-                new Sample { name = "far concrete wall", albedo = HallPalette.Concrete, d1 = 15.0, d2 = 15.0, emission = HallPalette.ConcreteEmission },
-                new Sample { name = "pool tile at the rack ledge", albedo = HallPalette.PoolTile, d1 = 16.0, d2 = 17.0 },
+                At("stainless vessel head under the lamps", HallPalette.Stainless, 0, HallDimensions.ContainmentTop, 0),
+                At("containment paint", HallPalette.ContainmentPaint, 0, HallDimensions.ContainmentTop - HallDimensions.HeadDomeHeight, -r),
+                At("crane girder in safety yellow", HallPalette.CranePaint, 0, deckY + HallDimensions.CraneRailAboveDeck, HallDimensions.CraneBridgeZ),
+                At("hall deck near the window", HallPalette.Deck, 0, deckY, nearDeckZ),
+                At("far concrete wall", HallPalette.Concrete, 0, deckY + 3.0, HallDimensions.HallRadius, HallPalette.ConcreteEmission),
+                At("pool tile at the rack ledge", HallPalette.PoolTile, 0, HallDimensions.RackLedgeHeight, HallDimensions.PoolRadius),
             };
         }
 

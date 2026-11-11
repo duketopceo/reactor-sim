@@ -115,5 +115,15 @@ namespace ReactorSim.Core.Tests
             foreach (var id in new[] { "boron_ppm", "game_clock", "turbine_mech_mw", "excore_flux" })
                 Assert.Equal("K04", inv.Find(id).kit);
         }
+
+        [Fact]
+        public void TierReadingsReadAsNamesNeverAsADecimalTier()
+        {
+            Assert.Equal("Advisory", ControlTooltipModel.DragReadout("Assistant tier", 1.0, 0.0, "tier", true).Split('\n')[1].Split(' ')[0]);
+            string frac = ControlTooltipModel.DragReadout("Assistant tier", 0.62, 0.0, "tier", false);
+            Assert.DoesNotContain("0.62", frac);
+            Assert.DoesNotContain("tier", frac.Split('\n')[1]);
+            Assert.Contains("Supervised", ControlTooltipModel.DragReadout("Assistant tier", 2.2, 0.0, "tier", false));
+        }
     }
 }

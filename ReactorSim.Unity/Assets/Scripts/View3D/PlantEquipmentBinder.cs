@@ -22,6 +22,16 @@ public class PlantEquipmentBinder : MonoBehaviour
     public static double? PowerOverride { get; set; }
     /// <summary>Capture only: switches the rack emission, haze and lights fully off (a reference frame), ignoring the dim floor.</summary>
     public static bool GlowOff { get; set; }
+
+    // With Domain Reload disabled (Enter Play Mode options) statics survive from one play session to the next, so a capture pose
+    // forced in one run would leak into the next. Reset them before the first scene loads.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics()
+    {
+        PowerOverride = null;
+        GlowOff = false;
+    }
+
     private Transform porvAnchor;
     private ParticleSystem porvSteam;
     private ParticleSystem sgSteam;

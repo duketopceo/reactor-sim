@@ -26,9 +26,9 @@ namespace ReactorSim.Core.Tests
         [Fact]
         public void RimHiddenBelowMatchesAHandCalculationAndMovesTheRightWay()
         {
-            // stand eye 22 + 2.2 - 1.6 + 1.65 = 24.25 m over the floor, rim 22.15 m, rim 4.5 + 13 - 11 = 6.5 m out, pool radius 11 m past it
+            // stand eye 22 + 2.25 - 1.65 + 1.65 = 24.25 m over the floor, rim 22.15 m, rim 4.5 + 13 - 11 = 6.5 m out, pool radius 11 m past it
             Assert.Equal(22.15 - (24.25 - 22.15) * 11.0 / 6.5, HallSightline.RimHiddenBelow(HallSightline.Stand()), 2);
-            // seated eye 22 + 2.2 - 1.6 + 1.2 = 23.8 m, rim 6.1 + 13 - 11 = 8.1 m out
+            // seated eye 22 + 2.25 - 1.65 + 1.2 = 23.8 m, rim 6.1 + 13 - 11 = 8.1 m out
             Assert.Equal(22.15 - (23.8 - 22.15) * 11.0 / 8.1, HallSightline.RimHiddenBelow(HallSightline.Seat()), 2);
         }
 
@@ -87,6 +87,28 @@ namespace ReactorSim.Core.Tests
             double[][] box = HallSightline.CraneBox();
             Assert.True(HallSightline.CraneClearOfModule(HallSightline.Stand(), box));
             Assert.True(HallSightline.CraneClearOfModule(HallSightline.Seat(), box));
+        }
+
+        [Fact]
+        public void TheRealCraneFillsLittleOfTheWindowFromTheStandAndTheSeat()
+        {
+            double[][] box = HallSightline.CraneBox();
+            foreach (var v in new[] { HallSightline.Stand(), HallSightline.Seat() })
+            {
+                double c = HallSightline.CraneOpeningCoverage(v, box);
+                Assert.True(c <= HallSightline.MaxCraneOpeningCoverage, $"{v.name}: crane fills {c:0.00} of the opening");
+            }
+        }
+
+        [Fact]
+        public void ACraneAboveTheHorizonButAcrossTheWindowIsCaught()
+        {
+            // a bridge parked over the deck in front of the window, at the height of the opening's upper half: no sight line to the
+            // module touches it (they slope down), but it fills the top of the view, so the opening check must fail
+            double deckY = HallDimensions.WaterDepth + HallDimensions.DeckAboveWater;
+            double[][] high = { new[] { -14.0, deckY + 1.5, -12.0 }, new[] { 14.0, deckY + 6.0, -9.0 } };
+            Assert.False(HallSightline.CraneClearOfModule(HallSightline.Stand(), high));
+            Assert.True(HallSightline.CraneOpeningCoverage(HallSightline.Stand(), high) > HallSightline.MaxCraneOpeningCoverage);
         }
 
         [Fact]
