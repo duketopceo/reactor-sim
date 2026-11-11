@@ -23,6 +23,13 @@ Licensed under the SIL Open Font License 1.1. The license text is kept beside th
 with Reserved Font Name "Plex". Licensed under the SIL Open Font License 1.1. The license text is kept beside the
 font: `ReactorSim.Unity/Assets/Fonts/IBMPlexMono-LICENSE.txt`. The generated SDF font asset carries the same license.
 
+## Kokoro voice model (assistant voice lines)
+
+The WAV files in `ReactorSim.Unity/Assets/Audio/Voice/` were synthesized with the Kokoro-82M text-to-speech model
+(voice `am_onyx`), run locally through the Voicebox app, then processed with Voicebox's built-in audio effects
+(pitch shift, chorus, band-pass, compressor). Kokoro-82M is released under the Apache License 2.0. The line texts
+are this project's own. The generator script is `tools/voice/voice_lines.py`.
+
 ## Unity packages and TextMesh Pro
 
 The `ReactorSim.Unity` project depends on Unity Technologies packages (see `ReactorSim.Unity/Packages/manifest.json`)
