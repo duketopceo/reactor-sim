@@ -18,6 +18,8 @@ public class ControlRoom3DBinder : MonoBehaviour
     // local frame (X across the face, Y out of the face toward the operator, Z up the face). In Unity that is:
     public static readonly Vector3 KitFaceNormal = Vector3.up;     // needles and knobs turn about it; buttons press along -it
     public static readonly Vector3 KitFaceUp = Vector3.forward;    // edgewise bars slide along it
+    /// <summary>The face's right as the operator sees it (looking down -KitFaceNormal with KitFaceUp up): derived, not assumed.</summary>
+    public static readonly Vector3 KitFaceRight = Vector3.Cross(KitFaceUp, -KitFaceNormal);
     public static readonly Vector3 KitAcross = Vector3.right;      // rod-bank levers pitch about it
 
     public PlantBridge bridge;

@@ -346,7 +346,15 @@ public static class ControlRoomSceneBuilder
         Transform door = FindDeep(crRoot, "Door_Leaf");
         var doorR = door != null ? door.GetComponent<Renderer>() : null;
         float doorX = doorR != null ? doorR.bounds.center.x : wb.center.x;
-        float wx = doorX + (wb.max.x - doorX >= doorX - wb.min.x ? WindowOffsetFromDoor : -WindowOffsetFromDoor);
+        // The window goes on the side of the door that the south-wall detail (WallMimic_Plate, authored in Blender on the other side)
+        // does not use. With the door at the middle of the wall the two sides tie, so comparing wall extents was a floating-point
+        // coin toss; the detail itself says which side is taken. Without it, fall back to the roomier side, ties going to +x.
+        Transform detail = FindDeep(crRoot, "WallMimic_Plate");
+        var detailR = detail != null ? detail.GetComponent<Renderer>() : null;
+        float windowSide;
+        if (detailR != null && Mathf.Abs(detailR.bounds.center.x - doorX) > 0.5f) windowSide = detailR.bounds.center.x > doorX ? -1f : 1f;
+        else windowSide = (wb.max.x - doorX) >= (doorX - wb.min.x) - 0.01f ? 1f : -1f;
+        float wx = doorX + windowSide * WindowOffsetFromDoor;
         float xl = wx - WindowWidth * 0.5f, xr = wx + WindowWidth * 0.5f;
         // keep the wider opening inside the wall, with a little masonry left at the corner
         if (xr > wb.max.x - 0.25f) { float d = xr - (wb.max.x - 0.25f); wx -= d; xl -= d; xr -= d; }
@@ -493,6 +501,8 @@ public static class ControlRoomSceneBuilder
     // A monitor face that no CRT_ page owns (an out-of-service screen kit: its mesh keeps the exported screen material but
     // is named OOS_Part_crt_*) would be an empty dark pane: it gets a renderer on the standby page instead, so every screen in
     // the room shows something deliberate.
+    // Each face gets its own name (STANDBY_01, STANDBY_02, ...): ScreenFocus registers and picks by screenName, and the capture shots are
+    // named after it, so two faces sharing one name collide. Every STANDBY_nn shows the same default page.
     public const string StandbyScreenName = "STANDBY";
     private static void AttachStandbyScreens(GameObject root, PlantBridge bridge)
     {
@@ -509,8 +519,8 @@ public static class ControlRoomSceneBuilder
             if (!screen) continue;
             var crt = r.gameObject.AddComponent<CrtScreenRenderer>();
             crt.bridge = bridge;
-            crt.screenName = StandbyScreenName;
             n++;
+            crt.screenName = StandbyScreenName + "_" + n.ToString("00");
         }
         Debug.Log("[Phase2SceneBuilder] " + n + " unassigned monitor faces set to the standby page.");
     }

@@ -145,7 +145,8 @@ public static class HallBuilder
         // ---- lights, hall layer only. Two warm high-bay lamps over the deck and ONE cool rack light (below): three real lights,
         // under the default pixel-light count of 4, so no object is lit by a sorted-out subset. The racks' glow cue is carried by
         // emission and haze, which need no light at all.
-        Vector3[] lightAt = { new Vector3(-4.5f, deckY + HallPalette.HighBayHeightAboveDeck, 2f), new Vector3(4.5f, deckY + HallPalette.HighBayHeightAboveDeck, 2f) };
+        double[][] lamps = HallPalette.HighBayPositions();
+        Vector3[] lightAt = { new Vector3((float)lamps[0][0], (float)lamps[0][1], (float)lamps[0][2]), new Vector3((float)lamps[1][0], (float)lamps[1][1], (float)lamps[1][2]) };
         for (int i = 0; i < lightAt.Length; i++)
         {
             var lg = new GameObject("HallLight_" + i);

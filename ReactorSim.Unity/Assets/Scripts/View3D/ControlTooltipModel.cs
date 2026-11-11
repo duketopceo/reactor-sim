@@ -84,7 +84,7 @@ namespace ReactorSim.Controls
                 double target = !double.IsNaN(pendingTarget) ? pendingTarget : ControlValues.Commanded(spec, s);
                 if (!double.IsNaN(target) && (!double.IsNaN(pendingTarget) || double.IsNaN(cur) || Math.Abs(target - cur) > 0.005))
                     t.Setpoint = "set " + Fmt(target, units, spec.Discrete) + (queued ? "  [queued]" : "");
-                t.Limits = "range " + Num(spec.Min) + " - " + Num(spec.Max) + UnitSuffix(units);
+                t.Limits = units == TierUnits ? "range " + TierName(spec.Min) + " - " + TierName(spec.Max) : "range " + Num(spec.Min) + " - " + Num(spec.Max) + UnitSuffix(units);
             }
             t.Description = row != null ? row.description : "";
             t.Note = note ?? "";
@@ -105,7 +105,7 @@ namespace ReactorSim.Controls
             }
             double lo, hi;
             if (row != null && TryRange(row.range, out lo, out hi))
-                t.Limits = "range " + Num(lo) + " - " + Num(hi) + UnitSuffix(units);
+                t.Limits = units == TierUnits ? "range " + TierName(lo) + " - " + TierName(hi) : "range " + Num(lo) + " - " + Num(hi) + UnitSuffix(units);
             t.Description = row != null ? row.description : "";
             t.Note = note ?? "";
             return t;
@@ -145,6 +145,7 @@ namespace ReactorSim.Controls
         /// <summary>Drag readout: label, the value being set with its unit, and the change since the press.</summary>
         public static string DragReadout(string label, double value, double startValue, string units, bool integer)
         {
+            if (units == TierUnits) { integer = true; value = Math.Round(value); startValue = Math.Round(startValue); }   // steps, not fractions of a tier
             double delta = value - startValue;
             string sign = delta > 0.0 ? "+" : "";
             return (label ?? "") + "\n" + Fmt(value, units, integer) + "   (" + sign + (integer ? Num(Math.Round(delta)) : ReactorSim.Ui.ReadoutFormat.Adaptive(delta)) + ")";
@@ -180,8 +181,18 @@ namespace ReactorSim.Controls
             return string.IsNullOrEmpty(units) ? "" : " " + units;
         }
 
+        // A "tier" reading is the assistant level: it reads as a name ("Advisory"), never "0.62 tier".
+        private const string TierUnits = "tier";
+        private static readonly string[] TierNames = { "Off", "Advisory", "Supervised", "Autopilot" };
+        private static string TierName(double v)
+        {
+            int i = (int)Math.Round(v);
+            return TierNames[Math.Max(0, Math.Min(TierNames.Length - 1, i))];
+        }
+
         private static string Fmt(double v, string units, bool integer)
         {
+            if (units == TierUnits && !double.IsNaN(v)) return TierName(v);
             return (integer ? Num(Math.Round(v)) : ReactorSim.Ui.ReadoutFormat.Adaptive(v)) + UnitSuffix(units);
         }
 

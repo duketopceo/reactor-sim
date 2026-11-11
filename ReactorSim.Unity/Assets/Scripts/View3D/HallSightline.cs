@@ -150,11 +150,39 @@ namespace ReactorSim
         }
 
         /// <summary>
-        /// True when no sight line from the viewpoint to the module (head centre and both flanks) or to the water over it crosses the
-        /// crane box, i.e. the girders do not cut across the view of the reactor.
+        /// Fraction (0..1) of a grid of sight lines through the observation opening, from the viewpoint, that run into the crane box
+        /// before they leave the hall. Unlike the module sight lines this sees a crane above the horizon: it is how much of the
+        /// window the girders and trolley fill, so a crane that sits across the view of the reactor is a number that can fail.
+        /// </summary>
+        public static double CraneOpeningCoverage(View v, double[][] craneBox, int grid = 12)
+        {
+            double[] eye = EyeInHallSpace(v);
+            double wallZ = -HallDimensions.PoolAxisFromWall;
+            double centreX = -HallDimensions.VesselShiftX;                   // window centre, hall space
+            double sillY = HallDimensions.RoomFloorAbovePoolFloor + HallDimensions.WindowSill;
+            int hits = 0;
+            for (int i = 0; i < grid; i++)
+                for (int j = 0; j < grid; j++)
+                {
+                    double px = centreX + (-0.5 + (i + 0.5) / grid) * HallDimensions.WindowWidth;
+                    double py = sillY + (j + 0.5) / grid * HallDimensions.WindowHeight;
+                    double t = (HallDimensions.HallRadius - eye[2]) / (wallZ - eye[2]);   // extend the ray to the far hall wall
+                    double[] far = { eye[0] + (px - eye[0]) * t, eye[1] + (py - eye[1]) * t, HallDimensions.HallRadius };
+                    if (SegmentHitsBox(new[] { px, py, wallZ }, far, craneBox[0], craneBox[1])) hits++;
+                }
+            return hits / (double)(grid * grid);
+        }
+
+        /// <summary>Most of the window the crane may fill from the stand or the seat before it counts as across the view.</summary>
+        public const double MaxCraneOpeningCoverage = 0.25;
+
+        /// <summary>
+        /// True when the crane neither crosses a sight line to the module (head centre and both flanks) or to the water over it, nor
+        /// fills more than <see cref="MaxCraneOpeningCoverage"/> of the opening seen from the viewpoint.
         /// </summary>
         public static bool CraneClearOfModule(View v, double[][] craneBox)
         {
+            if (CraneOpeningCoverage(v, craneBox) > MaxCraneOpeningCoverage) return false;
             double[] eye = EyeInHallSpace(v);
             double r = HallDimensions.ContainmentDiameter * 0.5;
             double top = HallDimensions.SightTargetHeight;

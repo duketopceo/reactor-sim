@@ -93,11 +93,15 @@ for c in data.get("captures", []):
     print(line)
 
 glow = {c.get("pose"): c for c in data.get("captures", []) if str(c.get("pose", "")).startswith("glow") and "skipped" not in c}
-if glow:
+glow_wanted = any(p.startswith("glow") for p in required)
+# The glow check is graded whenever a glow pose was captured or asked for. glowoff is the reference frame, so skipping it (or
+# idle or full) can never leave the check "partly graded": that is a failure. Only glowmid may be skipped on purpose, and the
+# monotonic check it feeds is then reported as ungraded rather than dropped without a word.
+if glow or glow_wanted:
     mult, delta_min = float(os.environ["GLOW_MULT"]), float(os.environ["GLOW_DELTA"])
     off, idle, mid, full = (glow.get(k, {}).get("cropMean") for k in ("glowoff", "glowidle", "glowmid", "glowfull"))
     if None in (off, idle, full):
-        problems.append("rack glow: needs glowoff, glowidle and glowfull captures with a cropMean")
+        problems.append("rack glow: needs glowoff, glowidle and glowfull captures with a cropMean (--allow-skip cannot waive them), so the glow check is ungraded")
     else:
         d_idle, d_full = idle - off, full - off
         d_mid = (mid - off) if mid is not None else None
@@ -109,8 +113,13 @@ if glow:
             problems.append("rack glow: full-power gain %+.4f is under %g x the idle gain %+.4f" % (d_full, mult, d_idle))
         if d_idle < -1e-6:
             problems.append("rack glow: idle is darker than the glow-off frame (%+.4f)" % d_idle)
-        if d_mid is not None and not (d_idle - 1e-6 <= d_mid <= d_full + 1e-6):
-            problems.append("rack glow: brightness is not monotonic idle %+.4f mid %+.4f full %+.4f" % (d_idle, d_mid, d_full))
+        if d_mid is not None:
+            if not (d_idle - 1e-6 <= d_mid <= d_full + 1e-6):
+                problems.append("rack glow: brightness is not monotonic idle %+.4f mid %+.4f full %+.4f" % (d_idle, d_mid, d_full))
+        elif "glowmid" in allow_skip:
+            print("  NOTE rack glow: glowmid skipped by --allow-skip, the monotonic check is NOT graded")
+        else:
+            problems.append("rack glow: no glowmid capture, the monotonic check cannot be graded (waive it with --allow-skip glowmid)")
 
 for pose in required:
     if pose not in seen and pose not in allow_skip and not any(p.startswith(pose + " skipped") for p in problems):

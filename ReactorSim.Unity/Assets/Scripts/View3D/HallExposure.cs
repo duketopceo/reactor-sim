@@ -76,6 +76,20 @@ namespace ReactorSim
         public const float HighBayHeightAboveDeck = 6.0f;
         /// <summary>Linear emission added to concrete so a far wall never goes black under a falling-off light.</summary>
         public const float ConcreteEmission = 0.04f;
+        public const float HighBayLampX = 4.5f;               // the two lamps sit at +-this x, in hall space (pool axis at the origin)
+        public const float HighBayLampZ = 2.0f;
+        /// <summary>Hall-space {x, y, z} of both high-bay lamps; HallBuilder places the real lights here and the exposure tests measure from here.</summary>
+        public static double[][] HighBayPositions()
+        {
+            double y = HallDimensions.WaterDepth + HallDimensions.DeckAboveWater + HighBayHeightAboveDeck;
+            return new[] { new[] { (double)-HighBayLampX, y, HighBayLampZ }, new[] { (double)HighBayLampX, y, HighBayLampZ } };
+        }
+        /// <summary>Distance from a hall-space point to a lamp.</summary>
+        public static double DistanceToLamp(int lamp, double x, double y, double z)
+        {
+            double[] l = HighBayPositions()[lamp];
+            return Math.Sqrt((l[0] - x) * (l[0] - x) + (l[1] - y) * (l[1] - y) + (l[2] - z) * (l[2] - z));
+        }
         public static readonly float[] ShallowWater = { 0.05f, 0.42f, 0.52f };
         public static readonly float[] DeepWater = { 0.01f, 0.12f, 0.30f };
 

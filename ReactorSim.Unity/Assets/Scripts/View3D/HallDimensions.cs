@@ -13,10 +13,11 @@ namespace ReactorSim
         public static readonly float DeckAboveWater = 0.15f;         // hall deck (pool rim) above the water: a low coaming, so it hides as little of the module as it can
         public static readonly float PoolRadius = 11.0f;
         public static readonly float HallRadius = 15.0f;             // circular hall, concrete wall
-        // Standing eye height over the water surface. Low enough that the window's 15 to 20 degree downward reach still takes in
+        // Standing eye height over the water surface (the room floor is this minus the standing eye; 2.25 - 1.65 = 0.6 m, the geometry the renders were taken with). Low enough that the window's 15 to 20 degree downward reach still takes in
         // the module head, high enough that the near pool rim does not hide it (see HallSightline.RimVisibleHeight).
-        public static readonly float GalleryEyeAboveWater = 2.2f;
-        public static readonly float EyeAboveRoomFloor = 1.6f;
+        public static readonly float GalleryEyeAboveWater = 2.25f;
+        /// <summary>Standing eye over the control-room floor. One number with <see cref="StandEyeHeight"/> (a const, so the order of the initialisers cannot matter).</summary>
+        public static float EyeAboveRoomFloor { get { return StandEyeHeight; } }
         /// <summary>Control-room floor above the pool floor.</summary>
         public static readonly float RoomFloorAbovePoolFloor = WaterDepth + GalleryEyeAboveWater - EyeAboveRoomFloor;
         /// <summary>Horizontal distance from the window wall to the pool axis.</summary>
@@ -29,8 +30,8 @@ namespace ReactorSim
         public static readonly float WindowOffsetFromDoor = 3.0f;    // opening centre, along the wall from the door centre
         public static readonly float HeaderMinWall = 0.3f;           // wall the builder keeps above the opening
         public static readonly float VesselShiftX = 2.2f;            // pool axis, from the window centre along the wall (towards the seat side)
-        public static readonly float StandEyeHeight = 1.65f;         // OperatorMath.StandingEyeHeight
-        public static readonly float SeatEyeHeight = 1.2f;           // OperatorMath.SeatedEyeHeight: the eye the player really has in the chair
+        public const float StandEyeHeight = OperatorMath.StandingEyeHeight;   // one source: the eye the walking operator really has
+        public const float SeatEyeHeight = OperatorMath.SeatedEyeHeight;      // the eye the player really has in the chair
         public static readonly float StandBackFromWall = 4.5f;       // STAND_Center distance from the window wall
         public static readonly float SeatBackFromWall = 6.1f;        // seat distance from the window wall (the seat view uses the seated eye height)
         public static readonly float StandAlongWall = -3.0f;         // stand position along the wall, from the window centre

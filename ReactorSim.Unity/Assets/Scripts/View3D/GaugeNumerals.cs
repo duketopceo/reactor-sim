@@ -36,7 +36,7 @@ public static class GaugeNumerals
         parent.SetParent(kit, false);
 
         var marks = GaugeScale.Marks(src.Min, src.Max, src.Units);
-        var right = Vector3.right;   // local +X is the face's right (the needle sweeps toward it as the value rises)
+        var right = ControlRoom3DBinder.KitFaceRight;   // the needle sweeps toward it as the value rises
         for (int i = 0; i < marks.Count; i++)
         {
             var mark = marks[i];
@@ -108,7 +108,7 @@ public static class GaugeNumerals
             // inside the strip, a little in from its ends, so the limit markers there do not sit on the numerals
             lo = Mathf.Max(-limit, lo) + BarEndInsetM;
             hi = Mathf.Min(limit, hi) - BarEndInsetM;
-            side = Vector3.left * (BarFaceWidthM * 0.14f);
+            side = -ControlRoom3DBinder.KitFaceRight * (BarFaceWidthM * 0.14f);   // toward the face's left, derived from the kit axes
         }
         float size = BarFaceWidthM * 0.15f;
         // The unit rides on the maximum only when it fits the strip's width; a long one stays in the tooltip.
