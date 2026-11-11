@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Local CI — the verification contract:
 #   Clean-room scan + scanner self-test -> Core DLL freshness -> Release build (0 warnings) -> xUnit tests -> Runner --scenario all -> Runner --verify
-#   -> [UNITY_EXE set] Unity batchmode scene build + trim-sheet binding check.
+#   -> [UNITY_EXE set] Unity batchmode scene build + scene drift guard + trim-sheet binding check.
 # Any failure exits nonzero. Runs on Linux (dotnet 8+) and Git Bash on Windows.
 #   bash scripts/ci.sh
 #   UNITY_EXE="/c/Program Files/Unity/Hub/Editor/6000.6.7f1/Editor/Unity.exe" bash scripts/ci.sh
@@ -72,8 +72,28 @@ if [ -n "${UNITY_EXE:-}" ]; then
       || { echo "Unity $method failed (log: $log)" >&2; return 1; }
     if grep -q 'error CS' "$log"; then echo "Unity compile errors (log: $log)" >&2; return 1; fi
   }
+  # Scene drift guard: the committed scenes must equal what the builders generate. Unity re-rolls fileIDs on every save
+  # (two builds of one hierarchy differ byte-wise), so compare scripts/scene-signature.sh output, not raw bytes.
+  scenes="ReactorSim.Unity/Assets/Scenes/Bootstrap.unity ReactorSim.Unity/Assets/Scenes/Menu.unity"
+  scene_guard() {
+    local rc=0 f committed built
+    for f in $scenes; do
+      committed="$(git show "HEAD:$f" | bash scripts/scene-signature.sh /dev/stdin | sha256sum | cut -d' ' -f1)"
+      built="$(bash scripts/scene-signature.sh "$f" | sha256sum | cut -d' ' -f1)"
+      if [ "$committed" != "$built" ]; then
+        echo "SCENE DRIFT: committed $f differs from the builder output." >&2
+        echo "A release player would embed a stale scene. Fix: run the Unity scene build" >&2
+        echo "  (ControlRoomSceneBuilder.BuildPhase2Scene, MenuSceneBuilder.BuildMenuScene) and commit the regenerated scene." >&2
+        rc=1
+      fi
+    done
+    return $rc
+  }
   say "Unity: Phase-2 scene build"
   unity ControlRoomSceneBuilder.BuildPhase2Scene
+  unity MenuSceneBuilder.BuildMenuScene
+  say "Unity: committed scenes match builder output (drift guard)"
+  scene_guard
   say "Unity: trim-sheet binding"
   unity BlenderAssetPostprocessor.VerifyTrimSheets
   say "Unity: control map"
