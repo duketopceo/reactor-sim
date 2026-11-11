@@ -355,6 +355,10 @@ public static class ControlRoomSceneBuilder
         if (detailR != null && Mathf.Abs(detailR.bounds.center.x - doorX) > 0.5f) windowSide = detailR.bounds.center.x > doorX ? -1f : 1f;
         else windowSide = (wb.max.x - doorX) >= (doorX - wb.min.x) - 0.01f ? 1f : -1f;
         float wx = doorX + windowSide * WindowOffsetFromDoor;
+        bool usedDetail = detailR != null && Mathf.Abs(detailR.bounds.center.x - doorX) > 0.5f;
+        Debug.Log($"[Phase2SceneBuilder] window side {(windowSide > 0f ? "+x" : "-x")} of the door ({(usedDetail ? "opposite the wall detail" : "fallback: roomier side")}).");
+        if (usedDetail && Mathf.Abs(detailR.bounds.center.z - zInner) > 0.6f)
+            Debug.LogWarning("[Phase2SceneBuilder] WallMimic_Plate is not on the window wall; the window side may not match the detail side.");
         float xl = wx - WindowWidth * 0.5f, xr = wx + WindowWidth * 0.5f;
         // keep the wider opening inside the wall, with a little masonry left at the corner
         if (xr > wb.max.x - 0.25f) { float d = xr - (wb.max.x - 0.25f); wx -= d; xl -= d; xr -= d; }

@@ -154,7 +154,7 @@ public class CaptureMode : MonoBehaviour
                 {
                     var r = crt.GetComponent<Renderer>();
                     if (r == null) continue;
-                    if (crt.screenName.StartsWith("STANDBY"))   // every STANDBY_nn face shows the same page: shoot the first only
+                    if (crt.screenName.StartsWith("STANDBY", System.StringComparison.Ordinal))   // every STANDBY_nn face shows the same page: shoot the first only
                     {
                         if (standbyShot) continue;
                         standbyShot = true;

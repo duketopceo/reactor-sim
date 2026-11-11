@@ -5,7 +5,7 @@
 # itself. With --baseline <dir> (a capture run of the same poses before the hall change) it also grades the hall's runtime
 # budget (KTD9): the gallery and gallery-away captures must both exist in both runs. Exit 0: every check passed. 
 # --budget-only grades only the gallery and gallery-away poses (a run made with -poses gallery,away). --only a,b requires only
-# those poses (for example glowoff,glowidle,glowfull). When glow poses are present, the rack glow must rise from off through idle and mid to full power.
+# those poses (for example glowoff,glowidle,glowfull). When glow poses are present or requested, the rack glow must rise from off through idle and mid to full power.
 # Exit 1: a check failed (each failure is named). Exit 2: bad usage or nothing to grade.
 set -uo pipefail
 
@@ -119,7 +119,7 @@ if glow or glow_wanted:
         elif "glowmid" in allow_skip:
             print("  NOTE rack glow: glowmid skipped by --allow-skip, the monotonic check is NOT graded")
         else:
-            problems.append("rack glow: no glowmid capture, the monotonic check cannot be graded (waive it with --allow-skip glowmid)")
+            problems.append("rack glow: glowmid is missing or has no cropMean, the monotonic check cannot be graded (waive it with --allow-skip glowmid)")
 
 for pose in required:
     if pose not in seen and pose not in allow_skip and not any(p.startswith(pose + " skipped") for p in problems):

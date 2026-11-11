@@ -183,11 +183,11 @@ namespace ReactorSim.Controls
 
         // A "tier" reading is the assistant level: it reads as a name ("Advisory"), never "0.62 tier".
         private const string TierUnits = "tier";
-        private static readonly string[] TierNames = { "Off", "Advisory", "Supervised", "Autopilot" };
         private static string TierName(double v)
         {
-            int i = (int)Math.Round(v);
-            return TierNames[Math.Max(0, Math.Min(TierNames.Length - 1, i))];
+            if (double.IsNaN(v)) return "--";
+            int max = Enum.GetValues(typeof(AssistTier)).Length - 1;
+            return ((AssistTier)Math.Max(0, Math.Min(max, (int)Math.Round(v)))).ToString();
         }
 
         private static string Fmt(double v, string units, bool integer)
