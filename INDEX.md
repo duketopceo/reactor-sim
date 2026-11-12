@@ -36,6 +36,7 @@ Runner targets net8.0; on machines with only newer runtimes set
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — layering, tick structure, host-authoritative co-op
 - [docs/TESTING.md](docs/TESTING.md) — determinism contract, scenario and check inventory, CI
+- [ROADMAP.md](ROADMAP.md) — where the project is headed: next, later and ongoing work
 - [docs/STARTUP.md](docs/STARTUP.md) — cold shutdown to power on the grid: the 13-step checklist, why each step comes where it does, measured game minutes, pace guidance
 - [docs/PLAYTEST.md](docs/PLAYTEST.md) — launching the Windows build, the playtest checklist, controls, and fetching session logs
 - [docs/testing/simulation-verification.md](docs/testing/simulation-verification.md) — `--verify` design, fixtures, known defects
