@@ -9,21 +9,19 @@ built in Blender and bound to live sim state.
 
 ## 1. Environment (do this first — nothing builds without it)
 
-Blender is **not installed** on omarchy-max (no pacman/AUR package on Arch ARM).
+**Resolved 2026-11-11:** agents run on the Windows box. Blender 5.2.2 LTS is installed at
+`C:\Program Files\Blender Foundation\Blender 5.2\blender.exe` and the headless verify already
+passed (`PLANTEQUIP_SAVED`, 46 objects). Invoke it by full path or add it to PATH:
 
-Options, in order of preference:
+```
+"C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" -b --python-exit-code 1 --python Blender/scripts/make_plant_equipment.py
+```
 
-1. **Flatpak (recommended, stays on this machine):**
-   `flatpak install flathub org.blender.Blender`
-   aarch64 build exists; headless `blender -b --python ...` works the same.
-   Note: flatpak Blender path is `flatpak run org.blender.Blender` — wrap scripts accordingly.
-2. **Windows box:** the pipeline was authored against `Blender 5.2` at
-   `C:\Program Files\Blender Foundation\Blender 5.2\blender.exe` — if the agent runs on
-   Windows, paths in `Blender/README.md` already work.
-3. blender.org tarball (aarch64 Linux builds are published).
+(The `HIPEW initialization failed` warning on launch is harmless — no GPU compute needed for FBX export.)
 
-Verify: `blender --version` then `blender -b --python-exit-code 1 --python Blender/scripts/make_plant_equipment.py`
-must print `PLANTEQUIP_SAVED`.
+Fallbacks if a Linux run is wanted later: `flatpak install flathub org.blender.Blender` on
+omarchy-max (aarch64 build exists; headless works the same via `flatpak run org.blender.Blender`),
+or the blender.org aarch64 tarball.
 
 ## 2. Read these first (in order)
 
@@ -34,7 +32,7 @@ must print `PLANTEQUIP_SAVED`.
 | `Blender/README.md` | Pipeline: generate → export FBX → sync into Unity |
 | `Blender/scripts/lib_common.py`, `lib_kits.py`, `lib_materials.py` | Existing helpers — reuse, don't reinvent |
 | `Blender/scripts/make_plant_equipment.py` | Current P01–P08 blockout (89 lines of primitives — the thing being replaced/upgraded) |
-| `~/nucleares-re/RESEARCH.md` + `~/nucleares-re/sections/reactor-core-fuel.md` | Behavioral dossier: rod banks, fuel bays, drive mechanics, visual feedback (Cherenkov glow, bubbles, turbulence). **Prose only — see §4** |
+| `C:\Users\kimba\nucleares-re\RESEARCH.md` + `C:\Users\kimba\nucleares-re\sections\reactor-core-fuel.md` | Behavioral dossier: rod banks, fuel bays, drive mechanics, visual feedback (Cherenkov glow, bubbles, turbulence). Synced from omarchy-max 2026-11-11. **Prose only — see §4** |
 | `ReactorSim.Unity/Assets/Scripts/View3D/PlantEquipmentBinder.cs` | The Unity binding contract — object names it searches for |
 
 ## 3. The binding contract (do not break)
@@ -58,7 +56,7 @@ Sim state available to drive "living" motion (`PlantSnapshot`): `Power`, `FuelTe
 
 - **Clean room.** Original assets only. Reference material = the dossier prose above +
   public engineering knowledge (PWR/SMR cutaways, fuel assembly photos, CRDM diagrams).
-  **NEVER open `~/nucleares-re/decompiled/`** — repo AGENTS.md forbids it for implementation work.
+  **NEVER open `C:\Users\kimba\nucleares-re\decompiled\`** — repo AGENTS.md forbids it for implementation work.
 - **Conventions** (`plant-and-assets.md` §1–2, §5):
   - Names: `RS_<CAT>_<Family>_<Variant>[_<Index>]` (CAT table in doc; `VES` vessel/cutaway,
     `ROD` rod drive, `SGN` steam generator, `PRI` primary, `TUR` turbine, `VAL` valves…).
@@ -92,10 +90,10 @@ extend, don't fork.
 ## 6. Verification loop (every asset)
 
 ```
-blender -b --python Blender/scripts/<script>.py          # build .blend
-blender -b <file>.blend --python <turntable_render>.py   # render preview
+"C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" -b --python Blender/scripts/<script>.py          # build .blend
+"C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" -b <file>.blend --python <turntable_render>.py   # render preview
 # visual critique -> iterate
-blender -b --python Blender/scripts/export_unity.py -- <Name>
+"C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" -b --python Blender/scripts/export_unity.py -- <Name>
 bash Blender/scripts/sync-blender-to-unity.sh
 # Unity: batchmode import check + Play Mode binder check
 bash scripts/ci.sh                                       # before any commit
@@ -111,23 +109,23 @@ A render you haven't looked at is not done. Keep turntable renders in `Blender/p
 ```
 You are building accurate 3D reactor assets for ReactorSim, a deterministic PWR plant
 simulator (Unity 6 front-end, procedural Blender pipeline). Work in
-/home/lukekimball/Documents/github/personal/reactor-sim.
+C:\Users\kimba\reactor-sim (Windows; use forward slashes or quoted paths in shell commands).
+
+Blender is at "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" — invoke by full
+path (or add its dir to PATH). Headless verify already passes; re-run it yourself first:
+  "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" -b --python-exit-code 1 --python Blender/scripts/make_plant_equipment.py
 
 READ FIRST, in order:
 1. AGENTS.md (repo root) — clean-room rules are hard constraints
 2. docs/design/plant-and-assets.md — the asset spec (naming, pivots, LOD, export)
 3. Blender/README.md and Blender/scripts/{lib_common,lib_kits,lib_materials}.py
 4. Blender/scripts/make_plant_equipment.py — current blockout you are upgrading
-5. ~/nucleares-re/sections/reactor-core-fuel.md — behavioral reference for the
-   "living reactor" (rod banks, fuel handling, glow/bubbles/turbulence cues).
-   NEVER open anything under ~/nucleares-re/decompiled/.
+5. C:\Users\kimba\nucleares-re\sections\reactor-core-fuel.md (+ RESEARCH.md in the
+   same dir) — behavioral reference for the "living reactor" (rod banks, fuel
+   handling, glow/bubbles/turbulence cues). NEVER open anything under
+   C:\Users\kimba\nucleares-re\decompiled/.
 6. ReactorSim.Unity/Assets/Scripts/View3D/PlantEquipmentBinder.cs — Unity finds
    moving parts by name prefix; preserve or deliberately migrate these names.
-
-ENVIRONMENT: Blender is not installed on this machine. Install it first:
-  flatpak install flathub org.blender.Blender   (or use the Windows Blender 5.2
-  if you are on that box). Verify headless:
-  blender -b --python-exit-code 1 --python Blender/scripts/make_plant_equipment.py
 
 TASK (Phase A — fuel assembly, control rod, CRDM drive):
 - Model a PWR-style fuel assembly: grid spacers, ~100+ rodlets (instanced/linked

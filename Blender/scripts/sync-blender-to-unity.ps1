@@ -6,16 +6,17 @@ $ExportDir = Join-Path $RepoRoot "Blender\exports"
 $Dest = Join-Path $RepoRoot "ReactorSim.Unity\Assets\Blender"
 New-Item -ItemType Directory -Force -Path $Dest | Out-Null
 $Copied = 0
-foreach ($fbx in @("ControlRoom.fbx", "PanelKits.fbx", "PlantEquipment.fbx")) {
+foreach ($fbx in @("ControlRoom.fbx", "PanelKits.fbx", "PlantEquipment.fbx", "ReactorCore.fbx", "VesselInternals.fbx", "RotatingEquipment.fbx")) {
   $src = Join-Path $ExportDir $fbx
   if (Test-Path $src) {
     Copy-Item -LiteralPath $src -Destination (Join-Path $Dest $fbx) -Force
     Write-Host "Copied $fbx"
     $Copied++
   } else {
-    Write-Host "Missing $src (run Blender export first)"
+    throw "Missing $src (run Blender export first)"
   }
 }
+Copy-Item -LiteralPath (Join-Path $RepoRoot "assets\manifest.csv") -Destination (Join-Path $Dest "ReactorManifest.csv") -Force
 $TexSrc = Join-Path $ExportDir "Textures"
 $TexDest = Join-Path $Dest "Textures"
 if (Test-Path $TexSrc) {

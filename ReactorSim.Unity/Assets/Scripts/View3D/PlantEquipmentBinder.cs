@@ -9,6 +9,7 @@ using ReactorSim.Instruments;
 public class PlantEquipmentBinder : MonoBehaviour
 {
     public PlantBridge bridge;
+    private ReactorAssetMotion reactorMotion;
 
     private Transform flywheel;
     private Material rackCellMat;
@@ -35,13 +36,14 @@ public class PlantEquipmentBinder : MonoBehaviour
     private Transform porvAnchor;
     private ParticleSystem porvSteam;
     private ParticleSystem sgSteam;
-    private readonly System.Collections.Generic.List<Transform> crdmRods = new System.Collections.Generic.List<Transform>();
 
     private void Awake()
     {
         if (bridge == null)
             bridge = FindAnyObjectByType<PlantBridge>();
         BindTransforms();
+        reactorMotion = GetComponent<ReactorAssetMotion>();
+        if (reactorMotion != null) reactorMotion.Bind();
         if (porvAnchor != null)
         {
             porvSteam = MakeSteamJet(porvAnchor.gameObject);
@@ -74,7 +76,7 @@ public class PlantEquipmentBinder : MonoBehaviour
     {
         foreach (Transform t in GetComponentsInChildren<Transform>(true))
         {
-            if (t.name.StartsWith("Flywheel_PrimaryFlow") || t.name == "Flywheel")
+            if (t.name == "Flywheel_PrimaryFlow" || t.name == "Flywheel")
                 flywheel = t;
             else if (t.name.StartsWith("RackGlow_Cells_"))
             {
@@ -93,8 +95,6 @@ public class PlantEquipmentBinder : MonoBehaviour
             }
             else if (t.name.StartsWith("VFX_PORV_SteamJet") || t.name.StartsWith("VFX_SGRelief"))
                 porvAnchor = t;
-            else if (t.name.StartsWith("BIND_BAR_BankInsertion_"))
-                crdmRods.Add(t);
         }
     }
 
@@ -110,6 +110,7 @@ public class PlantEquipmentBinder : MonoBehaviour
         }
         // Power is a fraction of rated (1.0 = rated); GlowMapping turns it into emission, haze and light, with a dim floor at 0.
         double power = PowerOverride.HasValue ? PowerOverride.Value : s.Power;
+        if (reactorMotion != null) reactorMotion.Apply(s, power, GlowOff, Time.deltaTime);
         float shimmer = GlowOff ? 0f : 0.94f + 0.06f * Mathf.Sin(Time.time * 2.3f);
         if (rackCellMat != null && rackCellMat.HasProperty("_EmissionColor"))
             rackCellMat.SetColor("_EmissionColor", RackCellColour * ((float)GlowMapping.RackEmission(power) * shimmer));
@@ -136,13 +137,6 @@ public class PlantEquipmentBinder : MonoBehaviour
                 if (relief && !porvSteam.isPlaying) porvSteam.Play();
                 if (!relief && porvSteam.isPlaying) porvSteam.Stop();
             }
-        }
-        for (int i = 0; i < crdmRods.Count && i < 4; i++)
-        {
-            double ins = s.BankInsertion != null && i < s.BankInsertion.Length ? s.BankInsertion[i] : 1.0;
-            var rod = crdmRods[i];
-            rod.localPosition = new Vector3(rod.localPosition.x, rod.localPosition.y,
-                Mathf.Lerp(0f, 1.0f, (float)ins) + rod.localPosition.z * 0f);
         }
     }
 }

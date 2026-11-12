@@ -27,3 +27,5 @@ ReactorSim.Unity/Assets/_Recovery/
 .agentflow/
 # Python bytecode from Blender scripts
 __pycache__/
+Blender/previews/
+*.blend1

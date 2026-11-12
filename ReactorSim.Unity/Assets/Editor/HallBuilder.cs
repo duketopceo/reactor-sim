@@ -161,6 +161,7 @@ public static class HallBuilder
         }
         FuelRackMesh.BuildSharedLight(T, new Vector3(0f, ledge + HallDimensions.RackCellHeight + 1.6f, Rp - 2.3f));
 
+        HallAssetPlacer.Build(root);
         FinishHall(root, windowBounds);
         return root;
     }
@@ -171,7 +172,7 @@ public static class HallBuilder
         foreach (var tr in root.GetComponentsInChildren<Transform>(true))
         {
             tr.gameObject.layer = ControlRoomSceneBuilder.HallLayer;
-            if (tr.GetComponent<MeshRenderer>() != null)
+            if (tr.GetComponent<MeshRenderer>() != null && !HallAssetPlacer.IsMoving(tr))
                 GameObjectUtility.SetStaticEditorFlags(tr.gameObject, StaticEditorFlags.BatchingStatic);
         }
         foreach (var l in root.GetComponentsInChildren<Light>(true)) l.cullingMask = 1 << ControlRoomSceneBuilder.HallLayer;

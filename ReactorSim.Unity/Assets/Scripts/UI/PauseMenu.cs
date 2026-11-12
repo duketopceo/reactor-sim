@@ -30,7 +30,7 @@ public class PauseMenu : MonoBehaviour
     private void Update()
     {
         // Escape leaves a focused screen first; it must not also open this menu (either Update order works).
-        if (Input.GetKeyDown(KeyCode.Escape) && !ScreenFocus.ConsumesEscape && !DiegeticInteractable.InputConsumedThisFrame)
+        if (Input.GetKeyDown(KeyCode.Escape) && !ScreenFocus.ConsumesEscape && !ReactorInspectionView.ConsumesEscape && !DiegeticInteractable.InputConsumedThisFrame)
         {
             if (open) Close(); else Open();
         }
