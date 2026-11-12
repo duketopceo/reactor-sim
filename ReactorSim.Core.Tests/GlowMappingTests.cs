@@ -8,6 +8,15 @@ namespace ReactorSim.Core.Tests
     public class GlowMappingTests
     {
         [Fact]
+        public void FuelTemperatureCueClampsAndIsFinite()
+        {
+            Assert.Equal(0.0, GlowMapping.FuelTemperatureLevel(60));
+            Assert.Equal(1.0, GlowMapping.FuelTemperatureLevel(605));
+            Assert.Equal(0.0, GlowMapping.FuelTemperatureLevel(double.NaN));
+            Assert.Equal(1.0, GlowMapping.FuelTemperatureLevel(double.PositiveInfinity));
+            Assert.InRange(GlowMapping.FuelTemperatureLevel(300), 0.0, 1.0);
+        }
+        [Fact]
         public void ZeroPowerIsTheFloorAndFullPowerIsTheMax()
         {
             Assert.Equal(GlowMapping.Floor, GlowMapping.Glow(0.0), 12);

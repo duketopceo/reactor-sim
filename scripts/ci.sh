@@ -102,6 +102,8 @@ if [ -n "${UNITY_EXE:-}" ]; then
   unity InstrumentCheck.Run
   say "Unity: reactor hall (module scale, layers, budgets, rebuild)"
   unity HallCheck.Run
+  say "Unity: authored reactor endpoints, motion and metadata"
+  unity ReactorAssetCheck.Run
   say "Unity: layout (reach, view angle, occlusion)"
   unity LayoutCheck.Run
   say "Unity: round trip (every bound control, play mode)"
@@ -109,6 +111,8 @@ if [ -n "${UNITY_EXE:-}" ]; then
   if [ "${ROOM_RENDER:-}" = "1" ]; then
     say "Unity: room render (play mode, with graphics)"
     unity_gfx RoomRender.Run
+    say "Unity: live reactor inspection"
+    unity_gfx ReactorAssetPlayCheck.Run
   fi
 else
   say "Unity checks skipped (set UNITY_EXE to run them)"

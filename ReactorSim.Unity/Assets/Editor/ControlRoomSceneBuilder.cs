@@ -215,6 +215,8 @@ public static class ControlRoomSceneBuilder
             cam.gameObject.AddComponent<CameraShake>();
         if (cam.GetComponent<OperatorController>() == null)
             cam.gameObject.AddComponent<OperatorController>();
+        if (cam.GetComponent<ReactorInspectionView>() == null)
+            cam.gameObject.AddComponent<ReactorInspectionView>();
 
         // Audio root
         if (GameObject.Find("AudioRoot") == null)

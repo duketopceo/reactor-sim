@@ -15,7 +15,8 @@ Writes `Blender/ControlRoom.blend`.
 
 Open `ControlRoom.blend` in Blender, run `Blender/scripts/export_unity.py`
 (or headless: `blender -b --python Blender/scripts/export_unity.py`),
-then drop `exports/ControlRoom.fbx` into `ReactorSim.Unity/Assets/Models/`.
+then sync with `Blender/scripts/sync-blender-to-unity.sh` (or `.ps1`) into
+`ReactorSim.Unity/Assets/Blender/`.
 
 ## Collections
 
@@ -42,3 +43,34 @@ A smoothness; imported linear), `T_<mat>_Emission` (emissive masters only), plus
 `ReactorSim.Unity/Assets/Blender/Textures/`, where `BlenderAssetPostprocessor`
 binds them onto the FBX materials of the same name and re-imports the FBX when a
 map changes. The .blend files are opened read-only and never re-saved.
+
+## Living reactor assets
+
+Run from the repository root using the installed Blender executable (`blender`
+below). `--python-exit-code 1` makes script errors fail the build.
+
+```bash
+blender -b --python-exit-code 1 --python Blender/scripts/make_reactor_core.py
+blender -b --python-exit-code 1 --python Blender/scripts/make_vessel_internals.py
+blender -b --python-exit-code 1 --python Blender/scripts/make_rotating_equipment.py
+blender -b --python-exit-code 1 --python Blender/scripts/check_reactor_assets.py -- --write-manifest
+blender -b --python-exit-code 1 --python Blender/scripts/check_reactor_assets.py
+blender -b --python-exit-code 1 --python Blender/scripts/export_unity.py -- ReactorCore VesselInternals RotatingEquipment
+bash Blender/scripts/sync-blender-to-unity.sh
+```
+
+PowerShell sync is also supported. Both sync scripts fail on missing required FBX
+or manifest files. Existing room/panel assets are preserved by these generators.
+The exporter validates names, triangulates meshes and exports custom properties;
+preview lights/cameras never enter reactor FBX files.
+
+Preview a whole asset or a nozzle detail without saving the source blend:
+
+```bash
+blender -b Blender/ReactorCore.blend --python-exit-code 1 --python Blender/scripts/render_turntable.py -- Blender/previews/ReactorCore
+blender -b Blender/ReactorCore.blend --python-exit-code 1 --python Blender/scripts/render_turntable.py -- Blender/previews/FuelNozzle 1.3 RS_VES_FuelAssembly_00_PIV top
+```
+
+Previews and Blender backups are ignored; select images for review deliberately.
+See [bindings and checks](../docs/design/reactor-core-assets.md) for live-view
+controls, scene integration and the authoritative metadata contract.

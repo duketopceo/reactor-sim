@@ -86,7 +86,7 @@ public static class HallCheck
         f += Report(cont.bounds.max.y > vessel.bounds.max.y && cont.bounds.min.y <= vessel.bounds.min.y, "containment wraps the vessel from base to head");
         var water = Find(hall, "Pool_Surface");
         f += Report(water != null && cont.bounds.max.y < water.bounds.max.y, "the containment head is under the water surface");
-        f += Report(Find(hall, "Smr_Pumps") != null && Find(hall, "Smr_Pipes") != null && Find(hall, "Smr_Skin") != null,
+        f += Report(Find(hall, "RS_PRI_PumpMotor_01_LOD0") != null && Find(hall, "Smr_Pipes") != null && Find(hall, "Smr_Skin") != null,
             "pump housings, pipes and the translucent containment skin exist");
         f += Report(Find(hall, "Crane_Bridge") != null && Find(hall, "CableTray") != null, "polar crane and cable tray exist");
         return f;

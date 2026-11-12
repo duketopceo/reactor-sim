@@ -9,6 +9,14 @@ namespace ReactorSim.Instruments
 {
     public static class GlowMapping
     {
+        // Original gameplay colour cue, not blackbody radiation or a fuel-temperature instrument.
+        public static double FuelTemperatureLevel(double temperatureC)
+        {
+            if (double.IsNaN(temperatureC) || temperatureC <= 60.0) return 0.0;
+            if (temperatureC >= 605.0) return 1.0;
+            return (temperatureC - 60.0) / 545.0;
+        }
+
         /// <summary>Glow level at zero (or invalid) power.</summary>
         public const double Floor = 0.08;
         /// <summary>Glow level at rated power and above.</summary>

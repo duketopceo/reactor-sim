@@ -52,17 +52,7 @@ public static class SmrModuleMesh
 
         // ---- canned recirculation pump motors on the vessel shoulder (visible through the slot) ----
         var pumps = new MeshBuilder();
-        for (int i = 0; i < HallDimensions.PumpHousingCount; i++)
-        {
-            float a = SlotCentre + Mathf.Deg2Rad * (-39f + 26f * i);
-            var d = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
-            Vector3 foot = d * (R + 0.34f) + Vector3.up * (vt - 5.6f);
-            pumps.AddTube(foot, foot + Vector3.up * 2.6f, 0.34f, 16, true);                                 // motor housing
-            pumps.AddTube(foot + Vector3.up * 2.6f, foot + Vector3.up * 3.0f, 0.22f, 12, true);             // terminal cap
-            pumps.AddTube(foot + Vector3.up * 0.9f, foot + Vector3.up * 1.0f, 0.40f, 16, true);             // cooling-jacket ring
-            pumps.AddTube(d * (R - 0.05f) + Vector3.up * (vt - 5.2f), d * (R + 0.34f) + Vector3.up * (vt - 5.2f), 0.18f, 10, true);   // suction stub
-        }
-        pumps.Attach(lod0.transform, "Smr_Pumps", m.dark);
+        // Motors are now the imported RS_PRI_PumpMotor meshes; no hidden proxy body is generated.
 
         // ---- penetrations through the containment wall: CVCS in/out, safety injection, vent ----
         var pipes = new MeshBuilder();
@@ -163,7 +153,15 @@ public static class SmrModuleMesh
             r.Add(R * Mathf.Cos(phi));
             y.Add(yTopCyl + upperH * Mathf.Sin(phi));
         }
-        b.AddLathe(r.ToArray(), y.ToArray(), seg);
+        // Keep both heads and the physical envelope; open the straight wall towards the existing containment slot.
+        b.AddLathe(r.GetRange(0, cap + 1).ToArray(), y.GetRange(0, cap + 1).ToArray(), seg);
+        b.AddArcShell(R, vb + lowerH, yTopCyl,
+            SlotCentre + SlotHalfWidthDeg * Mathf.Deg2Rad,
+            SlotCentre - SlotHalfWidthDeg * Mathf.Deg2Rad + 2f * Mathf.PI, seg, false);
+        b.AddArcShell(R - 0.06f, vb + lowerH, yTopCyl,
+            SlotCentre + SlotHalfWidthDeg * Mathf.Deg2Rad,
+            SlotCentre - SlotHalfWidthDeg * Mathf.Deg2Rad + 2f * Mathf.PI, seg, true);
+        b.AddLathe(r.GetRange(cap + 2, cap + 1).ToArray(), y.GetRange(cap + 2, cap + 1).ToArray(), seg);
     }
 
     // Domed containment head from y0 up by height.
