@@ -109,6 +109,9 @@ public static class InstrumentCheck
             }
         }
         Debug.Log("[InstrumentCheck] " + crts + " CRT screens, " + gauges + " gauge/bar pivots inspected");
+        int roomTris, roomRenderers, roomLights;
+        HallBuilder.Stats(room, out roomTris, out roomRenderers, out roomLights);
+        Debug.Log($"[InstrumentCheck] control-room totals: {roomTris} tris, {roomRenderers} renderers, {roomLights} lights");
         return failures;
     }
 
