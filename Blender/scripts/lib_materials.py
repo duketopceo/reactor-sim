@@ -32,6 +32,8 @@ def build_materials():
     materials["M_ScramRed"] = make_mat("M_ScramRed", (0.45, 0.05, 0.05), metallic=0.20, roughness=0.35)
     materials["M_FloorDark"] = make_mat("M_FloorDark", (0.10, 0.11, 0.13), metallic=0.05, roughness=0.55)
     materials["M_GaugeNeedle"] = make_mat("M_GaugeNeedle", (0.75, 0.10, 0.10), metallic=0.0, roughness=0.40)
+    # 9. Painted bezel / instrument trim (dials, CRT bezels, switch collars)
+    materials["M_BezelBlack"] = make_mat("M_BezelBlack", (0.04, 0.05, 0.06), metallic=0.75, roughness=0.40)
     # Assert all 8 core materials exist
     required = ["M_PanelSlate", "M_ConsoleBeige", "M_BrushedSteel", "M_DarkRubber", "M_CrtScreen", "M_GaugeFace", "M_AnnunciatorEmissive", "M_ContainmentGlass"]
     for r in required:
