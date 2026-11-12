@@ -122,6 +122,7 @@ public static class ControlRoomSceneBuilder
             // Ok controls and malformed names both get an interactable so a malformed name is reported at play.
             // Hit area: at least HitArea.MinPixels on screen at the default field of view and the playtest window height (R7).
             FitCollider(t, (float)HitArea.MinSideMetres(OperatorMath.FovDefault, 900.0));
+            ExpandColliderToAux(t);
             var inter = t.gameObject.AddComponent<DiegeticInteractable>();
             inter.binder = binder;
             DesignData.Row row;
@@ -672,6 +673,42 @@ public static class ControlRoomSceneBuilder
             }
         }
         return has;
+    }
+
+    // The kit's auxiliary cover pivots (PART_Guard / PART_ScramCover) are siblings of the INT_ pivot, so the fitted
+    // box would miss clicks on the guard or SCRAM cover. Grow the box to include their meshes (local space of `t`).
+    private static void ExpandColliderToAux(Transform t)
+    {
+        var ctl = FindCtlRoot(t);
+        var box = t.GetComponent<BoxCollider>();
+        if (ctl == null || box == null) return;
+        Bounds b = new Bounds(box.center, box.size);
+        bool any = false;
+        foreach (Transform aux in ctl.GetComponentsInChildren<Transform>(true))
+        {
+            if (aux == t || aux.IsChildOf(t)) continue;
+            string n = aux.name;
+            if (!n.EndsWith("_PART_Guard", System.StringComparison.OrdinalIgnoreCase)
+                && !n.EndsWith("_PART_ScramCover", System.StringComparison.OrdinalIgnoreCase)) continue;
+            foreach (var mf in aux.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (mf.sharedMesh == null) continue;
+                var mr = mf.GetComponent<MeshRenderer>();
+                if (mr == null || !mr.enabled) continue;
+                Bounds mb = mf.sharedMesh.bounds;
+                Vector3 c = mb.center, e = mb.extents;
+                for (int i = 0; i < 8; i++)
+                {
+                    var corner = c + new Vector3((i & 1) == 0 ? -e.x : e.x, (i & 2) == 0 ? -e.y : e.y, (i & 4) == 0 ? -e.z : e.z);
+                    Vector3 p = t.InverseTransformPoint(mf.transform.TransformPoint(corner));
+                    b.Encapsulate(p);
+                    any = true;
+                }
+            }
+        }
+        if (!any) return;
+        box.center = b.center;
+        box.size = b.size;
     }
 
     // Sizes a BoxCollider on `t` to the meshes at or below it (an empty pivot has none of its own); never thinner than

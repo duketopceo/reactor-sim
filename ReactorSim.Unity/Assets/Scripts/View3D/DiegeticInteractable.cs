@@ -42,6 +42,9 @@ public class DiegeticInteractable : MonoBehaviour
     public ParseStatus Status { get; private set; }
     public bool OutOfService { get { return outOfService; } }
 
+    /// <summary>True while a guarded button's guard is lifted; the binder animates the kit's cover pivot from this.</summary>
+    public bool GuardOpen { get { return guarded && Time.unscaledTime < guardLiftedUntil; } }
+
     /// <summary>The control being dragged, or null.</summary>
     public static DiegeticInteractable Dragging { get; private set; }
     /// <summary>True while any control is being dragged; OperatorController ignores mouse-look and walking then.</summary>
@@ -208,6 +211,8 @@ public class DiegeticInteractable : MonoBehaviour
         InputLog.Event(InputLogFormat.PressRejected, "row", RowName, "reason", reason);
         var n = binder != null ? binder : (notifier != null ? notifier : (notifier = FindAnyObjectByType<ControlRoom3DBinder>()));
         if (n != null) n.Notice(RejectNote(reason));
+        // Tactile refusal: a brief plunger dip on button specs, no state change (transient travel only).
+        if (n != null && Spec != null && Spec.Style == ControlStyle.Button) n.RejectPress(this);
     }
 
     private void OnMouseDown()
