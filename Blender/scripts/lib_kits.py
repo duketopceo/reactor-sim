@@ -545,13 +545,32 @@ def _k19(ctx):
 @_register("K13")
 def _k13(ctx):
     m = ctx.m
-    ctx.box("Housing", (0, 0.12, 0), (0.34, 0.24, 0.26), m["M_PanelSlate"])
-    ctx.box("Bezel", (0, 0.265, 0), (0.40, 0.05, 0.30), m["M_PanelSlate"])
-    # CrtScreenRenderer lays text on the thinnest bounds axis (Y here) of the CRT_* mesh
-    scr = ctx.box("Screen", (0, 0.292, 0), (0.32, 0.006, 0.24), m["M_CrtScreen"])
+    # Deep console CRT: housing, picture-frame bezel, recessed emissive face, vents, corner screws.
+    # The Screen mesh keeps its ~0.32 x 0.24 active face; CrtScreenRenderer targets it by name + thinnest axis,
+    # so nothing else here may carry the CRT_ name or the M_CrtScreen material, and no glass may cover the face
+    # (the text plane sits 3 mm proud of it).
+    ctx.box("Housing", (0, 0.10, 0), (0.36, 0.20, 0.28), m["M_PanelSlate"])
+    ctx.box("HousingLip", (0, 0.205, 0), (0.37, 0.01, 0.29), m["M_BezelBlack"])  # shadow gap under the bezel
+    # Bezel frame: four rails out to the 0.40 x 0.30 face edges around the screen opening, front face at y = 0.29.
+    for sz, nm in ((1, "BezelTop"), (-1, "BezelBottom")):
+        ctx.box(nm, (0, 0.26, sz * 0.14), (0.40, 0.06, 0.02), m["M_BezelBlack"])
+    for sx, nm in ((1, "BezelLeft"), (-1, "BezelRight")):
+        ctx.box(nm, (sx * 0.19, 0.26, 0), (0.02, 0.06, 0.26), m["M_BezelBlack"])
+    # Screen recessed ~20 mm behind the bezel face.
+    scr = ctx.box("Screen", (0, 0.266, 0), (0.32, 0.008, 0.234), m["M_CrtScreen"])
     scr.name = ctx.mover
     ctx.set_mover(scr)
-    ctx.box("PowerLED", (0.17, 0.293, -0.135), (0.012, 0.006, 0.012), m["M_GreenGlow"])
+    # Vent slots on both housing side faces (the front is fully occupied by lip + bezel).
+    for sx in (-1, 1):
+        for i in range(3):
+            ctx.box("Vent%d_%d" % (sx, i), (sx * 0.181, 0.10, -0.06 + i * 0.06),
+                    (0.004, 0.06, 0.010), m["M_DarkRubber"])
+    # Corner screws on the bezel face.
+    for sx in (-1, 1):
+        for sz in (-1, 1):
+            ctx.cyl("Screw%d_%d" % (sx, sz), (sx * 0.185, 0.291, sz * 0.14), 0.006, 0.004,
+                    m["M_BrushedSteel"], axis="Y", verts=12)
+    ctx.box("PowerLED", (0.16, 0.291, -0.14), (0.012, 0.004, 0.012), m["M_GreenGlow"])
 
 
 @_register("K16")
