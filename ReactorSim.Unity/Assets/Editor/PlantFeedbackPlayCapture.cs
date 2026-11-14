@@ -56,6 +56,8 @@ public static class PlantFeedbackPlayCapture
                 return;
             }
             if (EditorApplication.timeSinceStartup - SessionState.GetFloat(Started, 0) < 6) return;
+            if (GameObject.Find("ReactorInspectionPrompt") != null)
+                throw new InvalidOperationException("The idle reactor inspection prompt is still visible");
             hall.SetActive(true);
             var bubbles = ControlRoomSceneBuilder.FindDeep(hall.transform, "Pool_VisibleBubbles");
             var ps = bubbles != null ? bubbles.GetComponent<ParticleSystem>() : null;
@@ -76,6 +78,10 @@ public static class PlantFeedbackPlayCapture
             var feed = ControlRoomSceneBuilder.FindDeep(map, "Pipe_Feedwater_00");
             var dump = ControlRoomSceneBuilder.FindDeep(map, "Pipe_SteamDump_00");
             if (view == null || rod == null || feed == null || dump == null) throw new InvalidOperationException("Missing live wall binding or bypass");
+            var panel = ControlRoomSceneBuilder.FindDeep(map, "LiveMetricsPlate");
+            var text = ControlRoomSceneBuilder.FindDeep(map, "LiveMetrics");
+            if (panel == null || text == null || text.GetComponent<TMPro.TextMeshPro>() == null)
+                throw new InvalidOperationException("Live metrics panel missing");
             var state = new PlantSnapshot { BankInsertion = new[] { 0.0, 0.0, 0.0, 0.0 }, FeedwaterDeliveredFrac = 0.0 };
             view.ApplySnapshot(state);
             var withdrawn = rod.position;
@@ -86,10 +92,19 @@ public static class PlantFeedbackPlayCapture
             Color idle = properties.GetColor("_Color");
             state.BankInsertion[3] = 1.0;
             state.FeedwaterDeliveredFrac = 1.0;
+            state.Power = .42;
+            state.FuelTempC = 456;
             view.ApplySnapshot(state);
             feedRenderer.GetPropertyBlock(properties);
             if (Vector3.Distance(withdrawn, rod.position) < 0.01f || properties.GetColor("_Color").maxColorComponent <= idle.maxColorComponent)
                 throw new InvalidOperationException("Live rod or delivered feedwater binding did not respond");
+            if (!text.GetComponent<TMPro.TextMeshPro>().text.Contains("POWER 42.0 %") ||
+                !text.GetComponent<TMPro.TextMeshPro>().text.Contains("FUEL 456.0 C"))
+                throw new InvalidOperationException("Live metrics do not match the supplied snapshot");
+            var metrics = text.GetComponent<TMPro.TextMeshPro>();
+            metrics.ForceMeshUpdate();
+            if (metrics.textBounds.size.x > metrics.rectTransform.rect.width || metrics.textBounds.size.y > metrics.rectTransform.rect.height)
+                throw new InvalidOperationException("Live metrics overflow their backing panel");
             view.ApplySnapshot(view.bridge != null ? view.bridge.GetSnapshot() : null);
             var renderers = map.GetComponentsInChildren<Renderer>();
             if (renderers.Length == 0) throw new InvalidOperationException("No wall renderers");
@@ -98,6 +113,9 @@ public static class PlantFeedbackPlayCapture
             cam.transform.position = seat.position;
             cam.transform.LookAt(bounds.center);
             Capture(cam, Path.Combine(dir, "wall.png"));
+            cam.transform.position = panel.position + map.forward * 2.2f;
+            cam.transform.LookAt(panel.position);
+            Capture(cam, Path.Combine(dir, "wall-metrics-close.png"));
             Debug.Log("[PlantFeedbackPlayCapture] PASS bubbles=" + ps.particleCount + " " + dir);
             SessionState.SetInt(Stage, 3);
             EditorApplication.isPlaying = false;

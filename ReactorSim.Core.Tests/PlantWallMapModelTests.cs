@@ -4,6 +4,22 @@ using Xunit;
 public class PlantWallMapModelTests
 {
     [Fact]
+    public void SummaryUsesLiveReadingsAndMarksUnavailableData()
+    {
+        var s = new PlantSnapshot { Mode = "Power", Power = .42, FuelTempC = 456, PrimaryPressureBar = 150,
+            PrimarySatMarginC = 30, PrimaryFlowFrac = .8, FeedwaterDeliveredFrac = .3, GeneratorKw = 1234 };
+        string summary = PlantWallMapModel.Summary(s, ReactorSim.Instruments.LampContext.Default);
+        Assert.Contains("POWER 42.0 %", summary);
+        Assert.Contains("FUEL 456.0 C", summary);
+        Assert.Contains("PRIMARY 150.0 bar", summary);
+        Assert.Contains("FEED 30.0 % rated", summary);
+        Assert.Contains("OUTPUT 1234 kW", summary);
+        s.FuelTempC = double.NaN;
+        Assert.Contains("FUEL N/M", PlantWallMapModel.Summary(s, ReactorSim.Instruments.LampContext.Default));
+        Assert.Equal("PLANT DATA UNAVAILABLE", PlantWallMapModel.Summary(null, ReactorSim.Instruments.LampContext.Default));
+    }
+
+    [Fact]
     public void PumpAndPressurizerReportTheirOwnConditions()
     {
         var s = new PlantSnapshot { PrimaryFlowFrac = 1, PrimaryPressureBar = 90, PrimarySatMarginC = 30 };

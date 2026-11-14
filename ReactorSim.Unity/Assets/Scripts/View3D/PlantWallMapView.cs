@@ -15,6 +15,7 @@ public sealed class PlantWallMapView : MonoBehaviour
     private TextMeshPro metrics;
     private Renderer fuel;
     private ControlRoom3DBinder roomBinder;
+    private Material metricsMaterial;
 
     private void Awake()
     {
@@ -36,18 +37,48 @@ public sealed class PlantWallMapView : MonoBehaviour
             }
             if (t.name.StartsWith("RodBank_") && t.parent != null) rods[t] = t.localPosition;
             if (t.name == "Core_Fuel") fuel = t.GetComponent<Renderer>();
-            if (t.name == "MetricsSocket")
-            {
-                var go = new GameObject("LiveMetrics");
-                go.transform.SetParent(t, false);
-                metrics = go.AddComponent<TextMeshPro>();
-                metrics.fontSize = 1.2f;
-                metrics.alignment = TextAlignmentOptions.Top;
-                metrics.textWrappingMode = TextWrappingModes.NoWrap;
-                metrics.color = ThemeColors.TextBody;
-                metrics.rectTransform.sizeDelta = new Vector2(7f, 0.8f);
-            }
         }
+        MountMetrics();
+    }
+
+    private void MountMetrics()
+    {
+        Renderer board = null;
+        foreach (var r in GetComponentsInChildren<Renderer>(true))
+            if (r.name == "Board_Back") { board = r; break; }
+        if (board == null) return;
+        // The wrapper has a uniform scale and faces into the room; the plate is flush beneath the diagram.
+        Vector3 center = transform.InverseTransformPoint(board.bounds.center);
+        float width = board.bounds.size.x / Mathf.Abs(transform.lossyScale.x);
+        float height = board.bounds.size.y / Mathf.Abs(transform.lossyScale.y);
+        float face = fuel != null && Vector3.Dot(fuel.bounds.center - board.bounds.center, transform.forward) < 0f ? -1f : 1f;
+        var plate = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        plate.name = "LiveMetricsPlate";
+        plate.transform.SetParent(transform, false);
+        plate.transform.localPosition = new Vector3(center.x, center.y - height * 0.5f - 0.48f, center.z + face * 0.08f);
+        plate.transform.localScale = new Vector3(width, 0.92f, 0.12f);
+        Destroy(plate.GetComponent<Collider>());
+        plate.layer = gameObject.layer;
+        metricsMaterial = new Material(Shader.Find("Unlit/Color"));
+        metricsMaterial.color = ThemeColors.SurfaceScreen;
+        plate.GetComponent<Renderer>().sharedMaterial = metricsMaterial;
+        var go = new GameObject("LiveMetrics");
+        go.layer = gameObject.layer;
+        go.transform.SetParent(transform, false);
+        go.transform.localPosition = plate.transform.localPosition + new Vector3(0f, 0.37f, face * 0.075f);
+        go.transform.localRotation = face > 0f ? Quaternion.Euler(0f, 180f, 0f) : Quaternion.identity;
+        metrics = go.AddComponent<TextMeshPro>();
+        metrics.fontSize = 1.5f;
+        metrics.alignment = TextAlignmentOptions.Top;
+        metrics.textWrappingMode = TextWrappingModes.NoWrap;
+        metrics.color = ThemeColors.TextBody;
+        metrics.rectTransform.pivot = new Vector2(0.5f, 1f);
+        metrics.rectTransform.sizeDelta = new Vector2(width - 0.24f, 0.75f);
+    }
+
+    private void OnDestroy()
+    {
+        if (metricsMaterial != null) Destroy(metricsMaterial);
     }
 
     private void Update()
@@ -113,23 +144,7 @@ public sealed class PlantWallMapView : MonoBehaviour
             pair.Value.SetPropertyBlock(block);
         }
         if (metrics == null) return;
-        if (s == null) { metrics.text = "PLANT DATA UNAVAILABLE"; return; }
-        int alarms = 0;
         var alarmContext = roomBinder != null ? roomBinder.CurrentLampContext() : LampContext.Default;
-        foreach (string name in ReactorSim.Instruments.LampPredicates.AlarmNames)
-            if (ReactorSim.Instruments.LampPredicates.Evaluate(name, s, alarmContext)) alarms++;
-        metrics.text = (s.Mode ?? "N/M") + "   ALARMS " + alarms + "   " + (s.Scrammed ? "SCRAM" : "NO SCRAM") + "\n" +
-            "POWER " + PlantWallMapModel.Reading(s.Power * 100, "%") +
-            "   FUEL " + PlantWallMapModel.Reading(s.FuelTempC, "C") +
-            "   PRIMARY " + PlantWallMapModel.Reading(s.PrimaryPressureBar, "bar") +
-            "   SG " + PlantWallMapModel.Reading(s.SecondaryPressureBar, "bar") + "\n" +
-            "FLOW " + PlantWallMapModel.Reading(s.PrimaryFlowFrac * 100, "%") +
-            "   TURBINE " + PlantWallMapModel.Reading(s.TurbineRpm, "rpm", 0) +
-            "   GRID " + PlantWallMapModel.Reading(s.GridFrequencyHz, "Hz") +
-            "   COND " + PlantWallMapModel.Reading(s.CondenserPressureBar, "bar", 2) + "\n" +
-            "RHO " + PlantWallMapModel.Reading(s.TotalReactivityPcm, "pcm", 0) +
-            "   BORON " + PlantWallMapModel.Reading(s.BoronPpm, "ppm", 0) +
-            "   FEED " + PlantWallMapModel.Reading(s.FeedwaterDeliveredFrac * 100, "% rated") +
-            "   OUTPUT " + PlantWallMapModel.Reading(s.GeneratorKw, "kW", 0);
+        metrics.text = PlantWallMapModel.Summary(s, alarmContext);
     }
 }
