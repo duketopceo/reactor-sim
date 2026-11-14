@@ -31,7 +31,7 @@ public static class ReactorAssetCheck
                     var withdrawn = pivot.parent.Find("RS_ROD_Bank" + letter + "_Withdrawn_PIV");
                     var inserted = pivot.parent.Find("RS_ROD_Bank" + letter + "_Inserted_PIV");
                     Vector3 expected = Vector3.Lerp(withdrawn.position, inserted.position,
-                        (float)snapshot.BankInsertion[bank]);
+                        (float)snapshot.BankInsertion[3 - bank]); // snapshot order is D, C, B, A
                     Require(Vector3.Distance(pivot.position, expected) < 0.001f, "bank " + letter + " follows its own actual insertion");
                     Require(inserted.position.y < withdrawn.position.y - 3.8f, "bank " + letter + " inserts downward in metres");
                     foreach (var renderer in pivot.GetComponentsInChildren<Renderer>())
