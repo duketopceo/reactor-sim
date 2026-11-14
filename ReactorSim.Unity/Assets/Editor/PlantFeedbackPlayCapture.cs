@@ -64,6 +64,7 @@ public static class PlantFeedbackPlayCapture
             var soundscape = UnityEngine.Object.FindAnyObjectByType<ReactorSoundscape>();
             if (soundscape == null || soundscape.GetComponentsInChildren<AudioSource>().Length < 6)
                 throw new InvalidOperationException("Reactor sound layers are missing");
+            CheckReliefBindings();
             string dir = Path.GetFullPath(Path.Combine(Application.dataPath, "../../out/plant-feedback-play"));
             Directory.CreateDirectory(dir);
             Capture(cam, Path.Combine(dir, "reactor.png"));
@@ -102,6 +103,29 @@ public static class PlantFeedbackPlayCapture
             EditorApplication.isPlaying = false;
         }
         catch (Exception ex) { Debug.LogError("[PlantFeedbackPlayCapture] FAIL " + ex); Finish(1); }
+    }
+
+    private static void CheckReliefBindings()
+    {
+        // The currently placed hall has no relief anchors, so exercise both authored anchor types in a temporary fixture.
+        var fixture = new GameObject("ReliefBindingFixture");
+        fixture.SetActive(false);
+        var primary = new GameObject("VFX_PORV_SteamJet_Anchor");
+        primary.transform.SetParent(fixture.transform, false);
+        var secondary = new GameObject("VFX_SGRelief_SteamJet_Anchor_1");
+        secondary.transform.SetParent(fixture.transform, false);
+        var binder = fixture.AddComponent<PlantEquipmentBinder>();
+        fixture.SetActive(true);
+        var priJet = primary.GetComponentInChildren<ParticleSystem>();
+        var secJet = secondary.GetComponentInChildren<ParticleSystem>();
+        if (priJet == null || secJet == null) throw new InvalidOperationException("Relief fixture jets not bound");
+        binder.ApplyReliefState(true, false);
+        if (priJet.emission.rateOverTime.constant <= 0 || secJet.emission.rateOverTime.constant != 0)
+            throw new InvalidOperationException("Primary relief incorrectly drives secondary relief");
+        binder.ApplyReliefState(false, true);
+        if (priJet.emission.rateOverTime.constant != 0 || secJet.emission.rateOverTime.constant <= 0)
+            throw new InvalidOperationException("Secondary relief incorrectly drives primary relief");
+        UnityEngine.Object.Destroy(fixture);
     }
 
     private static void Capture(Camera cam, string path)

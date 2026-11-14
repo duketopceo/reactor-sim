@@ -4,6 +4,18 @@ using Xunit;
 public class ReactorSoundMixTests
 {
     [Fact]
+    public void TurbineSteamSoundTracksDeliveredSteamRatherThanThrottle()
+    {
+        var s = new PlantSnapshot { SteamDemandFrac = 1, TurbineSteamKW = Physics.RatedThermalKW * .5 };
+        Assert.Equal(.5f, ReactorSoundMix.From(s).TurbineSteam);
+        s.TurbineTripped = true;
+        s.TurbineSteamKW = 0;
+        Assert.Equal(0, ReactorSoundMix.From(s).TurbineSteam);
+        s.TurbineSteamKW = double.NaN;
+        Assert.Equal(0, ReactorSoundMix.From(s).TurbineSteam);
+    }
+
+    [Fact]
     public void ReactsToPlantStateAndStopsReliefWhenClosed()
     {
         var s = new PlantSnapshot { Power = 0, PrimaryFlowFrac = 0, CoolingWaterFrac = 0, VacuumPumpFrac = 0 };

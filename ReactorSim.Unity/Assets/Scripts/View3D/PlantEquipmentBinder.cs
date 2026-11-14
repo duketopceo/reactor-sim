@@ -33,9 +33,8 @@ public class PlantEquipmentBinder : MonoBehaviour
         GlowOff = false;
     }
 
-    private Transform porvAnchor;
-    private ParticleSystem porvSteam;
-    private ParticleSystem sgSteam;
+    private readonly System.Collections.Generic.List<ParticleSystem> primaryReliefJets = new System.Collections.Generic.List<ParticleSystem>();
+    private readonly System.Collections.Generic.List<ParticleSystem> secondaryReliefJets = new System.Collections.Generic.List<ParticleSystem>();
 
     private void Awake()
     {
@@ -44,11 +43,6 @@ public class PlantEquipmentBinder : MonoBehaviour
         BindTransforms();
         reactorMotion = GetComponent<ReactorAssetMotion>();
         if (reactorMotion != null) reactorMotion.Bind();
-        if (porvAnchor != null)
-        {
-            porvSteam = MakeSteamJet(porvAnchor.gameObject);
-            sgSteam = MakeSteamJet(porvAnchor.gameObject); // same anchor drives both relief paths
-        }
     }
 
     private static ParticleSystem MakeSteamJet(GameObject parent)
@@ -57,6 +51,7 @@ public class PlantEquipmentBinder : MonoBehaviour
         var go = new GameObject(parent.name + "_Steam");
         go.transform.SetParent(parent.transform, false);
         var ps = go.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         var main = ps.main;
         main.startLifetime = 0.9f;
         main.startSpeed = 2.2f;
@@ -93,8 +88,10 @@ public class PlantEquipmentBinder : MonoBehaviour
                 var l = t.GetComponent<Light>();
                 if (l != null) { rackLights.Add(l); rackLightBase.Add(l.intensity); }
             }
-            else if (t.name.StartsWith("VFX_PORV_SteamJet") || t.name.StartsWith("VFX_SGRelief"))
-                porvAnchor = t;
+            else if (t.name.StartsWith("VFX_PORV_SteamJet"))
+                primaryReliefJets.Add(MakeSteamJet(t.gameObject));
+            else if (t.name.StartsWith("VFX_SGRelief"))
+                secondaryReliefJets.Add(MakeSteamJet(t.gameObject));
         }
     }
 
@@ -123,20 +120,25 @@ public class PlantEquipmentBinder : MonoBehaviour
         float lightScale = (float)GlowMapping.LightScale(power) * shimmer;
         for (int i = 0; i < rackLights.Count; i++)
             if (rackLights[i] != null) rackLights[i].intensity = rackLightBase[i] * lightScale;
-        if (porvAnchor != null)
+        ApplyReliefState(s.ReliefOpen, s.SecondaryReliefOpen);
+    }
+
+    // Kept separate so each authored relief path can be checked independently in play mode.
+    public void ApplyReliefState(bool primaryOpen, bool secondaryOpen)
+    {
+        SetReliefJets(primaryReliefJets, primaryOpen);
+        SetReliefJets(secondaryReliefJets, secondaryOpen);
+    }
+
+    private static void SetReliefJets(System.Collections.Generic.List<ParticleSystem> jets, bool open)
+    {
+        foreach (var jet in jets)
         {
-            bool relief = s.ReliefOpen || s.SecondaryReliefOpen;
-            porvAnchor.gameObject.SetActive(relief);
-            if (porvAnchor.gameObject.activeSelf)
-                porvAnchor.Rotate(0f, 90f * Time.deltaTime, 0f);
-            // Steam particle emission tracks relief state (VFX jet, no prefab asset).
-            if (porvSteam != null)
-            {
-                var e = porvSteam.emission;
-                e.rateOverTime = relief ? 60f : 0f;
-                if (relief && !porvSteam.isPlaying) porvSteam.Play();
-                if (!relief && porvSteam.isPlaying) porvSteam.Stop();
-            }
+            if (jet == null) continue;
+            var emission = jet.emission;
+            emission.rateOverTime = open ? 60f : 0f;
+            if (open && !jet.isPlaying) jet.Play();
+            else if (!open && jet.isPlaying) jet.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         }
     }
 }

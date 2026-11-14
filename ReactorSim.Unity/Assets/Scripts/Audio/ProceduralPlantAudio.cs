@@ -290,8 +290,10 @@ public class ProceduralPlantAudio : MonoBehaviour
         }
         if (steamLoop != null)
         {
-            steamLoop.volume = Mathf.Clamp01((float)s.SteamDemandFrac) * 0.7f;
-            steamLoop.pitch = 0.7f + Mathf.Clamp01((float)s.SteamDemandFrac) * 0.6f;
+            // Follow steam delivered to the turbine, not the throttle command: a trip closes its stop valve.
+            float steam = ReactorSoundMix.From(s).TurbineSteam;
+            steamLoop.volume = steam * 0.7f;
+            steamLoop.pitch = 0.7f + steam * 0.6f;
         }
         if (turbineLoop != null)
         {
