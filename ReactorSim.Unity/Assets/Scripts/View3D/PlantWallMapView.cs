@@ -14,10 +14,12 @@ public sealed class PlantWallMapView : MonoBehaviour
     private MaterialPropertyBlock block;
     private TextMeshPro metrics;
     private Renderer fuel;
+    private ControlRoom3DBinder roomBinder;
 
     private void Awake()
     {
         if (bridge == null) bridge = FindAnyObjectByType<PlantBridge>();
+        roomBinder = GetComponentInParent<ControlRoom3DBinder>();
         block = new MaterialPropertyBlock();
         foreach (var t in GetComponentsInChildren<Transform>(true))
         {
@@ -113,8 +115,9 @@ public sealed class PlantWallMapView : MonoBehaviour
         if (metrics == null) return;
         if (s == null) { metrics.text = "PLANT DATA UNAVAILABLE"; return; }
         int alarms = 0;
+        var alarmContext = roomBinder != null ? roomBinder.CurrentLampContext() : LampContext.Default;
         foreach (string name in ReactorSim.Instruments.LampPredicates.AlarmNames)
-            if (ReactorSim.Instruments.LampPredicates.Evaluate(name, s, ReactorSim.Instruments.LampContext.Default)) alarms++;
+            if (ReactorSim.Instruments.LampPredicates.Evaluate(name, s, alarmContext)) alarms++;
         metrics.text = (s.Mode ?? "N/M") + "   ALARMS " + alarms + "   " + (s.Scrammed ? "SCRAM" : "NO SCRAM") + "\n" +
             "POWER " + PlantWallMapModel.Reading(s.Power * 100, "%") +
             "   FUEL " + PlantWallMapModel.Reading(s.FuelTempC, "C") +

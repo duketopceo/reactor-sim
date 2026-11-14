@@ -44,6 +44,52 @@ public static class PlantWallMapModel
         return Math.Max(0, Math.Min(1, s.BankInsertion[index]));
     }
 
+    // Compact component readouts use actual snapshot values; command values are labeled explicitly.
+    // Returns N/M for missing sensors rather than filling in plausible-looking numbers.
+    public static string ComponentReadout(string name, PlantSnapshot s)
+    {
+        if (s == null) return "N/M";
+        switch (name)
+        {
+            case "Reactor":
+                return "PWR " + Reading(s.Power * 100, "%") + "  FUEL " + Reading(s.FuelTempC, "C") +
+                    "\nRHO " + Reading(s.TotalReactivityPcm, "pcm", 0) + "  PERIOD " + Reading(s.PeriodSeconds, "s") +
+                    "\nRODS A " + Reading(BankInsertion("A", s) * 100, "%", 0) + " B " + Reading(BankInsertion("B", s) * 100, "%", 0) +
+                    " C " + Reading(BankInsertion("C", s) * 100, "%", 0) + " D " + Reading(BankInsertion("D", s) * 100, "%", 0);
+            case "Safety": return s.Scrammed ? "SCRAM ACTIVE" : "SCRAM CLEAR  |  SAFETY FLOW N/M";
+            case "PrimaryPump":
+                return "FLOW " + Reading(s.PrimaryFlowFrac * 100, "%") + "  TEMP " + Reading(s.PrimaryTempC, "C") +
+                    "\nLEVEL " + Reading(s.PrimaryLevelFrac * 100, "%");
+            case "Pressurizer":
+                return "PRESS " + Reading(s.PrimaryPressureBar, "bar") + "  MARGIN " + Reading(s.PrimarySatMarginC, "C") +
+                    "\nHEAT " + Reading(s.HeaterPowerFrac * 100, "%") + "  SPRAY " + Reading(s.SprayFrac * 100, "%") +
+                    "  RELIEF " + (s.ReliefOpen ? "OPEN" : "CLOSED");
+            case "SteamGenerator":
+                return "PRESS " + Reading(s.SecondaryPressureBar, "bar") + "  TEMP " + Reading(s.SecondaryTempC, "C") +
+                    "\nLEVEL " + Reading(s.SecondaryLevelFrac * 100, "%") + "  RELIEF " + (s.SecondaryReliefOpen ? "OPEN" : "CLOSED") +
+                    "\nTHROTTLE " + Reading(s.SteamDemandFrac * 100, "% command") + "  DUMP " + Reading(s.DumpSteamKW, "kW heat", 0);
+            case "Turbine":
+                return "SPEED " + Reading(s.TurbineRpm, "rpm", 0) + "  STEAM " + Reading(s.TurbineSteamKW, "kW heat", 0) +
+                    "\n" + (s.TurbineTripped ? "TRIPPED" : "NOT TRIPPED");
+            case "Generator":
+                return "OUTPUT " + Reading(s.GeneratorKw, "kW", 0) + "  " + (s.GeneratorSynced ? "SYNCED" : "BREAKER OPEN");
+            case "Grid":
+                return "FREQ " + Reading(s.GridFrequencyHz, "Hz", 2) + "  OUTPUT " + Reading(s.GridOutputFrac * 100, "% rated");
+            case "Condenser":
+                return "PRESS " + Reading(s.CondenserPressureBar, "bar", 2) + "  HOTWELL " + Reading(s.HotwellInventoryFrac * 100, "%") +
+                    "\nVACUUM PUMP " + Reading(s.VacuumPumpFrac * 100, "% command");
+            case "Cooling": return "COOLING " + Reading(s.CoolingWaterFrac * 100, "%");
+            case "FeedPump":
+                return "DELIVERED " + Reading(s.FeedwaterDeliveredFrac * 100, "% rated") +
+                    "\nPUMP " + Reading(s.FeedwaterFlowFrac * 100, "% command") +
+                    "  SUPPLY " + Reading(s.FeedwaterAvailabilityFrac * 100, "%");
+            case "Chemistry":
+                return "BORON " + Reading(s.BoronPpm, "ppm", 0) + "  PH " + Reading(s.Ph, "", 2) +
+                    "\nCHEMISTRY FLOW N/M";
+            default: return "N/M";
+        }
+    }
+
     public static Status Primary(PlantSnapshot s)
     {
         if (s == null || !Finite(s.PrimaryPressureBar) || !Finite(s.PrimaryFlowFrac) || !Finite(s.PrimarySatMarginC)) return Status.Unavailable;
@@ -70,12 +116,16 @@ public static class PlantWallMapModel
             case "Reactor":
                 if (!Finite(s.Power) || !Finite(s.FuelTempC)) return Status.Unavailable;
                 return s.Scrammed || LampPredicates.Evaluate("FUEL_TEMP_HI", s, c) || LampPredicates.Evaluate("HIGH_FLUX", s, c) ? Status.Alarm : Status.Normal;
-            case "Safety": return s.Scrammed ? Status.Alarm : Status.Normal;
-            case "PrimaryPump": return Primary(s);
+            case "Safety": return s.Scrammed ? Status.Alarm : Status.Unavailable;
+            case "PrimaryPump":
+                if (!Finite(s.PrimaryFlowFrac)) return Status.Unavailable;
+                if (s.PrimaryFlowFrac <= 0) return Status.Offline;
+                return LampPredicates.Evaluate("RCP_LOW_FLOW", s, c) || LampPredicates.Evaluate("FLOW_LO", s, c) ? Status.Warning : Status.Normal;
             case "Pressurizer":
-                var primary = Primary(s);
-                return primary == Status.Unavailable || primary == Status.Alarm ? primary :
-                    s.ReliefOpen ? Status.Warning : primary;
+                if (!Finite(s.PrimaryPressureBar) || !Finite(s.PrimarySatMarginC)) return Status.Unavailable;
+                if (LampPredicates.Evaluate("PRI_PRESS_HI", s, c)) return Status.Alarm;
+                return LampPredicates.Evaluate("PRI_PRESS_LO", s, c) || LampPredicates.Evaluate("SUBCOOL_LO", s, c) ||
+                    s.ReliefOpen ? Status.Warning : Status.Normal;
             case "SteamGenerator":
                 if (!Finite(s.SecondaryPressureBar) || !Finite(s.SecondaryLevelFrac)) return Status.Unavailable;
                 if (LampPredicates.Evaluate("SG_LOW_LEVEL_TRIP", s, c)) return Status.Alarm;

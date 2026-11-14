@@ -4,6 +4,36 @@ using Xunit;
 public class PlantWallMapModelTests
 {
     [Fact]
+    public void PumpAndPressurizerReportTheirOwnConditions()
+    {
+        var s = new PlantSnapshot { PrimaryFlowFrac = 1, PrimaryPressureBar = 90, PrimarySatMarginC = 30 };
+        Assert.Equal(PlantWallMapModel.Status.Normal, PlantWallMapModel.Component("PrimaryPump", s));
+        Assert.Equal(PlantWallMapModel.Status.Warning, PlantWallMapModel.Component("Pressurizer", s));
+        s.PrimaryFlowFrac = 0;
+        s.PrimaryPressureBar = 150;
+        Assert.Equal(PlantWallMapModel.Status.Offline, PlantWallMapModel.Component("PrimaryPump", s));
+        Assert.Equal(PlantWallMapModel.Status.Normal, PlantWallMapModel.Component("Pressurizer", s));
+        s.ReliefOpen = true;
+        Assert.Equal(PlantWallMapModel.Status.Warning, PlantWallMapModel.Component("Pressurizer", s));
+        Assert.Equal(PlantWallMapModel.Status.Unavailable, PlantWallMapModel.Component("Safety", s));
+    }
+
+    [Fact]
+    public void DetailedReadoutsDistinguishActualFromCommandAndHandleMissingData()
+    {
+        var s = new PlantSnapshot { FeedwaterDeliveredFrac = .2, FeedwaterFlowFrac = .9,
+            BankInsertion = new[] { .1, .2, .3, .4 }, FuelTempC = double.NaN };
+        string feed = PlantWallMapModel.ComponentReadout("FeedPump", s);
+        Assert.Contains("DELIVERED 20.0 % rated", feed);
+        Assert.Contains("PUMP 90.0 % command", feed);
+        string reactor = PlantWallMapModel.ComponentReadout("Reactor", s);
+        Assert.Contains("FUEL N/M", reactor);
+        Assert.Contains("RODS A 40 % B 30 % C 20 % D 10 %", reactor);
+        Assert.Equal("N/M", PlantWallMapModel.ComponentReadout("Reactor", null));
+        Assert.Equal("N/M", PlantWallMapModel.ComponentReadout("Unknown", s));
+    }
+
+    [Fact]
     public void RoutesUseOnlyTheirOwnModeledActivity()
     {
         var s = new PlantSnapshot { PrimaryFlowFrac = .4, FeedwaterFlowFrac = .9, FeedwaterDeliveredFrac = .2, CoolingWaterFrac = .7, GridOutputFrac = 1.2, TurbineSteamKW = Physics.RatedThermalKW * .6, DumpSteamKW = Physics.RatedThermalKW * .25, TurbineRpm = Physics.TurbineRatedRpm * .8 };

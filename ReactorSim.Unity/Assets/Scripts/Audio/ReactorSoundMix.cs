@@ -4,7 +4,7 @@ using ReactorSim;
 // Pure sound levels derived from the same snapshot as the instruments.
 public struct ReactorSoundMix
 {
-    public float Core, Water, Relief, Cooling, Generator, DetectorRate;
+    public float Core, Water, Relief, Cooling, Generator, DetectorRate, TurbineSteam;
 
     private static float Unit(double value)
     {
@@ -20,6 +20,7 @@ public struct ReactorSoundMix
         return new ReactorSoundMix {
             Core = 0.035f + 0.12f * (float)Math.Sqrt(power),
             Water = 0.025f + 0.15f * flow,
+            TurbineSteam = Unit(s.TurbineSteamKW / Physics.RatedThermalKW),
             Relief = s.ReliefOpen || s.SecondaryReliefOpen ? 0.22f : 0,
             Cooling = 0.10f * cooling,
             Generator = s.GeneratorSynced ? 0.12f * Unit(s.GridOutputFrac) : 0,
