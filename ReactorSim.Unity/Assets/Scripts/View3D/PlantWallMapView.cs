@@ -27,10 +27,11 @@ public sealed class PlantWallMapView : MonoBehaviour
                 var go = new GameObject("LiveMetrics");
                 go.transform.SetParent(t, false);
                 metrics = go.AddComponent<TextMeshPro>();
-                metrics.fontSize = 0.55f;
-                metrics.alignment = TextAlignmentOptions.Center;
-                metrics.color = Color.white;
-                metrics.rectTransform.sizeDelta = new Vector2(7f, 0.65f);
+                metrics.fontSize = 1.2f;
+                metrics.alignment = TextAlignmentOptions.Top;
+                metrics.textWrappingMode = TextWrappingModes.NoWrap;
+                metrics.color = ThemeColors.TextBody;
+                metrics.rectTransform.sizeDelta = new Vector2(7f, 0.8f);
             }
         }
     }
@@ -43,11 +44,11 @@ public sealed class PlantWallMapView : MonoBehaviour
             Color color;
             switch (PlantWallMapModel.Component(pair.Key, s))
             {
-                case PlantWallMapModel.Status.Normal: color = new Color(0.1f, 0.8f, 0.3f); break;
-                case PlantWallMapModel.Status.Warning: color = new Color(1f, 0.6f, 0.05f); break;
-                case PlantWallMapModel.Status.Alarm: color = Color.red; break;
-                case PlantWallMapModel.Status.Offline: color = new Color(0.3f, 0.45f, 0.6f); break;
-                default: color = Color.gray; break;
+                case PlantWallMapModel.Status.Normal: color = ThemeColors.StatusOk; break;
+                case PlantWallMapModel.Status.Warning: color = ThemeColors.StatusCaution; break;
+                case PlantWallMapModel.Status.Alarm: color = ThemeColors.StatusCritical; break;
+                case PlantWallMapModel.Status.Offline: color = ThemeColors.StatusNormal; break;
+                default: color = ThemeColors.TextDim; break;
             }
             pair.Value.GetPropertyBlock(block);
             block.SetColor("_Color", color);

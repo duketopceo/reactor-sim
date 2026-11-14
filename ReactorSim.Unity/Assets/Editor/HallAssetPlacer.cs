@@ -52,7 +52,7 @@ public static class HallAssetPlacer
         var light = lightObject.AddComponent<Light>();
         light.type = LightType.Point;
         light.color = new Color(0.18f, 0.52f, 1f);
-        light.range = 6f;
+        light.range = 9f;
         light.intensity = 0.6f;
         light.shadows = LightShadows.None;
         hall.AddComponent<ReactorAssetMotion>();

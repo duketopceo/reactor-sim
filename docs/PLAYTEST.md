@@ -105,12 +105,13 @@ not exist, and exits 2 when the host is unreachable. It only reads from the Wind
 
 ## Reactor hall (the window in the south wall)
 
-The window looks down from a gallery about 3 m over the water into a circular hall with a 22 m deep pool. It is 4 m wide
-and runs from nearly the floor to 2.35 m, because from the standing spot (4.5 m back) and the seat (6 m back) it can only look
-about 19 and 15 degrees down; the pool is placed so the module head sits inside that reach from both and shows over the near pool rim (checked by
-`HallSightline`, a pure test, and by `HallCheck`). From the stand and the seat you see the module's head, the pump shoulders and
-the steam lines under the surface. The deep body of the vessel fades into the water, which is why it is only seen close
-to the rail. The crane is parked behind the pool, out of the line of sight.
+The wide window is an underwater observation pane into a 22 m deep pool. Its sightline is aimed at the fuel and lower rod-drive
+region, with blue water tint and rising bubbles as visual cues. The window is behind the operator's chair, so stand and turn to
+look through it. Press **F8** for closer live views of the fuel, rod drives, pumps and turbine display.
+
+The whole-plant overview panel is on the wall to the left of the door when facing it from inside. Its lamps and summary readings
+follow live plant state; the diagram is schematic. Reactor hum, water, detector ticks, cooling, relief and generator sounds follow
+the plant alongside the existing pump, turbine, control, alarm and voice sounds. The Escape menu's master volume controls them all.
 
 - **The module.** A small modular reactor of the pumped integral type: a 2.7 m wide, 18.8 m tall reactor vessel standing in
   a 4.5 m wide containment shell, in the pool with the containment head just under the water. The steam generators and the

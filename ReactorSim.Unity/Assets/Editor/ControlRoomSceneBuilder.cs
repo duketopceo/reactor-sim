@@ -186,18 +186,29 @@ public static class ControlRoomSceneBuilder
 
         // The overview is a separate read-only surface, rebuilt with the room.
         var wallMapPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(FbxDir + "/PlantOverview.fbx");
-        var northWall = FindDeep(crRoot.transform, "Wall_North");
-        var northRenderer = northWall != null ? northWall.GetComponent<Renderer>() : null;
-        if (wallMapPrefab != null && northRenderer != null)
+        var door = FindDeep(crRoot.transform, "Door_Leaf");
+        var doorRenderer = door != null ? door.GetComponent<Renderer>() : null;
+        var glass = FindDeep(crRoot.transform, "Window_Glass");
+        var glassRenderer = glass != null ? glass.GetComponent<Renderer>() : null;
+        var floor = FindDeep(crRoot.transform, "Floor");
+        var floorRenderer = floor != null ? floor.GetComponent<Renderer>() : null;
+        if (wallMapPrefab != null && doorRenderer != null && glassRenderer != null && floorRenderer != null)
         {
-            var map = (GameObject)PrefabUtility.InstantiatePrefab(wallMapPrefab, crRoot.transform);
-            map.name = "WholePlantOverview";
-            map.transform.localScale = Vector3.one * 0.5f;
-            var bounds = northRenderer.bounds;
-            map.transform.position = new Vector3(bounds.center.x, bounds.min.y + 1.15f, bounds.min.z - 0.10f);
+            // Keep the FBX's imported axis conversion on its child; orient only a wrapper.
+            var map = new GameObject("WholePlantOverview");
+            map.transform.SetParent(crRoot.transform, false);
+            PrefabUtility.InstantiatePrefab(wallMapPrefab, map.transform);
+            map.transform.localScale = Vector3.one * 0.4f;
+            var windowBounds = glassRenderer.bounds;
+            float inward = floorRenderer.bounds.center.z > windowBounds.center.z ? 1f : -1f;
+            // From inside, left of the door has the same X sign as the inward Z direction.
+            map.transform.rotation = inward > 0f ? Quaternion.identity : Quaternion.Euler(0f, 180f, 0f);
+            float roomFloor = windowBounds.min.y - HallDimensions.WindowSill;
+            map.transform.position = new Vector3(doorRenderer.bounds.center.x + inward * 2.8f,
+                roomFloor + 0.85f, windowBounds.center.z + inward * 0.18f);
             map.AddComponent<PlantWallMapView>().bridge = bridge;
         }
-        else Debug.LogWarning("[Phase2SceneBuilder] Plant overview asset or north wall missing.");
+        else Debug.LogWarning("[Phase2SceneBuilder] Plant overview asset, door, window, or floor missing.");
 
         // U16: procedure clipboards on the bench in front of each chair (children of crRoot, so a rebuild replaces them).
         PlaceClipboard(crRoot.transform, "SEAT_A1", "CLIPBOARD_A1", "Startup checklist", new[] { "cold-start-to-grid" });
@@ -235,12 +246,15 @@ public static class ControlRoomSceneBuilder
             cam.gameObject.AddComponent<ReactorInspectionView>();
 
         // Audio root
-        if (GameObject.Find("AudioRoot") == null)
-        {
-            var audioGo = new GameObject("AudioRoot");
-            var audio = audioGo.AddComponent<ProceduralPlantAudio>();
-            audio.bridge = bridge;
-        }
+        var audioGo = GameObject.Find("AudioRoot");
+        if (audioGo == null) audioGo = new GameObject("AudioRoot");
+        var audio = audioGo.GetComponent<ProceduralPlantAudio>() ?? audioGo.AddComponent<ProceduralPlantAudio>();
+        audio.bridge = bridge;
+        var voice = audioGo.GetComponent<VoiceAnnouncer>() ?? audioGo.AddComponent<VoiceAnnouncer>();
+        voice.bridge = bridge;
+        if (voice.clips == null || voice.clips.Length == 0) voice.clips = LoadVoiceClips();
+        var soundscape = audioGo.GetComponent<ReactorSoundscape>() ?? audioGo.AddComponent<ReactorSoundscape>();
+        soundscape.bridge = bridge;
 
         // U11: mission readout (HUD + runner). Idempotent; the HUD shows the live hint in the sandbox too.
         if (GameObject.Find("MissionUI") == null)
@@ -420,18 +434,19 @@ public static class ControlRoomSceneBuilder
 
         // Glass: translucent, solid for movement, never a click target (Ignore Raycast, so OnMouse rays pass to controls).
         var glass = WindowBox(win.transform, "Window_Glass", xl, xr, ySill, yHead, zMid, 0.04f,
-                              MakeMaterial("M_WindowGlass", new Color(0.75f, 0.88f, 1f, 0.05f), true, false), true);
+                              MakeMaterial("M_WindowGlass", new Color(0.10f, 0.55f, 0.80f, 0.20f), true, false), true);
         glass.GetComponent<BoxCollider>().size = new Vector3(1f, 1f, 1.5f); // a little thicker than the pane so nothing slips past
 
         // Gallery rail on the hall side of the glass: one top rail with posts (visual only; a mid rail cut across the view of the module).
         float zRail = zOuter - inward * 0.35f;
         Material railMat = MakeMaterial("M_GalleryRail", new Color(0.62f, 0.65f, 0.7f), false, false);
-        WindowBox(win.transform, "Rail_Top", xl, xr, y0 + 1.0f, y0 + 1.05f, zRail, 0.05f, railMat, false);
+        float railTop = ySill + 0.12f;
+        WindowBox(win.transform, "Rail_Top", xl, xr, railTop, railTop + 0.05f, zRail, 0.05f, railMat, false);
         int posts = Mathf.CeilToInt((xr - xl) / 1.3f);
         for (int i = 0; i <= posts; i++)
         {
             float px = Mathf.Lerp(xl + 0.03f, xr - 0.03f, (float)i / posts);
-            WindowBox(win.transform, "Rail_Post_" + i, px - 0.025f, px + 0.025f, ySill, y0 + 1.05f, zRail, 0.05f, railMat, false);
+            WindowBox(win.transform, "Rail_Post_" + i, px - 0.025f, px + 0.025f, ySill, railTop + 0.05f, zRail, 0.05f, railMat, false);
         }
 
         // The hall is only seen through this opening, so the frustum gate tests the opening (padded a little).
@@ -746,5 +761,17 @@ public static class ControlRoomSceneBuilder
             box.size = new Vector3(Mathf.Max(b.size.x, min), Mathf.Max(b.size.y, min), Mathf.Max(b.size.z, min));
         }
         box.isTrigger = false;
+    }
+
+    // The Kokoro voice lines (tools/voice): every AudioClip under Assets/Audio/Voice, named by file stem.
+    private static AudioClip[] LoadVoiceClips()
+    {
+        var clips = new List<AudioClip>();
+        foreach (var guid in AssetDatabase.FindAssets("t:AudioClip", new[] { "Assets/Audio/Voice" }))
+        {
+            var c = AssetDatabase.LoadAssetAtPath<AudioClip>(AssetDatabase.GUIDToAssetPath(guid));
+            if (c != null) clips.Add(c);
+        }
+        return clips.ToArray();
     }
 }

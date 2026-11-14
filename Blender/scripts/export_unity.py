@@ -5,6 +5,8 @@
 import bpy
 import os
 import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from scrub_fbx_paths import scrub
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BLEND_DIR = os.path.dirname(SCRIPT_DIR)
@@ -43,5 +45,6 @@ for name in BLENDS:
         use_triangles=True,
         bake_anim=False,
     )
+    scrub(out)
     print("EXPORTED", out)
 print("EXPORT_ALL_DONE")

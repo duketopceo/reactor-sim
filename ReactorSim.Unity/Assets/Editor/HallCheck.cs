@@ -140,7 +140,7 @@ public static class HallCheck
     }
 
     // PR4: the window the stand and seat look through is as wide and as low as the sight-line maths assumes, and the parked crane
-    // (read from the built meshes, in hall space) is out of the way of every sight line from either viewpoint down to the module and the pool.
+    // (read from the built meshes, in hall space) is out of the way of every sight line from either viewpoint to the vessel band.
     private static int CheckWindowAndCrane()
     {
         var hall = GameObject.Find(HallBuilder.RootName);
@@ -151,7 +151,7 @@ public static class HallCheck
         float sill = g.min.y - roomFloorWorld, width = Mathf.Max(g.size.x, g.size.z);
         int f = Report(Mathf.Abs(sill - HallDimensions.WindowSill) < 0.02f, $"the window sill is {sill:0.00} m (expected {HallDimensions.WindowSill:0.00})");
         f += Report(width >= HallDimensions.WindowWidth - 0.05f, $"the window is {width:0.00} m wide (expected {HallDimensions.WindowWidth:0.00})");
-        f += Report(HallSightline.CheckWindowReach().Count == 0, "the stand and the seat both see the module head through the window");
+        f += Report(HallSightline.CheckWindowReach().Count == 0, "the stand and the seat both see the vessel mid-body band through the underwater window");
 
         var lo = new double[] { double.MaxValue, double.MaxValue, double.MaxValue };
         var hi = new double[] { double.MinValue, double.MinValue, double.MinValue };
@@ -169,7 +169,7 @@ public static class HallCheck
         {
             var box = new[] { lo, hi };
             f += Report(HallSightline.CraneClearOfModule(HallSightline.Stand(), box) && HallSightline.CraneClearOfModule(HallSightline.Seat(), box),
-                $"the built crane (z {lo[2]:0.0}..{hi[2]:0.0}, y {lo[1]:0.0}..{hi[1]:0.0}) is clear of the sight lines down to the module from the stand and the seat");
+                $"the built crane (z {lo[2]:0.0}..{hi[2]:0.0}, y {lo[1]:0.0}..{hi[1]:0.0}) is clear of the sight lines to the vessel band from the stand and the seat");
         }
         return f;
     }

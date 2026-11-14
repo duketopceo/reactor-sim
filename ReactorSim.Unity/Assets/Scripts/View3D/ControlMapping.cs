@@ -98,7 +98,7 @@ namespace ReactorSim.Controls
         }
     }
 
-    public enum ControlSound { Tick, Clunk, Breaker }
+    public enum ControlSound { Tick, Clunk, Breaker, Reject }
 
     // Control feel (U17): which procedural sound a control makes. Pure so the mapping is tested.
     public static class ControlSounds

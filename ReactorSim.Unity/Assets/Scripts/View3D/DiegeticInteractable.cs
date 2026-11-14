@@ -213,6 +213,7 @@ public class DiegeticInteractable : MonoBehaviour
         if (n != null) n.Notice(RejectNote(reason));
         // Tactile refusal: a brief plunger dip on button specs, no state change (transient travel only).
         if (n != null && Spec != null && Spec.Style == ControlStyle.Button) n.RejectPress(this);
+        if (ProceduralPlantAudio.Instance != null) ProceduralPlantAudio.Instance.PlayControl(ControlSound.Reject);
     }
 
     private void OnMouseDown()

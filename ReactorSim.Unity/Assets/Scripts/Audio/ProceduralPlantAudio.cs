@@ -99,16 +99,16 @@ public class ProceduralPlantAudio : MonoBehaviour
             clip = MakeControlClip(kind);
             controlClips[kind] = clip;
         }
-        sfxSource.PlayOneShot(clip, kind == ControlSound.Breaker ? 1f : (kind == ControlSound.Tick ? 0.35f : 0.6f));
+        sfxSource.PlayOneShot(clip, kind == ControlSound.Breaker ? 1f : (kind == ControlSound.Tick ? 0.35f : (kind == ControlSound.Reject ? 0.5f : 0.6f)));
     }
 
     // Tick: a 4 ms click. Clunk: a short low thump with a noisy edge. Breaker: a deep, longer thud with a metallic ring.
     private AudioClip MakeControlClip(ControlSound kind)
     {
         const int rate = 22050;
-        float duration = kind == ControlSound.Tick ? 0.025f : (kind == ControlSound.Clunk ? 0.12f : 0.45f);
-        float f = kind == ControlSound.Tick ? 1800f : (kind == ControlSound.Clunk ? 120f : 55f);
-        float decay = kind == ControlSound.Tick ? 160f : (kind == ControlSound.Clunk ? 30f : 9f);
+        float duration = kind == ControlSound.Tick ? 0.025f : (kind == ControlSound.Clunk ? 0.12f : (kind == ControlSound.Reject ? 0.16f : 0.45f));
+        float f = kind == ControlSound.Tick ? 1800f : (kind == ControlSound.Clunk ? 120f : (kind == ControlSound.Reject ? 82f : 55f));
+        float decay = kind == ControlSound.Tick ? 160f : (kind == ControlSound.Clunk ? 30f : (kind == ControlSound.Reject ? 22f : 9f));
         int samples = Mathf.Max(1, (int)(rate * duration));
         AudioClip clip = AudioClip.Create("proc_control_" + kind, samples, 1, rate, false);
         float[] data = new float[samples];
@@ -123,6 +123,13 @@ public class ProceduralPlantAudio : MonoBehaviour
             float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
             if (kind == ControlSound.Tick) v = v * 0.5f + noise * 0.5f;
             else if (kind == ControlSound.Clunk) v = v * 0.8f + noise * 0.25f * Mathf.Exp(-300f * t);
+            else if (kind == ControlSound.Reject)
+            {
+                // Dull refusal: two soft thuds, lower and duller than a real clunk.
+                float gate = t < 0.07f ? 1f : (t < 0.11f ? 0.15f : 0.85f);
+                v = v * 0.55f + noise * 0.45f * Mathf.Exp(-200f * t);
+                v *= gate;
+            }
             else v = v * 0.9f + Mathf.Sin(t * 880f * Mathf.PI * 2f) * 0.18f * Mathf.Exp(-14f * t) + noise * 0.3f * Mathf.Exp(-120f * t);
             data[i] = v * env * 0.9f;
         }
@@ -225,16 +232,43 @@ public class ProceduralPlantAudio : MonoBehaviour
         return clip;
     }
 
+    // Continuous loops have short edge fades instead of a full-second decay and restart.
+    private AudioClip MakeLoopClip(int frequency, bool noise)
+    {
+        const int rate = 22050, count = rate * 2;
+        var data = new float[count];
+        var rng = new System.Random(177 + frequency);
+        float filtered = 0f;
+        for (int i = 0; i < count; i++)
+        {
+            float t = i / (float)rate;
+            float sample;
+            if (noise)
+            {
+                float n = (float)(rng.NextDouble() * 2 - 1);
+                filtered += (n - filtered) * 0.35f;
+                sample = filtered * 0.55f;
+            }
+            else sample = Mathf.Sin(2f * Mathf.PI * frequency * t) * 0.4f
+                + Mathf.Sin(4f * Mathf.PI * frequency * t) * 0.1f;
+            float fade = Mathf.Min(1f, Mathf.Min(i, count - 1 - i) / (rate * 0.008f));
+            data[i] = sample * fade;
+        }
+        var clip = AudioClip.Create("reactor_loop_" + frequency, count, 1, rate, false);
+        clip.SetData(data, 0);
+        return clip;
+    }
+
     private void GenerateClips()
     {
         if (rcpLoop != null && rcpLoop.clip == null)
         {
-            rcpLoop.clip = MakeTone(85f, 1.0f, 0.5f);
+            rcpLoop.clip = MakeLoopClip(85, false);
             if (!rcpLoop.isPlaying) rcpLoop.Play();
         }
         if (steamLoop != null && steamLoop.clip == null)
         {
-            steamLoop.clip = MakeTone(0f, 1.0f, 0.4f, noise: true);
+            steamLoop.clip = MakeLoopClip(0, true);
             if (!steamLoop.isPlaying) steamLoop.Play();
         }
         if (scramKlaxon != null && scramKlaxon.clip == null)
@@ -264,7 +298,7 @@ public class ProceduralPlantAudio : MonoBehaviour
             // A hum that rises with turbine speed (rpm 0..3000 and beyond).
             if (turbineLoop.clip == null)
             {
-                turbineLoop.clip = MakeTone(110f, 1.0f, 0.5f);
+                turbineLoop.clip = MakeLoopClip(110, false);
                 turbineLoop.Play();
             }
             float rpmFrac = Mathf.Clamp01((float)s.TurbineRpm / 3000f);

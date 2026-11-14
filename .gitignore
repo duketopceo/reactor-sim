@@ -24,6 +24,10 @@ out/
 # Unity workbench artifacts (never committed)
 unity-*.log
 ReactorSim.Unity/Assets/_Recovery/
+ReactorSim.Unity/Assets/_Recovery.meta
+# Temporary scene copies produced by the local preview builder
+ReactorSim.Unity/Assets/PlantWallPreview*/
+ReactorSim.Unity/Assets/PlantWallPreview*.meta
 .agentflow/
 # Python bytecode from Blender scripts
 __pycache__/
