@@ -4,6 +4,29 @@ using Xunit;
 public class PlantWallMapModelTests
 {
     [Fact]
+    public void RoutesUseOnlyTheirOwnModeledActivity()
+    {
+        var s = new PlantSnapshot { PrimaryFlowFrac = .4, FeedwaterFlowFrac = .2, CoolingWaterFrac = .7, GridOutputFrac = 1.2 };
+        Assert.Equal(.4, PlantWallMapModel.RouteActivity("PrimaryHot", s));
+        Assert.Equal(.2, PlantWallMapModel.RouteActivity("Feedwater", s));
+        Assert.Equal(.7, PlantWallMapModel.RouteActivity("CoolingReturn", s));
+        Assert.Equal(1, PlantWallMapModel.RouteActivity("Grid", s));
+        Assert.True(double.IsNaN(PlantWallMapModel.RouteActivity("Steam", s)));
+        s.PrimaryFlowFrac = double.NaN;
+        Assert.True(double.IsNaN(PlantWallMapModel.RouteActivity("PrimaryCold", s)));
+    }
+
+    [Fact]
+    public void RodsUseSnapshotBankOrderAndHandleMissingValues()
+    {
+        var s = new PlantSnapshot { BankInsertion = new[] { .1, .2, .3, .4 } };
+        Assert.Equal(.4, PlantWallMapModel.BankInsertion("A", s));
+        Assert.Equal(.1, PlantWallMapModel.BankInsertion("D", s));
+        Assert.True(double.IsNaN(PlantWallMapModel.BankInsertion("E", s)));
+        s.BankInsertion = null;
+        Assert.True(double.IsNaN(PlantWallMapModel.BankInsertion("A", s)));
+    }
+    [Fact]
     public void MissingAndInvalidReadingsAreUnavailable()
     {
         Assert.Equal("N/M", PlantWallMapModel.Reading(double.NaN, "bar"));
