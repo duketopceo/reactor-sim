@@ -105,7 +105,7 @@ public sealed class ReactorAssetMotion : MonoBehaviour
             coreLight.transform.localPosition = coreLightRestPosition;
             if (inspecting) coreLight.transform.position = Camera.main.transform.position;
             coreLight.color = inspecting ? ThemeColors.TextBody : tint;
-            coreLight.intensity = glowOff ? 0f : inspecting ? 2f : 0.35f * (float)GlowMapping.LightScale(power);
+            coreLight.intensity = glowOff ? 0f : inspecting ? 2f : 0.75f * (float)GlowMapping.LightScale(power);
         }
         foreach (var renderer in glow)
         {

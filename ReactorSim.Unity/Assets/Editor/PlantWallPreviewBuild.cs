@@ -13,13 +13,15 @@ public static class PlantWallPreviewBuild
     {
         try
         {
-            const string folder = "Assets/PlantWallPreview";
-            const string scenePath = folder + "/Bootstrap.unity";
+            string stamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+            string folderName = "PlantWallPreview_" + stamp;
+            string folder = "Assets/" + folderName;
+            string scenePath = folder + "/Bootstrap.unity";
             string repo = Path.GetFullPath(Path.Combine(Application.dataPath, "..", ".."));
-            string output = Path.Combine(repo, "out", "plant-wall-preview", "ReactorSim.exe");
+            string output = Path.Combine(repo, "out", "plant-wall-preview-" + stamp, "ReactorSim.exe");
             if (File.Exists(scenePath) || File.Exists(output))
                 throw new InvalidOperationException("Preview scene or executable already exists; choose a fresh output location.");
-            if (!AssetDatabase.IsValidFolder(folder)) AssetDatabase.CreateFolder("Assets", "PlantWallPreview");
+            if (!AssetDatabase.IsValidFolder(folder)) AssetDatabase.CreateFolder("Assets", folderName);
             var scene = ControlRoomSceneBuilder.Build(false);
             if (!scene.IsValid() || !scene.GetRootGameObjects().Any(root => root.name == "ControlRoom"))
                 throw new InvalidOperationException("Regenerated control room is missing.");

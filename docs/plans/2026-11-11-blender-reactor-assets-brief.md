@@ -32,7 +32,7 @@ or the blender.org aarch64 tarball.
 | `Blender/README.md` | Pipeline: generate → export FBX → sync into Unity |
 | `Blender/scripts/lib_common.py`, `lib_kits.py`, `lib_materials.py` | Existing helpers — reuse, don't reinvent |
 | `Blender/scripts/make_plant_equipment.py` | Current P01–P08 blockout (89 lines of primitives — the thing being replaced/upgraded) |
-| `C:\Users\kimba\nucleares-re\RESEARCH.md` + `C:\Users\kimba\nucleares-re\sections\reactor-core-fuel.md` | Behavioral dossier: rod banks, fuel bays, drive mechanics, visual feedback (Cherenkov glow, bubbles, turbulence). Synced from omarchy-max 2026-11-11. **Prose only — see §4** |
+| Public engineering sources and `docs/design/reactor-core-assets.md` | Original, game-scale guidance for rod banks, fuel bays, drive mechanics, and visual feedback. Machine-specific and third-party source paths were removed from this historical brief. |
 | `ReactorSim.Unity/Assets/Scripts/View3D/PlantEquipmentBinder.cs` | The Unity binding contract — object names it searches for |
 
 ## 3. The binding contract (do not break)
@@ -54,9 +54,7 @@ Sim state available to drive "living" motion (`PlantSnapshot`): `Power`, `FuelTe
 
 ## 4. Hard constraints
 
-- **Clean room.** Original assets only. Reference material = the dossier prose above +
-  public engineering knowledge (PWR/SMR cutaways, fuel assembly photos, CRDM diagrams).
-  **NEVER open `C:\Users\kimba\nucleares-re\decompiled\`** — repo AGENTS.md forbids it for implementation work.
+- **Clean room.** Original assets only, based on public engineering knowledge (PWR/SMR cutaways, fuel assembly photos, CRDM diagrams). Do not use proprietary code or artwork.
 - **Conventions** (`plant-and-assets.md` §1–2, §5):
   - Names: `RS_<CAT>_<Family>_<Variant>[_<Index>]` (CAT table in doc; `VES` vessel/cutaway,
     `ROD` rod drive, `SGN` steam generator, `PRI` primary, `TUR` turbine, `VAL` valves…).
@@ -82,7 +80,7 @@ Sim state available to drive "living" motion (`PlantSnapshot`): `Power`, `FuelTe
 | C | **Rotating equipment** — pump casing/impeller, flywheel (keep `Flywheel_PrimaryFlow`), SG tube-sheet cutaway, turbine rotor stub. | "Working" motion cues |
 | D | **Integration** — export FBX → `sync-blender-to-unity.sh` → Unity batchmode import check → binder verification in Play Mode. | Nothing counts until it renders in-scene |
 
-"Living" details worth stealing from the dossier (§reactor-core-fuel): Cherenkov-blue
+"Living" details for the visual design: Cherenkov-blue
 core glow scaling with power, bubble columns over hot bays, level-driven turbulence,
 rod banks dropping on SCRAM. Map them onto existing `GlowMapping`/binder patterns —
 extend, don't fork.
@@ -108,8 +106,8 @@ A render you haven't looked at is not done. Keep turntable renders in `Blender/p
 
 ```
 You are building accurate 3D reactor assets for ReactorSim, a deterministic PWR plant
-simulator (Unity 6 front-end, procedural Blender pipeline). Work in
-C:\Users\kimba\reactor-sim (Windows; use forward slashes or quoted paths in shell commands).
+simulator (Unity 6 front-end, procedural Blender pipeline). Work in the repository root
+(Windows; use forward slashes or quoted paths in shell commands).
 
 Blender is at "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" — invoke by full
 path (or add its dir to PATH). Headless verify already passes; re-run it yourself first:
@@ -120,10 +118,8 @@ READ FIRST, in order:
 2. docs/design/plant-and-assets.md — the asset spec (naming, pivots, LOD, export)
 3. Blender/README.md and Blender/scripts/{lib_common,lib_kits,lib_materials}.py
 4. Blender/scripts/make_plant_equipment.py — current blockout you are upgrading
-5. C:\Users\kimba\nucleares-re\sections\reactor-core-fuel.md (+ RESEARCH.md in the
-   same dir) — behavioral reference for the "living reactor" (rod banks, fuel
-   handling, glow/bubbles/turbulence cues). NEVER open anything under
-   C:\Users\kimba\nucleares-re\decompiled/.
+5. Public engineering sources and docs/design/reactor-core-assets.md — original
+   visual guidance for rod banks, fuel handling, glow, bubbles and turbulence.
 6. ReactorSim.Unity/Assets/Scripts/View3D/PlantEquipmentBinder.cs — Unity finds
    moving parts by name prefix; preserve or deliberately migrate these names.
 

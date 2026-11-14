@@ -12,7 +12,7 @@ execution: code
 
 - **Target repo:** the active `reactor-sim` repository. This plan builds on the current `feat/living-reactor-assets` checkout and the in-progress control-instrument work.
 - **Objective:** finish the existing control-room visual pass and add a separate, wall-mounted 3D plant map that shows the reactor, fuel, primary and secondary piping, balance of plant, live readings, and one-glance equipment/alarm status.
-- **Player outcome:** from the operator seat, a player can see where heat and steam are moving, what each major system is doing, and which component needs attention without opening a CRT or tablet page.
+- **Player outcome:** the player can stand and turn to the separate panel to the left of the door to see where heat and steam are moving, what each major system is doing, and which component needs attention without opening a CRT or tablet page.
 - **Product authority:** live `PlantSnapshot`, existing alarm sources, and `docs/design/plant-and-assets.md` own model values, alarms, naming and visual conventions. The diagram must not invent data or alter simulation physics.
 - **Delivery:** one reviewable implementation with pure status/layout logic, Blender-authored board geometry, Unity runtime binding, and visual evidence. Keep unrelated working-tree changes intact.
 
@@ -49,7 +49,7 @@ Finish the existing alarm boards, buttons, panels, labels, and status feedback, 
 
 **Separate whole-plant map**
 
-- R5. Add a dedicated, physically separate wall-mounted overview display. Do not repurpose the CRT mimic page or the small decorative primary-loop wall panel as the full map.
+- R5. Add a dedicated, physically separate wall-mounted overview display on the left side of the door when facing it from inside the room. Do not repurpose the CRT mimic page as the full map.
 - R6. The map is a read-only overview with a 3D/isometric plant composition: reactor vessel and visible fuel region at the center; control-rod banks; primary pumps and piping; pressurizer; steam generators; secondary steam/feed paths; turbine/generator; condenser and cooling return. Use existing assets where practical and add only the geometry needed to make connections legible.
 - R7. Pipe runs show system connectivity and direction of flow. Flow animation or segmented illumination scales only from real modeled flow/demand state; no animation implies a value the sim does not expose.
 - R8. Major components show adjacent, clearly labeled status lamps for normal, attention, alarm/trip, and offline states. Missing/unmodeled data uses a neutral “N/M” or unavailable treatment rather than green/normal.
@@ -69,7 +69,7 @@ Finish the existing alarm boards, buttons, panels, labels, and status feedback, 
 - **High-pressure alarm:** a primary pressure warning changes the corresponding loop/component lamp and summary alert consistently with the desk annunciator, and the exact pressure remains readable on the board.
 - **SCRAM:** rod-bank actual insertion animates from live insertion state, core power/status follows the snapshot, and the first-out/trip summary agrees with the alarm surface.
 - **Unknown state:** if a field is absent or a value is invalid, that component is marked unavailable and never presented as healthy.
-- **Viewpoint:** the system map and its safety summary can be read from the normal operator seat; closer inspection may use an existing screen-focus interaction without blocking room controls.
+- **Viewpoint:** a standing operator can find the system map beside the door and read its safety summary; closer inspection may use a focus interaction without blocking room controls.
 
 ## Scope Boundaries
 
@@ -121,7 +121,7 @@ Finish the existing alarm boards, buttons, panels, labels, and status feedback, 
 
 - **Goal:** R7-R11.
 - **Files:** `ControlRoomSceneBuilder`, a new `PlantWallMapView`/binder, shared runtime UI/theme helpers, and scene checks.
-- **Approach:** place the separate board on an approved wall location with a clear seat sightline; attach emissive status lamps and runtime metric text to authored sockets. Use compact system groupings and clear units. Keep inactive or unmodeled equipment distinguishable.
+- **Approach:** place the separate board to the left of the door as seen from inside the room; attach emissive status lamps and runtime metric text to authored sockets. Use compact system groupings and clear units. Keep inactive or unmodeled equipment distinguishable.
 - **Verification:** simulate representative state transitions and confirm the board, desk alarm tiles, CRTs and tablet agree. Check for duplicate roots after scene rebuild and for no false green states.
 
 ### U5. Visual, readability and regression gate
@@ -136,7 +136,7 @@ Finish the existing alarm boards, buttons, panels, labels, and status feedback, 
 - Existing alarm boards, buttons, labels, panels, and status indicators have a consistent visual language and tested interaction/state feedback.
 - A separate 3D wall map shows core/fuel, rod banks, primary and secondary pipes, steam generators, turbine/generator, condenser, and cooling return in one view.
 - Live component lamps and numeric metrics agree with the exact same snapshot/alarm state used by desk controls and screens.
-- The board is glanceable from the operator seat, provides detail without duplicating control functions, and marks unavailable state honestly.
+- The board is easy to find beside the door, provides detail without duplicating control functions, and marks unavailable state honestly.
 - Rebuilding the room is deterministic, all authored map IDs and bindings resolve, current performance/light budgets hold, and clean-room checks remain green.
 
 ## References

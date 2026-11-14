@@ -17,7 +17,9 @@ public static class ReactorAssetRender
             var motion = hall.GetComponent<ReactorAssetMotion>();
             motion.Bind();
             var snapshot = new PlantSnapshot { BankInsertion = new[] { 0.0, 0.35, 0.7, 1.0 }, FuelTempC = 350 };
-            string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../../out/reactor-assets"));
+            string requested = Environment.GetEnvironmentVariable("REACTOR_ASSET_RENDER_DIR");
+            string directory = Path.GetFullPath(string.IsNullOrEmpty(requested)
+                ? Path.Combine(Application.dataPath, "../../out/reactor-assets") : requested);
             Directory.CreateDirectory(directory);
             foreach (var lod in hall.GetComponentsInChildren<LODGroup>()) lod.ForceLOD(0);
             foreach (double power in new[] { 0.0, 1.0 })

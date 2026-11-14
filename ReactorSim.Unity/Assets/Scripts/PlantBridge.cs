@@ -126,6 +126,14 @@ public class PlantBridge : MonoBehaviour
         // GameSession.Mode only changes what the player does next (M1 is the selected mission either way).
         SandboxStart.Apply(Sim);
 
+        // Dev playtest hook: `ReactorSim.exe -dev` flips DevMode and starts the token-gated loopback API (port 7770)
+        // so presets like /api/scenario/full-power can jump the plant to a state for inspection. Off by default.
+        if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-dev") >= 0)
+        {
+            Sim.DevMode = true;
+            StartDevApi();
+        }
+
         // The HTTP/MCP API is dev-only (KTD9/R14): no listener starts here. Dev mode calls StartDevApi().
 
         var sessionLog = GetComponent<SessionLog>();

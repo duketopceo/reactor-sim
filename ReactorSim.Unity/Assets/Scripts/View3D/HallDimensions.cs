@@ -8,28 +8,27 @@ namespace ReactorSim
 {
     public static class HallDimensions
     {
-        // ---- pool and gallery ----
+        // ---- pool and gallery (aquarium window: the eye sits underwater, the room stays a dry pressure hull) ----
         public static readonly float WaterDepth = 22.0f;            // water surface above the pool floor
         public static readonly float DeckAboveWater = 0.15f;         // hall deck (pool rim) above the water: a low coaming, so it hides as little of the module as it can
-        public static readonly float PoolRadius = 11.0f;
+        public static readonly float PoolRadius = 13.0f;             // large enough that the pool edge crosses the window-wall plane: water reaches the glass
         public static readonly float HallRadius = 15.0f;             // circular hall, concrete wall
-        // Standing eye height over the water surface (the room floor is this minus the standing eye; 2.25 - 1.65 = 0.6 m, the geometry the renders were taken with). Low enough that the window's 15 to 20 degree downward reach still takes in
-        // the module head, high enough that the near pool rim does not hide it (see HallSightline.RimVisibleHeight).
-        public static readonly float GalleryEyeAboveWater = 2.25f;
+        // Put the window at the fuel display's depth so the core is visible through the glass.
+        public static readonly float GalleryEyeAboveWater = -13.0f;
         /// <summary>Standing eye over the control-room floor. One number with <see cref="StandEyeHeight"/> (a const, so the order of the initialisers cannot matter).</summary>
         public static float EyeAboveRoomFloor { get { return StandEyeHeight; } }
         /// <summary>Control-room floor above the pool floor.</summary>
         public static readonly float RoomFloorAbovePoolFloor = WaterDepth + GalleryEyeAboveWater - EyeAboveRoomFloor;
         /// <summary>Horizontal distance from the window wall to the pool axis.</summary>
-        public static readonly float PoolAxisFromWall = 13.0f;
+        public static readonly float PoolAxisFromWall = 12.0f;
 
         // ---- observation window (south wall) and the control-room anchors that look through it ----
         public static readonly float WindowWidth = 4.0f;
-        public static readonly float WindowSill = 0.05f;             // glass runs almost to the floor so the standing eye can look steeply down
+        public static readonly float WindowSill = 0.3f;              // sill high enough to keep the pane centred on the submerged eye
         public static readonly float WindowHeight = 2.3f;
         public static readonly float WindowOffsetFromDoor = 3.0f;    // opening centre, along the wall from the door centre
         public static readonly float HeaderMinWall = 0.3f;           // wall the builder keeps above the opening
-        public static readonly float VesselShiftX = 2.2f;            // pool axis, from the window centre along the wall (towards the seat side)
+        public static readonly float VesselShiftX = 3.4f;            // balance the window view between the stand and seat
         public const float StandEyeHeight = OperatorMath.StandingEyeHeight;   // one source: the eye the walking operator really has
         public const float SeatEyeHeight = OperatorMath.SeatedEyeHeight;      // the eye the player really has in the chair
         public static readonly float StandBackFromWall = 4.5f;       // STAND_Center distance from the window wall
@@ -54,8 +53,11 @@ namespace ReactorSim
         public static float ContainmentTop { get { return ContainmentBase + ContainmentHeight; } }
         /// <summary>Height at which the steam and feedwater stubs run sideways to the pool wall (just under the surface).</summary>
         public static float PipeRunHeight { get { return WaterDepth - 0.45f; } }
-        /// <summary>The point the stand's sight line aims at: the top of the module, just under the water surface.</summary>
-        public static float SightTargetHeight { get { return ContainmentTop; } }
+        /// <summary>The fuel and lower rod-drive band, measured above the pool floor.</summary>
+        public static readonly float VesselBandLow = VesselBase + 4.5f;
+        public static readonly float VesselBandHigh = VesselBase + 7.5f;
+        /// <summary>The fuel array and its glow, rather than the empty vessel mid-body.</summary>
+        public static float SightTargetHeight { get { return VesselBase + 5.2f; } }
         /// <summary>Eye height over the pool floor for a viewpoint at the given eye height over the room floor.</summary>
         public static float EyeAbovePoolFloor(float eyeAboveRoomFloor) { return RoomFloorAbovePoolFloor + eyeAboveRoomFloor; }
 
@@ -100,7 +102,7 @@ namespace ReactorSim
             if (HallCeilingAboveDeck < CraneRailAboveDeck + 3.5f) bad.Add("the hall ceiling is lower than the top of the crane trolley");
             if (WindowSill >= StandEyeHeight) bad.Add("the window sill is above the standing eye");
             if (WindowSill >= SeatEyeHeight) bad.Add("the window sill is above the seated eye");
-            if (PoolAxisFromWall - PoolRadius < 1.0f) bad.Add("the deck between the window wall and the pool edge is under 1 m");
+            if (PoolRadius - PoolAxisFromWall < 0.5f) bad.Add("the pool edge does not reach the window wall: no water at the glass");
             bad.AddRange(HallSightline.CheckWindowReach());
             return bad;
         }
