@@ -17,7 +17,7 @@ public static class HallAssetPlacer
             if (asset == null) throw new InvalidOperationException("Missing reactor FBX: " + name);
             var instance = (GameObject)PrefabUtility.InstantiatePrefab(asset, hall.transform);
             instance.name = name;
-            instance.transform.localPosition = Vector3.up * CoreBase;
+            instance.transform.localPosition = new Vector3(0f, CoreBase, HallDimensions.ModuleZ);   // on the module axis, which is off the pool axis
             // Authored -Y faces Unity +Z after FBX conversion; the hall window is towards -Z.
             instance.transform.localRotation = Quaternion.Euler(0, 180, 0);
             var levels = new List<Renderer>[] { new List<Renderer>(), new List<Renderer>(), new List<Renderer>() };
@@ -48,7 +48,7 @@ public static class HallAssetPlacer
         }
         var lightObject = new GameObject("RS_VES_CoreLight_PIV");
         lightObject.transform.SetParent(hall.transform, false);
-        lightObject.transform.localPosition = new Vector3(0, CoreBase + 2.2f, -0.65f);
+        lightObject.transform.localPosition = new Vector3(0, CoreBase + 2.2f, HallDimensions.ModuleZ - 0.65f);
         var light = lightObject.AddComponent<Light>();
         light.type = LightType.Point;
         light.color = new Color(0.18f, 0.52f, 1f);

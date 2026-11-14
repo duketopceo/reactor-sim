@@ -437,17 +437,7 @@ public static class ControlRoomSceneBuilder
                               MakeMaterial("M_WindowGlass", new Color(0.10f, 0.55f, 0.80f, 0.20f), true, false), true);
         glass.GetComponent<BoxCollider>().size = new Vector3(1f, 1f, 1.5f); // a little thicker than the pane so nothing slips past
 
-        // Gallery rail on the hall side of the glass: one top rail with posts (visual only; a mid rail cut across the view of the module).
-        float zRail = zOuter - inward * 0.35f;
-        Material railMat = MakeMaterial("M_GalleryRail", new Color(0.62f, 0.65f, 0.7f), false, false);
-        float railTop = ySill + 0.12f;
-        WindowBox(win.transform, "Rail_Top", xl, xr, railTop, railTop + 0.05f, zRail, 0.05f, railMat, false);
-        int posts = Mathf.CeilToInt((xr - xl) / 1.3f);
-        for (int i = 0; i <= posts; i++)
-        {
-            float px = Mathf.Lerp(xl + 0.03f, xr - 0.03f, (float)i / posts);
-            WindowBox(win.transform, "Rail_Post_" + i, px - 0.025f, px + 0.025f, ySill, railTop + 0.05f, zRail, 0.05f, railMat, false);
-        }
+        // No rail on the hall side of the glass: a rail across the pane was a gallery leftover and only cut the view of the module.
 
         // The hall is only seen through this opening, so the frustum gate tests the opening (padded a little).
         var gateBounds = new Bounds(new Vector3(wx, 0.5f * (ySill + yHead), zMid), new Vector3(WindowWidth + 0.6f, WindowHeight + 0.6f, 1.2f));

@@ -22,21 +22,31 @@ public static class ReactorAssetRender
                 ? Path.Combine(Application.dataPath, "../../out/reactor-assets") : requested);
             Directory.CreateDirectory(directory);
             foreach (var lod in hall.GetComponentsInChildren<LODGroup>()) lod.ForceLOD(0);
+            // Edit mode never runs Awake, so wake the water atmosphere (bubbles, core halo) by hand and let the bubbles settle.
+            var atmosphere = hall.GetComponent<ReactorWaterAtmosphere>();
+            typeof(ReactorWaterAtmosphere).GetMethod("Awake", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(atmosphere, null);
+            var bubbles = hall.GetComponentInChildren<ParticleSystem>(true);
+            float mz = HallDimensions.ModuleZ;
+            var stand = HallSightline.EyeInHallSpace(HallSightline.Stand());
+            var seat = HallSightline.EyeInHallSpace(HallSightline.Seat());
+            float windowY = HallDimensions.RoomFloorAbovePoolFloor + HallDimensions.WindowSill + HallDimensions.WindowHeight * 0.5f;
+            var windowCentre = new Vector3(-HallDimensions.VesselShiftX, windowY, -HallDimensions.PoolAxisFromWall);
             foreach (double power in new[] { 0.0, 1.0 })
             {
                 motion.Apply(snapshot, power, false, 0);
+                atmosphere.ApplyPower((float)power);
+                if (bubbles != null) { bubbles.Clear(true); bubbles.Simulate(9f, true, true); }
                 string suffix = power == 0 ? "shutdown" : "power";
-                Render(hall, new Vector3(-0.9f, HallAssetPlacer.CoreBase + 2.5f, -2.4f),
-                    new Vector3(0, HallAssetPlacer.CoreBase + 2.1f, 0), 50,
+                Render(hall, new Vector3(-0.9f, HallAssetPlacer.CoreBase + 2.5f, mz - 2.4f),
+                    new Vector3(0, HallAssetPlacer.CoreBase + 2.1f, mz), 50,
                     Path.Combine(directory, "core-close-" + suffix + ".png"), true);
-                Render(hall, new Vector3(-HallDimensions.VesselShiftX, HallDimensions.EyeAbovePoolFloor(HallDimensions.StandEyeHeight), -13.5f),
-                    new Vector3(0, HallAssetPlacer.CoreBase + 2, 0), 55,
+                Render(hall, new Vector3(-HallDimensions.VesselShiftX, HallDimensions.EyeAbovePoolFloor(HallDimensions.StandEyeHeight), -HallDimensions.PoolAxisFromWall - 1.5f),
+                    new Vector3(0, HallAssetPlacer.CoreBase + 2, mz), 55,
                     Path.Combine(directory, "window-close-" + suffix + ".png"), false);
-                Render(hall, new Vector3(HallDimensions.StandAlongWall - HallDimensions.VesselShiftX,
-                        HallDimensions.EyeAbovePoolFloor(HallDimensions.StandEyeHeight),
-                        -HallDimensions.PoolAxisFromWall - HallDimensions.StandBackFromWall),
-                    new Vector3(0, HallDimensions.SightTargetHeight - 1, 0), 55,
+                Render(hall, new Vector3((float)stand[0], (float)stand[1], (float)stand[2]), windowCentre, 55,
                     Path.Combine(directory, "window-standing-" + suffix + ".png"), false);
+                Render(hall, new Vector3((float)seat[0], (float)seat[1], (float)seat[2]), windowCentre, 55,
+                    Path.Combine(directory, "window-seat-" + suffix + ".png"), false);
             }
             Debug.Log("[ReactorAssetRender] PASS " + directory);
             if (Application.isBatchMode) EditorApplication.Exit(0);

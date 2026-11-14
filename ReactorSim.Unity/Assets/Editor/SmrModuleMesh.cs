@@ -21,12 +21,13 @@ public static class SmrModuleMesh
 
     /// <summary>Centre angle of the cutaway slot (towards the window, -z) and its half width, radians.</summary>
     public static readonly float SlotCentre = -0.5f * Mathf.PI;
-    public const float SlotHalfWidthDeg = 52f;
+    public const float SlotHalfWidthDeg = 76f;   // wide: the opaque flanks of a narrower slot hid the vessel from the stand and the seat, which look through the glass at an angle
 
     public static GameObject Build(Transform parent, Materials m)
     {
         var root = new GameObject("SmrModule");
         root.transform.SetParent(parent, false);
+        root.transform.localPosition = new Vector3(0f, 0f, HallDimensions.ModuleZ);   // near the glass, off the pool axis
         var lod0 = new GameObject("LOD0");
         lod0.transform.SetParent(root.transform, false);
         var lod1 = new GameObject("LOD1");
@@ -62,7 +63,8 @@ public static class SmrModuleMesh
         AddPenetration(pipes, R, C, 205f, ct - 11.5f, 0.15f);   // safety injection
         AddPenetration(pipes, R, C, 330f, ct - 2.2f, 0.08f);    // reactor vent
         // ---- steam and feedwater lines: out of the containment head, up, then sideways to the pool wall ----
-        float run = HallDimensions.PipeRunHeight, wall = HallDimensions.PoolRadius;
+        // The lines run sideways (+x) to the pool wall, which is nearer the module axis than the pool radius now the module is off the pool axis.
+        float run = HallDimensions.PipeRunHeight, wall = Mathf.Sqrt(Mathf.Max(1f, HallDimensions.PoolRadius * HallDimensions.PoolRadius - Mathf.Pow(-HallDimensions.ModuleZ + 0.6f, 2f))) - 0.1f;
         AddLine(pipes, new Vector3(0.85f, ct - 0.2f, -0.55f), run, wall, 0.24f);
         AddLine(pipes, new Vector3(0.85f, ct - 0.2f, 0.55f), run, wall, 0.17f);
         // lifting lugs on the containment head

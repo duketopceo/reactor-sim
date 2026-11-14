@@ -66,11 +66,11 @@ namespace ReactorSim
         public static View Stand() { return new View { name = "stand", eyeHeight = HallDimensions.StandEyeHeight, back = HallDimensions.StandBackFromWall, along = HallDimensions.StandAlongWall }; }
         public static View Seat() { return new View { name = "seat", eyeHeight = HallDimensions.SeatEyeHeight, back = HallDimensions.SeatBackFromWall, along = HallDimensions.SeatAlongWall }; }
 
-        /// <summary>Downward angle (degrees) from the viewpoint to a target at the given height above the pool floor over the pool axis.</summary>
+        /// <summary>Downward angle (degrees) from the viewpoint to a target at the given height above the pool floor over the module axis.</summary>
         public static double AngleToAxisTargetDeg(View v, double targetAbovePoolFloor)
         {
             double drop = HallDimensions.EyeAbovePoolFloor((float)v.eyeHeight) - targetAbovePoolFloor;
-            return DownAngleDeg(drop, v.back + HallDimensions.PoolAxisFromWall);
+            return DownAngleDeg(drop, v.back + HallDimensions.ModuleFromWall);
         }
 
         /// <summary>Margin in degrees by which the sight line to the target sits inside the opening's downward reach (negative = cut off).</summary>
@@ -79,24 +79,24 @@ namespace ReactorSim
             return OpeningDownReachDeg(v.eyeHeight, HallDimensions.WindowSill, v.back) - AngleToAxisTargetDeg(v, targetAbovePoolFloor);
         }
 
-        /// <summary>Margin in metres by which the sight line to the pool axis crosses the wall inside the opening's side edges.</summary>
+        /// <summary>Margin in metres by which the sight line to the module axis crosses the wall inside the opening's side edges.</summary>
         public static double EdgeMargin(View v)
         {
-            double crossing = CrossingAlong(v.along, HallDimensions.VesselShiftX, v.back, HallDimensions.PoolAxisFromWall);
+            double crossing = CrossingAlong(v.along, HallDimensions.VesselShiftX, v.back, HallDimensions.ModuleFromWall);
             return HallDimensions.WindowWidth * 0.5 - Math.Abs(crossing);
         }
 
         /// <summary>
         /// Height (metres above the pool floor) at which the sight line from the viewpoint through a point `edgeY` high on the
-        /// window wall crosses the pool axis. Similar triangles: the wall is `back` from the eye, the axis `PoolAxisFromWall` beyond it.
+        /// window wall crosses the module axis. Similar triangles: the wall is `back` from the eye, the axis `ModuleFromWall` beyond it.
         /// </summary>
         public static double AxisHeightThroughEdge(View v, double edgeY)
         {
             double eye = HallDimensions.EyeAbovePoolFloor((float)v.eyeHeight);
-            return edgeY + (edgeY - eye) * HallDimensions.PoolAxisFromWall / Math.Max(1e-9, v.back);
+            return edgeY + (edgeY - eye) * HallDimensions.ModuleFromWall / Math.Max(1e-9, v.back);
         }
 
-        /// <summary>The lowest and highest vessel heights (above the pool floor) the opening frames on the pool axis.</summary>
+        /// <summary>The lowest and highest vessel heights (above the pool floor) the opening frames on the module axis.</summary>
         public static void VisibleBandOnAxis(View v, out double low, out double high)
         {
             double sillY = HallDimensions.RoomFloorAbovePoolFloor + HallDimensions.WindowSill;
@@ -189,9 +189,10 @@ namespace ReactorSim
             double[] eye = EyeInHallSpace(v);
             double r = HallDimensions.ContainmentDiameter * 0.5;
             double top = HallDimensions.SightTargetHeight;
+            double mz = HallDimensions.ModuleZ;
             double[][] targets =
             {
-                new[] { 0.0, top, 0.0 }, new[] { -r, top, 0.0 }, new[] { r, top, 0.0 },
+                new[] { 0.0, top, mz }, new[] { -r, top, mz }, new[] { r, top, mz },
                 new[] { 0.0, (double)HallDimensions.WaterDepth, 0.0 },
                 new[] { 0.0, (double)HallDimensions.WaterDepth, -HallDimensions.PoolRadius },
                 new[] { 0.0, (double)HallDimensions.WaterDepth, HallDimensions.PoolRadius },

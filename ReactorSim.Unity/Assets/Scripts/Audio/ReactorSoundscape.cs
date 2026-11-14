@@ -90,11 +90,11 @@ public sealed class ReactorSoundscape : MonoBehaviour
             var hall = HallVisibility.FindHall();
             if (hall != null)
             {
-                core.transform.position = hall.transform.TransformPoint(new Vector3(0, HallDimensions.VesselBase + 5.2f, 0));
+                core.transform.position = hall.transform.TransformPoint(new Vector3(0, HallDimensions.VesselBase + 5.2f, HallDimensions.ModuleZ));
                 water.transform.position = hall.transform.TransformPoint(new Vector3(-HallDimensions.VesselShiftX, HallDimensions.WaterDepth + HallDimensions.GalleryEyeAboveWater, -HallDimensions.PoolAxisFromWall + 1f));
-                relief.transform.position = hall.transform.TransformPoint(new Vector3(0, HallDimensions.WaterDepth - 1f, 0));
-                cooling.transform.position = hall.transform.TransformPoint(new Vector3(4f, HallDimensions.VesselBase + 6f, 0));
-                generator.transform.position = hall.transform.TransformPoint(new Vector3(-3f, HallDimensions.VesselBase + 4f, 0));
+                relief.transform.position = hall.transform.TransformPoint(new Vector3(0, HallDimensions.WaterDepth - 1f, HallDimensions.ModuleZ));
+                cooling.transform.position = hall.transform.TransformPoint(new Vector3(4f, HallDimensions.VesselBase + 6f, HallDimensions.ModuleZ));
+                generator.transform.position = hall.transform.TransformPoint(new Vector3(-3f, HallDimensions.VesselBase + 4f, HallDimensions.ModuleZ));
                 positioned = true;
             }
         }

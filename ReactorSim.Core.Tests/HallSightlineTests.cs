@@ -20,9 +20,11 @@ namespace ReactorSim.Core.Tests
             Assert.Equal(HallDimensions.WaterDepth + HallDimensions.GalleryEyeAboveWater, HallDimensions.EyeAbovePoolFloor(HallDimensions.StandEyeHeight), 4);
             double low, high;
             HallSightline.VisibleBandOnAxis(HallSightline.Stand(), out low, out high);
-            // Room floor 7.35 m above pool floor; sill 7.65, top 9.95, standing eye 9.0.
-            Assert.Equal(7.65 + (7.65 - 9.0) * 12.0 / 4.5, low, 2);
-            Assert.Equal(9.95 + (9.95 - 9.0) * 12.0 / 4.5, high, 2);
+            // The module stands ModuleFromWall behind the glass; similar triangles from the standing eye through the sill and the head.
+            double eye = HallDimensions.EyeAbovePoolFloor(HallDimensions.StandEyeHeight);
+            double sillY = HallDimensions.RoomFloorAbovePoolFloor + HallDimensions.WindowSill, topY = sillY + HallDimensions.WindowHeight;
+            Assert.Equal(sillY + (sillY - eye) * HallDimensions.ModuleFromWall / HallDimensions.StandBackFromWall, low, 2);
+            Assert.Equal(topY + (topY - eye) * HallDimensions.ModuleFromWall / HallDimensions.StandBackFromWall, high, 2);
             Assert.True(low < HallDimensions.VesselBandLow, "the window must see down into the vessel band");
             Assert.True(high > HallDimensions.VesselBandHigh, "the window must see up through the vessel band");
         }
@@ -32,8 +34,10 @@ namespace ReactorSim.Core.Tests
         {
             double low, high;
             HallSightline.VisibleBandOnAxis(HallSightline.Seat(), out low, out high);
-            // Seated eye 7.35 + 1.2 = 8.55, 6.1 m back.
-            Assert.Equal(7.65 + (7.65 - 8.55) * 12.0 / 6.1, low, 2);
+            // Seated eye 1.2 m over the room floor, 6.1 m back.
+            double eye = HallDimensions.EyeAbovePoolFloor(HallDimensions.SeatEyeHeight);
+            double sillY = HallDimensions.RoomFloorAbovePoolFloor + HallDimensions.WindowSill;
+            Assert.Equal(sillY + (sillY - eye) * HallDimensions.ModuleFromWall / HallDimensions.SeatBackFromWall, low, 2);
             Assert.True(low <= HallDimensions.VesselBandLow + 1.5);
             Assert.True(high >= HallDimensions.VesselBandHigh);
         }
@@ -53,12 +57,12 @@ namespace ReactorSim.Core.Tests
         [Fact]
         public void AnAboveWaterEyeWouldFrameTheWrongBand()
         {
-            // negative control: raise the eye 3 m (still wet, but higher) and the same edge maths frames a band that tops
+            // negative control: raise the eye 6 m (the module now stands close to the glass, so the band moves about one metre per metre of eye height; 6 m is still wet, but higher) and the same edge maths frames a band that tops
             // out below the vessel mid-body — the submerged eye height is what puts the band on the vessel.
-            double eye = HallDimensions.EyeAbovePoolFloor(HallDimensions.StandEyeHeight) + 3.0;
+            double eye = HallDimensions.EyeAbovePoolFloor(HallDimensions.StandEyeHeight) + 6.0;
             double sillY = HallDimensions.RoomFloorAbovePoolFloor + HallDimensions.WindowSill;
             double topY = sillY + HallDimensions.WindowHeight;
-            double high = topY + (topY - eye) * HallDimensions.PoolAxisFromWall / HallDimensions.StandBackFromWall;
+            double high = topY + (topY - eye) * HallDimensions.ModuleFromWall / HallDimensions.StandBackFromWall;
             Assert.True(high < HallDimensions.VesselBandLow, $"a higher eye frames up to {high:0.0} m, below the vessel band");
         }
 

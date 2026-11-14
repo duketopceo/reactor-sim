@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using ReactorSim;
 using ReactorSim.Ui;
 
 // Explicit remote inspection, not walking through water or a claim of gallery line-of-sight.
@@ -111,6 +112,8 @@ public sealed class ReactorInspectionView : MonoBehaviour
         else if (view == 1) { position = new Vector3(-0.8f, coreBase + 8f, -3.6f); target = new Vector3(0, coreBase + 7.8f, 0); }
         else if (view == 2) { position = new Vector3(0, coreBase + 11.3f, -4.2f); target = new Vector3(0, coreBase + 11.3f, 0); }
         else { position = new Vector3(-3.1f, coreBase + 1.0f, -1.7f); target = new Vector3(-3.1f, coreBase + 0.7f, 0); }
+        position.z += HallDimensions.ModuleZ;   // the views are relative to the module axis, which is off the pool axis
+        target.z += HallDimensions.ModuleZ;
         transform.position = hall.transform.TransformPoint(position);
         transform.rotation = Quaternion.LookRotation(hall.transform.TransformPoint(target) - transform.position, hall.transform.up);
         cameraView.fieldOfView = view == 0 ? 58f : 50f;

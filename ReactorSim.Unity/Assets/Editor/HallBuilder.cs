@@ -125,6 +125,24 @@ public static class HallBuilder
         wShallow.Attach(T, "Pool_VolumeShallow", waterVolumeShallow);
         wDeep.Attach(T, "Pool_VolumeDeep", waterVolumeDeep);
 
+        // Depth veils: thin vertical tinted sheets across the pool at growing distance from the glass. Each one adds a little
+        // water colour to whatever lies behind it, so the module (two sheets) reads clearer than the far wall (eight): a
+        // distance gradient from the window with no fog setting, no real-time light and 8 x 12 triangles. Two sit between the glass and
+        // the module, the rest behind it; none cuts through the module.
+        Material waterVeil = makeMaterial("M_PoolVeil", new Color(0.05f, 0.30f, 0.48f, 0.09f), true, false);
+        waterVeil.EnableKeyword("_EMISSION");
+        waterVeil.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+        if (waterVeil.HasProperty("_EmissionColor")) waterVeil.SetColor("_EmissionColor", new Color(0.004f, 0.030f, 0.050f));
+        var veils = new MeshBuilder();
+        float moduleFront = HallDimensions.ModuleZ - HallDimensions.ContainmentDiameter * 0.5f - 0.1f;
+        float moduleBack = HallDimensions.ModuleZ + HallDimensions.ContainmentDiameter * 0.5f + 0.1f;
+        foreach (float vz in new[] { -D + 0.9f, 0.5f * (-D + moduleFront), moduleBack + 0.2f, -2f, 1f, 4f, 7f, 10f })
+        {
+            float half = Mathf.Sqrt(Mathf.Max(0.01f, Rp * Rp - vz * vz)) * 0.99f;
+            veils.AddBox(new Vector3(-half, 0.3f, vz - 0.01f), new Vector3(half, water - 0.05f, vz + 0.01f));
+        }
+        veils.Attach(T, "Pool_DepthVeils", waterVeil);
+
         // ---- the module, crane, trays ----
         SmrModuleMesh.Build(T, new SmrModuleMesh.Materials { vessel = steel, dark = dark, containment = paint, skin = skin });
         PolarCrane.Build(T, cranePaint, dark, deckY + HallDimensions.CraneRailAboveDeck, Rh, D);

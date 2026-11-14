@@ -13,22 +13,27 @@ namespace ReactorSim
         public static readonly float DeckAboveWater = 0.15f;         // hall deck (pool rim) above the water: a low coaming, so it hides as little of the module as it can
         public static readonly float PoolRadius = 13.0f;             // large enough that the pool edge crosses the window-wall plane: water reaches the glass
         public static readonly float HallRadius = 15.0f;             // circular hall, concrete wall
-        // Put the window at the fuel display's depth so the core is visible through the glass.
-        public static readonly float GalleryEyeAboveWater = -13.0f;
+        // Put the window at the fuel array's depth so the core sits mid-pane (eye 7.7 m over the pool floor, fuel glow about 7 m).
+        public static readonly float GalleryEyeAboveWater = -14.3f;
         /// <summary>Standing eye over the control-room floor. One number with <see cref="StandEyeHeight"/> (a const, so the order of the initialisers cannot matter).</summary>
         public static float EyeAboveRoomFloor { get { return StandEyeHeight; } }
         /// <summary>Control-room floor above the pool floor.</summary>
         public static readonly float RoomFloorAbovePoolFloor = WaterDepth + GalleryEyeAboveWater - EyeAboveRoomFloor;
         /// <summary>Horizontal distance from the window wall to the pool axis.</summary>
         public static readonly float PoolAxisFromWall = 12.0f;
+        /// <summary>Horizontal distance from the window wall to the reactor module's axis. The module stands in the pool near the glass,
+        /// not on the pool axis, so it fills the pane (a module 12 m back filled a third of it).</summary>
+        public static readonly float ModuleFromWall = 3.6f;
+        /// <summary>Hall-space z of the module axis (the hall origin is the pool axis; negative is towards the window).</summary>
+        public static float ModuleZ { get { return -(PoolAxisFromWall - ModuleFromWall); } }
 
         // ---- observation window (south wall) and the control-room anchors that look through it ----
-        public static readonly float WindowWidth = 4.0f;
+        public static readonly float WindowWidth = 3.0f;
         public static readonly float WindowSill = 0.3f;              // sill high enough to keep the pane centred on the submerged eye
         public static readonly float WindowHeight = 2.3f;
         public static readonly float WindowOffsetFromDoor = 3.0f;    // opening centre, along the wall from the door centre
         public static readonly float HeaderMinWall = 0.3f;           // wall the builder keeps above the opening
-        public static readonly float VesselShiftX = 3.4f;            // balance the window view between the stand and seat
+        public static readonly float VesselShiftX = 1.0f;            // balance the window view between the stand and seat: the module crosses the glass 0.8 m either side of centre
         public const float StandEyeHeight = OperatorMath.StandingEyeHeight;   // one source: the eye the walking operator really has
         public const float SeatEyeHeight = OperatorMath.SeatedEyeHeight;      // the eye the player really has in the chair
         public static readonly float StandBackFromWall = 4.5f;       // STAND_Center distance from the window wall
@@ -102,6 +107,8 @@ namespace ReactorSim
             if (HallCeilingAboveDeck < CraneRailAboveDeck + 3.5f) bad.Add("the hall ceiling is lower than the top of the crane trolley");
             if (WindowSill >= StandEyeHeight) bad.Add("the window sill is above the standing eye");
             if (WindowSill >= SeatEyeHeight) bad.Add("the window sill is above the seated eye");
+            if (ModuleFromWall < ContainmentDiameter * 0.5f + 1.0f) bad.Add("the module is closer to the glass than its containment and a 1 m walkway allow");
+            if (-ModuleZ + ContainmentDiameter * 0.5f + 1.0f > PoolRadius) bad.Add("the module does not fit in the pool at its offset");
             if (PoolRadius - PoolAxisFromWall < 0.5f) bad.Add("the pool edge does not reach the window wall: no water at the glass");
             bad.AddRange(HallSightline.CheckWindowReach());
             return bad;
