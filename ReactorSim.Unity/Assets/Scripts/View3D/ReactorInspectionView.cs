@@ -52,7 +52,8 @@ public sealed class ReactorInspectionView : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.LeftArrow)) SetView((view + Names.Length - 1) % Names.Length);
             cameraView.fieldOfView = Mathf.Clamp(cameraView.fieldOfView - Input.mouseScrollDelta.y * 3f, 25f, 70f);
         }
-        ShowPrompt(active || !OverlayOpen());
+        // Only show navigation help while actually inspecting; the persistent F8 prompt is unnecessary.
+        ShowPrompt(active);
     }
 
     public bool Enter()

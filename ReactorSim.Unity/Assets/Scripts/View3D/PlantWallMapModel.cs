@@ -14,6 +14,21 @@ public static class PlantWallMapModel
         return value.ToString("F" + decimals, CultureInfo.InvariantCulture) + " " + unit;
     }
 
+    public static string Summary(PlantSnapshot s, LampContext context)
+    {
+        if (s == null) return "PLANT DATA UNAVAILABLE";
+        int alarms = 0;
+        foreach (string name in LampPredicates.AlarmNames)
+            if (LampPredicates.Evaluate(name, s, context)) alarms++;
+        return (string.IsNullOrEmpty(s.Mode) ? "N/M" : s.Mode.ToUpperInvariant()) + "   ALARMS " + alarms + "   " + (s.Scrammed ? "SCRAM" : "NO SCRAM") + "\n" +
+            "POWER " + Reading(s.Power * 100, "%") + "   FUEL " + Reading(s.FuelTempC, "C") +
+            "   PRIMARY " + Reading(s.PrimaryPressureBar, "bar") + "   SG " + Reading(s.SecondaryPressureBar, "bar") + "\n" +
+            "PRIMARY FLOW " + Reading(s.PrimaryFlowFrac * 100, "%") + "   TURBINE " + Reading(s.TurbineRpm, "rpm", 0) +
+            "   GRID " + Reading(s.GridFrequencyHz, "Hz") + "   COND " + Reading(s.CondenserPressureBar, "bar", 2) + "\n" +
+            "RHO " + Reading(s.TotalReactivityPcm, "pcm", 0) + "   BORON " + Reading(s.BoronPpm, "ppm", 0) +
+            "   FEED " + Reading(s.FeedwaterDeliveredFrac * 100, "% rated") + "   OUTPUT " + Reading(s.GeneratorKw, "kW", 0);
+    }
+
     // Returns NaN for routes without a directly modeled flow/output reading.
     public static double RouteActivity(string name, PlantSnapshot s)
     {
