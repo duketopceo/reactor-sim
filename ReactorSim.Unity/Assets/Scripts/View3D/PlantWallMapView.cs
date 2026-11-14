@@ -8,6 +8,8 @@ public sealed class PlantWallMapView : MonoBehaviour
 {
     public PlantBridge bridge;
     private readonly Dictionary<string, Renderer> lamps = new Dictionary<string, Renderer>();
+    private readonly Dictionary<Renderer, string> routes = new Dictionary<Renderer, string>();
+    private readonly Dictionary<Transform, Vector3> rods = new Dictionary<Transform, Vector3>();
     private MaterialPropertyBlock block;
     private TextMeshPro metrics;
 
@@ -22,6 +24,13 @@ public sealed class PlantWallMapView : MonoBehaviour
                 var r = t.GetComponent<Renderer>();
                 if (r != null) lamps[t.name.Substring(7)] = r;
             }
+            if (t.name.StartsWith("Pipe_"))
+            {
+                int end = t.name.LastIndexOf('_');
+                var r = t.GetComponent<Renderer>();
+                if (r != null && end > 5) routes[r] = t.name.Substring(5, end - 5);
+            }
+            if (t.name.StartsWith("RodBank_") && t.parent != null) rods[t] = t.localPosition;
             if (t.name == "MetricsSocket")
             {
                 var go = new GameObject("LiveMetrics");
@@ -39,6 +48,29 @@ public sealed class PlantWallMapView : MonoBehaviour
     private void Update()
     {
         PlantSnapshot s = bridge != null ? bridge.GetSnapshot() : null;
+        foreach (var pair in routes)
+        {
+            double activity = PlantWallMapModel.RouteActivity(pair.Value, s);
+            var material = pair.Key.sharedMaterial;
+            // Unknown routes retain their authored circuit color, including after a reading disappears.
+            if (double.IsNaN(activity)) { pair.Key.SetPropertyBlock(null); continue; }
+            Color baseColor = material != null && material.HasProperty("_BaseColor") ? material.GetColor("_BaseColor") :
+                material != null && material.HasProperty("_Color") ? material.color : Color.white;
+            Color color = baseColor * Mathf.Lerp(0.3f, 1f, (float)activity);
+            pair.Key.GetPropertyBlock(block);
+            block.SetColor("_Color", color);
+            block.SetColor("_BaseColor", color);
+            block.SetColor("_EmissionColor", baseColor * ((float)activity * 0.45f));
+            pair.Key.SetPropertyBlock(block);
+        }
+        foreach (var pair in rods)
+        {
+            double insertion = PlantWallMapModel.BankInsertion(pair.Key.name.Substring(8), s);
+            if (double.IsNaN(insertion)) { pair.Key.localPosition = pair.Value; continue; }
+            // Move down in the mounted board's vertical direction, preserving the imported FBX axes.
+            Vector3 offset = pair.Key.parent.InverseTransformVector(-transform.up * (0.3f * (float)insertion * transform.lossyScale.y));
+            pair.Key.localPosition = pair.Value + offset;
+        }
         foreach (var pair in lamps)
         {
             Color color;

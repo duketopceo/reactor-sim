@@ -14,6 +14,32 @@ public static class PlantWallMapModel
         return value.ToString("F" + decimals, CultureInfo.InvariantCulture) + " " + unit;
     }
 
+    // Returns NaN for routes without a directly modeled flow/output reading.
+    public static double RouteActivity(string name, PlantSnapshot s)
+    {
+        if (s == null) return double.NaN;
+        double value;
+        switch (name)
+        {
+            case "PrimaryHot": case "PrimaryCold": value = s.PrimaryFlowFrac; break;
+            case "Feedwater": value = s.FeedwaterFlowFrac; break;
+            case "CoolingSupply": case "CoolingReturn": value = s.CoolingWaterFrac; break;
+            case "Grid": value = s.GridOutputFrac; break;
+            default: return double.NaN;
+        }
+        return Finite(value) ? Math.Max(0, Math.Min(1, value)) : double.NaN;
+    }
+
+    // The snapshot orders banks D, C, B, A; the asset labels them A, B, C, D.
+    public static double BankInsertion(string bank, PlantSnapshot s)
+    {
+        int index;
+        switch (bank) { case "A": index = 3; break; case "B": index = 2; break;
+            case "C": index = 1; break; case "D": index = 0; break; default: return double.NaN; }
+        if (s == null || s.BankInsertion == null || index >= s.BankInsertion.Length || !Finite(s.BankInsertion[index])) return double.NaN;
+        return Math.Max(0, Math.Min(1, s.BankInsertion[index]));
+    }
+
     public static Status Primary(PlantSnapshot s)
     {
         if (s == null || !Finite(s.PrimaryPressureBar) || !Finite(s.PrimaryFlowFrac) || !Finite(s.PrimarySatMarginC)) return Status.Unavailable;
