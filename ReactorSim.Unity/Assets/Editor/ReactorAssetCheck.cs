@@ -45,7 +45,7 @@ public static class ReactorAssetCheck
             var a = Find(hall, "ROD_BANK_A_PIV");
             Require(Vector3.Distance(a.position, a.parent.Find("RS_ROD_BankA_Inserted_PIV").position) < 0.001f,
                 "missing rod state safely inserts");
-            snapshot.BankInsertion = new[] { 0.5, 2.0, -1.0, double.NaN } // bank A is the last (D, C, B, A);
+            snapshot.BankInsertion = new[] { 0.5, 2.0, -1.0, double.NaN }; // bank A is last (D, C, B, A)
             motion.Apply(snapshot, 0, false, 0);
             Require(Vector3.Distance(a.position, a.parent.Find("RS_ROD_BankA_Inserted_PIV").position) < 0.001f,
                 "nonfinite insertion safely inserts");
