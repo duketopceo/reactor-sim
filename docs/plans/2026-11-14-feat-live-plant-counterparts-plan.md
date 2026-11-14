@@ -14,7 +14,7 @@ Make the reactor hall, plant overview and operator instruments tell the same sto
 
 ## Starting point
 
-The wall sits left of the door and contains the core, rod banks, major circuits, turbine/generator, condenser and a steam-dump bypass. Rod positions and fuel glow follow the same state as the hall; primary circulation, delivered feedwater, cooling, turbine steam heat, dump steam heat, shaft speed and grid output affect their routes. Snapshot fields preserve delivered feed and dump heat across save/load. The wall is still a schematic: several routes remain static, summary text is small, equipment detail is limited, and the full range of operating states has not been visually signed off. The existing `DOM-01`, `SCR-02`, and `EDGE-08` verification XFAILs remain separate known defects.
+The wall sits left of the door and contains the core, rod banks, major circuits, turbine/generator, condenser and a steam-dump bypass. Rod positions and fuel glow follow the same state as the hall; primary circulation, delivered feedwater, cooling, turbine steam heat, dump steam heat, shaft speed and grid output affect their routes. Snapshot fields preserve delivered feed and dump heat across save/load. A mounted summary has been added beneath the map, but grouped component detail is not yet displayed. The wall remains schematic: several routes are static, equipment detail is limited, and the full range of operating states has not been visually signed off. The existing `DOM-01`, `SCR-02`, and `EDGE-08` verification XFAILs remain separate known defects. Phase 1 is coordinated in [the broader CE plan](2026-11-14-ce-phase-1-trustworthy-plant-plan.md).
 
 ## Requirements and work
 
