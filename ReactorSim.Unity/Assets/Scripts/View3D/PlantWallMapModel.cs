@@ -105,6 +105,26 @@ public static class PlantWallMapModel
         }
     }
 
+    // Close-view grouped readings: one line per system, real snapshot values with units. First-out and procedure
+    // step have no authoritative source (the alarm list is unordered), so they are marked unavailable, never guessed.
+    public static string GroupedReadout(PlantSnapshot s)
+    {
+        if (s == null) return "PLANT DATA UNAVAILABLE";
+        string clock = Finite(s.SimSeconds) ? TimeSpan.FromSeconds(Math.Max(0, s.SimSeconds)).ToString(@"hh\:mm\:ss") : "N/M";
+        return "CORE " + Reading(s.Power * 100, "%") + " " + Reading(s.FuelTempC, "C") + " RHO " + Reading(s.TotalReactivityPcm, "pcm", 0) +
+                " RODS D/C/B/A " + RodPct("D", s) + "/" + RodPct("C", s) + "/" + RodPct("B", s) + "/" + RodPct("A", s) + " %\n" +
+            "PRIMARY " + Reading(s.PrimaryPressureBar, "bar") + " " + Reading(s.PrimaryTempC, "C") + " MARGIN " + Reading(s.PrimarySatMarginC, "C") +
+                " LEVEL " + Reading(s.PrimaryLevelFrac * 100, "%") + " FLOW " + Reading(s.PrimaryFlowFrac * 100, "%") + "\n" +
+            "SG " + Reading(s.SecondaryPressureBar, "bar") + " LEVEL " + Reading(s.SecondaryLevelFrac * 100, "%") +
+                " FEED " + Reading(s.FeedwaterDeliveredFrac * 100, "% rated") + "\n" +
+            "TURBINE " + Reading(s.TurbineRpm, "rpm", 0) + " " + (s.TurbineTripped ? "TRIPPED" : "NOT TRIPPED") +
+                " GEN " + Reading(s.GeneratorKw, "kW", 0) + " GRID " + Reading(s.GridFrequencyHz, "Hz", 2) + "\n" +
+            "COND " + Reading(s.CondenserPressureBar, "bar", 2) + " HOTWELL " + Reading(s.HotwellInventoryFrac * 100, "%") +
+                " COOLING " + Reading(s.CoolingWaterFrac * 100, "%") + "\n" +
+            "BORON " + Reading(s.BoronPpm, "ppm", 0) + " PH " + Reading(s.Ph, "", 2) + " CLOCK " + clock +
+                " FIRST-OUT N/M PROCEDURE N/M";
+    }
+
     public static Status Primary(PlantSnapshot s)
     {
         if (s == null || !Finite(s.PrimaryPressureBar) || !Finite(s.PrimaryFlowFrac) || !Finite(s.PrimarySatMarginC)) return Status.Unavailable;
@@ -165,6 +185,12 @@ public static class PlantWallMapModel
                 return LampPredicates.Evaluate("BORON_LOW", s, c) || LampPredicates.Evaluate("PH_DRIFT", s, c) ? Status.Warning : Status.Normal;
             default: return Status.Unavailable;
         }
+    }
+
+    private static string RodPct(string bank, PlantSnapshot s)
+    {
+        double v = BankInsertion(bank, s);
+        return double.IsNaN(v) ? "N/M" : (v * 100).ToString("F0", CultureInfo.InvariantCulture);
     }
 
     private static bool Finite(double value) { return !double.IsNaN(value) && !double.IsInfinity(value); }

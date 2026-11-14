@@ -13,6 +13,7 @@ public sealed class PlantWallMapView : MonoBehaviour
     private readonly Dictionary<Transform, Vector3> rods = new Dictionary<Transform, Vector3>();
     private MaterialPropertyBlock block;
     private TextMeshPro metrics;
+    private TextMeshPro detail;
     private Renderer fuel;
     private ControlRoom3DBinder roomBinder;
     private Material metricsMaterial;
@@ -74,6 +75,30 @@ public sealed class PlantWallMapView : MonoBehaviour
         metrics.color = ThemeColors.TextBody;
         metrics.rectTransform.pivot = new Vector2(0.5f, 1f);
         metrics.rectTransform.sizeDelta = new Vector2(width - 0.24f, 0.75f);
+
+        // Close-view grouped readings sit on a second plate directly beneath the summary plate.
+        var plate2 = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        plate2.name = "LiveDetailPlate";
+        plate2.transform.SetParent(transform, false);
+        plate2.transform.localPosition = plate.transform.localPosition + new Vector3(0f, -1.0f, 0f);
+        plate2.transform.localScale = new Vector3(width, 0.92f, 0.12f);
+        Destroy(plate2.GetComponent<Collider>());
+        plate2.layer = gameObject.layer;
+        plate2.GetComponent<Renderer>().sharedMaterial = metricsMaterial;
+        var go2 = new GameObject("LiveDetail");
+        go2.layer = gameObject.layer;
+        go2.transform.SetParent(transform, false);
+        go2.transform.localPosition = plate2.transform.localPosition + new Vector3(0f, 0.40f, face * 0.075f);
+        go2.transform.localRotation = go.transform.localRotation;
+        detail = go2.AddComponent<TextMeshPro>();
+        detail.enableAutoSizing = true;
+        detail.fontSizeMin = 0.6f;
+        detail.fontSizeMax = 1.2f;
+        detail.alignment = TextAlignmentOptions.Top;
+        detail.textWrappingMode = TextWrappingModes.Normal;
+        detail.color = ThemeColors.TextBody;
+        detail.rectTransform.pivot = new Vector2(0.5f, 1f);
+        detail.rectTransform.sizeDelta = new Vector2(width - 0.24f, 0.8f);
     }
 
     private void OnDestroy()
@@ -146,5 +171,6 @@ public sealed class PlantWallMapView : MonoBehaviour
         if (metrics == null) return;
         var alarmContext = roomBinder != null ? roomBinder.CurrentLampContext() : LampContext.Default;
         metrics.text = PlantWallMapModel.Summary(s, alarmContext);
+        if (detail != null) detail.text = PlantWallMapModel.GroupedReadout(s);
     }
 }

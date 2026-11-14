@@ -27,6 +27,6 @@ The old `PlantEquipment` Blender asset defines separate primary and steam-genera
 
 ## Verification and remaining work
 
-The grouped `ComponentReadout` model prepares labeled values for each wall component, but it is not yet connected to a visible detail view; its layout and readability need an in-game design pass. Pump and pressurizer status mappings are separate, and the safety lamp no longer implies the unmodeled safety system is healthy merely because SCRAM is clear.
+`PlantWallMapModel.GroupedReadout` is mounted on a second plate (`LiveDetail`) beneath the summary plate and shows core, rod banks, primary, steam generator and feed, turbine, generator, grid, condenser, cooling, chemistry and the simulation clock with units; first-out and procedure step are shown as N/M because no authoritative source exists. The per-component `ComponentReadout` text is still not displayed, and the plate layout needs an in-game readability pass. Pump and pressurizer status mappings are separate, and the safety lamp no longer implies the unmodeled safety system is healthy merely because SCRAM is clear.
 
 Automated model tests cover pump/pressurizer independence, missing and invalid readings, and turbine steam after a trip. A Unity play-mode fixture checks the two relief signals independently against temporary authored anchor types; those anchors remain absent from the currently placed hall assets. A listening pass, custom short-period tuning check, and the full visual scenario matrix remain to be done.

@@ -107,4 +107,31 @@ public class PlantWallMapModelTests
         s.CondenserPressureBar = double.NaN;
         Assert.Equal(PlantWallMapModel.Status.Unavailable, PlantWallMapModel.Component("Condenser", s));
     }
+
+    [Fact]
+    public void GroupedReadoutCoversEverySystemAndMarksUnsourcedFieldsUnavailable()
+    {
+        var s = new PlantSnapshot { Power = .5, PrimaryPressureBar = 155, TurbineRpm = 1800, TurbineTripped = true,
+            SimSeconds = 3725, BankInsertion = new[] { .1, .2, .3, .4 }, CondenserPressureBar = double.NaN };
+        string g = PlantWallMapModel.GroupedReadout(s);
+        foreach (string key in new[] { "CORE 50.0 %", "PRIMARY 155.0 bar", "SG ", "TURBINE 1800 rpm TRIPPED", "COND N/M",
+            "COOLING", "BORON", "CLOCK 01:02:05", "FIRST-OUT N/M", "PROCEDURE N/M", "RODS D/C/B/A 10/20/30/40 %" })
+            Assert.Contains(key, g);
+        Assert.Equal("PLANT DATA UNAVAILABLE", PlantWallMapModel.GroupedReadout(null));
+        s.SimSeconds = double.NaN;
+        Assert.Contains("CLOCK N/M", PlantWallMapModel.GroupedReadout(s));
+    }
+
+    [Theory]
+    [InlineData("Reactor")] [InlineData("PrimaryPump")] [InlineData("Pressurizer")] [InlineData("SteamGenerator")]
+    [InlineData("Turbine")] [InlineData("Condenser")] [InlineData("Cooling")] [InlineData("FeedPump")] [InlineData("Chemistry")]
+    public void NaNSnapshotIsNeverShownAsHealthy(string name)
+    {
+        var nan = double.NaN;
+        var s = new PlantSnapshot { Power = nan, FuelTempC = nan, PrimaryFlowFrac = nan, PrimaryPressureBar = nan,
+            PrimarySatMarginC = nan, SecondaryPressureBar = nan, SecondaryLevelFrac = nan, TurbineRpm = nan,
+            CondenserPressureBar = nan, HotwellInventoryFrac = nan, CoolingWaterFrac = nan, FeedwaterFlowFrac = nan,
+            BoronPpm = nan, Ph = nan };
+        Assert.Equal(PlantWallMapModel.Status.Unavailable, PlantWallMapModel.Component(name, s));
+    }
 }
