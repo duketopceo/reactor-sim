@@ -9,7 +9,7 @@ public sealed class ReactorAssetMotion : MonoBehaviour
 {
     private sealed class Bank
     {
-        public int index;
+        public string name;
         public Transform pivot;
         public Vector3 withdrawn, inserted;
     }
@@ -55,7 +55,7 @@ public sealed class ReactorAssetMotion : MonoBehaviour
                 var inserted = t.parent.Find("RS_ROD_Bank" + parts[2] + "_Inserted_PIV");
                 if (withdrawn == null || inserted == null)
                     throw new InvalidOperationException("Rod endpoints missing for " + t.name);
-                banks.Add(new Bank { index = index, pivot = t,
+                banks.Add(new Bank { name = parts[2], pivot = t,
                     withdrawn = withdrawn.localPosition, inserted = inserted.localPosition });
             }
             else if (t.name.StartsWith("Flywheel_PrimaryFlow_", StringComparison.Ordinal) ||
@@ -82,8 +82,7 @@ public sealed class ReactorAssetMotion : MonoBehaviour
     {
         foreach (var bank in banks)
         {
-            double input = snapshot.BankInsertion != null && bank.index < snapshot.BankInsertion.Length
-                ? snapshot.BankInsertion[bank.index] : 1.0;
+            double input = PlantWallMapModel.BankInsertion(bank.name, snapshot);
             float fraction = double.IsNaN(input) ? 1f : Mathf.Clamp01((float)input);
             bank.pivot.localPosition = Vector3.Lerp(bank.withdrawn, bank.inserted, fraction);
         }

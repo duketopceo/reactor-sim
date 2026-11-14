@@ -60,7 +60,10 @@ def build():
     pipe("PrimaryCold", [(-1.15,1.45),(-1.15,0.72),(-1.80,0.72),(-2.65,0.72),(-2.65,1.33)], primary)
     pipe("Surge", [(-2.0,2.15),(-2.0,2.55)], primary)
     pipe("Chemistry", [(-3.05,0.62),(-2.65,0.62),(-2.65,0.72)], chem)
-    pipe("Steam", [(-0.85,2.15),(-0.05,2.15)], steam)
+    pipe("SteamHeader", [(-0.85,2.15),(-0.55,2.15)], steam)
+    pipe("Steam", [(-0.55,2.15),(-0.05,2.15)], steam)
+    # The bypass carries dump steam directly to the condenser, independently of the turbine.
+    pipe("SteamDump", [(-0.55,2.15),(-0.55,1.15),(-0.05,1.15),(-0.05,1.10)], steam)
     pipe("TurbineExhaust", [(0.28,1.83),(0.28,1.10)], steam)
     pipe("Feedwater", [(-0.06,0.95),(-0.70,0.95),(-0.70,1.65),(-0.85,1.65)], water)
     pipe("CoolingSupply", [(0.62,0.80),(1.35,0.80),(1.35,0.50),(2.35,0.50),(2.35,0.65)], water)

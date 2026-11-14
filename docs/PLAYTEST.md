@@ -112,6 +112,11 @@ look through it. Press **F8** for closer live views of the fuel, rod drives, pum
 The whole-plant overview panel is on the wall to the left of the door when facing it from inside. Its lamps and summary readings
 follow live plant state; the diagram is schematic. Reactor hum, water, detector ticks, cooling, relief and generator sounds follow
 the plant alongside the existing pump, turbine, control, alarm and voice sounds. The Escape menu's master volume controls them all.
+The miniature rod banks use the same A-D positions as the reactor in the hall, and its fuel glow follows the same power and fuel
+temperature mapping. Primary circulation, delivered feedwater, cooling water, steam heat to the turbine, steam-dump heat, shaft
+speed, and electrical output control the brightness of their respective routes. Try changing each control and confirm the right
+route responds; a steam dump can carry heat to the condenser even when the turbine is tripped. The chemistry, surge, and safety
+connections remain static circuit markings because the snapshot does not expose a measured flow for those particular paths.
 
 - **The module.** A small modular reactor of the pumped integral type: a 2.7 m wide, 18.8 m tall reactor vessel standing in
   a 4.5 m wide containment shell, in the pool with the containment head just under the water. The steam generators and the

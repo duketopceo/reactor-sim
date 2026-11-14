@@ -6,12 +6,17 @@ public class PlantWallMapModelTests
     [Fact]
     public void RoutesUseOnlyTheirOwnModeledActivity()
     {
-        var s = new PlantSnapshot { PrimaryFlowFrac = .4, FeedwaterFlowFrac = .2, CoolingWaterFrac = .7, GridOutputFrac = 1.2 };
+        var s = new PlantSnapshot { PrimaryFlowFrac = .4, FeedwaterFlowFrac = .9, FeedwaterDeliveredFrac = .2, CoolingWaterFrac = .7, GridOutputFrac = 1.2, TurbineSteamKW = Physics.RatedThermalKW * .6, DumpSteamKW = Physics.RatedThermalKW * .25, TurbineRpm = Physics.TurbineRatedRpm * .8 };
         Assert.Equal(.4, PlantWallMapModel.RouteActivity("PrimaryHot", s));
         Assert.Equal(.2, PlantWallMapModel.RouteActivity("Feedwater", s));
         Assert.Equal(.7, PlantWallMapModel.RouteActivity("CoolingReturn", s));
         Assert.Equal(1, PlantWallMapModel.RouteActivity("Grid", s));
-        Assert.True(double.IsNaN(PlantWallMapModel.RouteActivity("Steam", s)));
+        Assert.Equal(.6, PlantWallMapModel.RouteActivity("Steam", s), 6);
+        Assert.Equal(.6, PlantWallMapModel.RouteActivity("TurbineExhaust", s), 6);
+        Assert.Equal(.25, PlantWallMapModel.RouteActivity("SteamDump", s), 6);
+        Assert.Equal(.85, PlantWallMapModel.RouteActivity("SteamHeader", s), 6);
+        Assert.Equal(.8, PlantWallMapModel.RouteActivity("Shaft", s), 6);
+        Assert.True(double.IsNaN(PlantWallMapModel.RouteActivity("Surge", s)));
         s.PrimaryFlowFrac = double.NaN;
         Assert.True(double.IsNaN(PlantWallMapModel.RouteActivity("PrimaryCold", s)));
     }

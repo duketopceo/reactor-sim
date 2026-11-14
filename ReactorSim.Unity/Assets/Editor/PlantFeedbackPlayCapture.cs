@@ -70,6 +70,26 @@ public static class PlantFeedbackPlayCapture
             var seat = ControlRoomSceneBuilder.FindDeep(room.transform, "CAM_Stand_Center");
             var map = ControlRoomSceneBuilder.FindDeep(room.transform, "WholePlantOverview");
             if (seat == null || map == null) throw new InvalidOperationException("Missing seat=" + (seat == null) + " map=" + (map == null));
+            var view = map.GetComponent<PlantWallMapView>();
+            var rod = ControlRoomSceneBuilder.FindDeep(map, "RodBank_A");
+            var feed = ControlRoomSceneBuilder.FindDeep(map, "Pipe_Feedwater_00");
+            var dump = ControlRoomSceneBuilder.FindDeep(map, "Pipe_SteamDump_00");
+            if (view == null || rod == null || feed == null || dump == null) throw new InvalidOperationException("Missing live wall binding or bypass");
+            var state = new PlantSnapshot { BankInsertion = new[] { 0.0, 0.0, 0.0, 0.0 }, FeedwaterDeliveredFrac = 0.0 };
+            view.ApplySnapshot(state);
+            var withdrawn = rod.position;
+            var properties = new MaterialPropertyBlock();
+            var feedRenderer = feed.GetComponent<Renderer>();
+            if (feedRenderer == null) throw new InvalidOperationException("Feedwater renderer missing");
+            feedRenderer.GetPropertyBlock(properties);
+            Color idle = properties.GetColor("_Color");
+            state.BankInsertion[3] = 1.0;
+            state.FeedwaterDeliveredFrac = 1.0;
+            view.ApplySnapshot(state);
+            feedRenderer.GetPropertyBlock(properties);
+            if (Vector3.Distance(withdrawn, rod.position) < 0.01f || properties.GetColor("_Color").maxColorComponent <= idle.maxColorComponent)
+                throw new InvalidOperationException("Live rod or delivered feedwater binding did not respond");
+            view.ApplySnapshot(view.bridge != null ? view.bridge.GetSnapshot() : null);
             var renderers = map.GetComponentsInChildren<Renderer>();
             if (renderers.Length == 0) throw new InvalidOperationException("No wall renderers");
             var bounds = renderers[0].bounds;
