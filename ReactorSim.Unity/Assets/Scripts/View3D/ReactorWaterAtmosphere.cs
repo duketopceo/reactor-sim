@@ -49,7 +49,14 @@ public sealed class ReactorWaterAtmosphere : MonoBehaviour
             particleTexture.SetPixel(x, y, ThemeColors.WithAlpha(ThemeColors.TextBody, alpha));
         }
         particleTexture.Apply();
+        // The additive particle shader is in Always Included Shaders (InstrumentCheck.RequiredShaders); fall back to the sprite
+        // shader, which every build carries, so the bubbles never vanish silently if that list ever loses it.
         var shader = Shader.Find("Legacy Shaders/Particles/Additive");
+        if (shader == null)
+        {
+            Debug.LogWarning("[ReactorWaterAtmosphere] additive particle shader missing from the build; using Sprites/Default");
+            shader = Shader.Find("Sprites/Default");
+        }
         if (shader != null)
         {
             particleMaterial = new Material(shader) { name = "PoolBubbleMaterial", mainTexture = particleTexture };

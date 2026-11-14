@@ -19,6 +19,7 @@ public static class InstrumentCheck
     {
         "Unlit/Color",
         "TextMeshPro/Distance Field",
+        "Legacy Shaders/Particles/Additive",   // ReactorWaterAtmosphere pool bubbles, resolved at runtime
     };
 
     public static void Run()
