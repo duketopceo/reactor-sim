@@ -49,6 +49,7 @@ public class PlantEquipmentBinder : MonoBehaviour
     {
         // Runtime-built particle jet so no .prefab asset is needed for the VFX.
         var go = new GameObject(parent.name + "_Steam");
+        go.layer = parent.layer;
         go.transform.SetParent(parent.transform, false);
         var ps = go.AddComponent<ParticleSystem>();
         ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
@@ -63,7 +64,7 @@ public class PlantEquipmentBinder : MonoBehaviour
         shape.shapeType = ParticleSystemShapeType.Cone;
         shape.angle = 18f;
         var renderer = go.GetComponent<ParticleSystemRenderer>();
-        renderer.material = new Material(Shader.Find("Unlit/Color")) { color = new Color(0.9f, 0.95f, 1f, 0.35f) };
+        renderer.sharedMaterial = new Material(Shader.Find("Unlit/Color")) { color = new Color(0.9f, 0.95f, 1f, 0.35f) };
         return ps;
     }
 

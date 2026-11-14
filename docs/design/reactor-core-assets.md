@@ -11,8 +11,8 @@ restores the operator's position, orientation, FOV and culling mask.
 The simulation keeps running. Room controls and other camera/overlay modes are
 suspended; Escape returns before it can open the pause menu.
 
-The normal gallery is unchanged. Its pool rim and window sill obscure the deep
-fuel array even with a vessel cutaway. Inspection is an explicit camera abstraction,
+The normal gallery view is a separate camera from this inspection. The deep fuel array
+is only fully visible in inspection or through the underwater window pane. Inspection is an explicit camera abstraction,
 not a claim that the operator can see through the deck or enter the pool.
 Inspection reuses the core light as a neutral camera-positioned service lamp;
 it does not add a fifth light or pretend that this fill is Cherenkov illumination.
@@ -99,5 +99,7 @@ build, tests, scenarios and numerical verification. The committed-scene drift
 gate remains a delivery requirement and rejects a new scene while deliberately
 left uncommitted for user review.
 
-Bubbles/turbulence, independent relief jets, latch-mechanism simulation and Core
-physics changes remain deferred.
+Latch-mechanism simulation and Core physics changes remain deferred. Pool bubbles
+(`ReactorWaterAtmosphere`, decorative) and independent primary/secondary relief jets
+(`PlantEquipmentBinder`) are implemented; the jets need authored relief anchors in the
+placed hall assets to appear.

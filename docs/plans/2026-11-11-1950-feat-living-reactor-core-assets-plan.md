@@ -34,7 +34,7 @@ The only reactor geometry in-game is procedural Unity code (`HallBuilder`/`SmrMo
 ### Key Decisions
 
 - **Session-settled: Blender→FBX pipeline** (user-directed — chosen over Unity procedural meshes and glTF: existing pipeline, zero new dependencies per `plant-and-assets.md` §5).
-- **Session-settled: Windows execution host** (user-directed — chosen over omarchy-max flatpak install: Blender 5.2.2 already installed and headless-verified at `C:\Program Files\Blender Foundation\Blender 5.2\blender.exe`).
+- **Session-settled: Windows execution host** (user-directed — chosen over a Linux flatpak install: Blender 5.2.2 already installed and headless-verified on the Windows host).
 - **Session-settled: full A–D program** (user-approved — chosen over Phase-A-only scoping: "the reactor full 3d sim" confirmed at scoping synthesis).
 
 ### Requirements

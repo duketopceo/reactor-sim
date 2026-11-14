@@ -111,7 +111,7 @@ public class VoiceAnnouncer : MonoBehaviour
             if (prevAlarmCount == 0 && alarmCount > 0) hadAlarms = true;
             if (hadAlarms && alarmCount == 0) { Say("all_normal"); hadAlarms = false; }
             prevAlarmCount = alarmCount;
-            foreach (var a in eng.ActiveAlarms)
+            if (eng.ActiveAlarms != null) foreach (var a in eng.ActiveAlarms)
             {
                 if (a == null) continue;
                 if (a.Code == "REACTIVITY_EXCURSION") Say("alarm_period");

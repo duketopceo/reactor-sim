@@ -14,6 +14,7 @@ public sealed class PlantWallMapView : MonoBehaviour
     private MaterialPropertyBlock block;
     private TextMeshPro metrics;
     private TextMeshPro detail;
+    private string lastSummary, lastDetail;
     private Renderer fuel;
     private ControlRoom3DBinder roomBinder;
     private Material metricsMaterial;
@@ -170,7 +171,12 @@ public sealed class PlantWallMapView : MonoBehaviour
         }
         if (metrics == null) return;
         var alarmContext = roomBinder != null ? roomBinder.CurrentLampContext() : LampContext.Default;
-        metrics.text = PlantWallMapModel.Summary(s, alarmContext);
-        if (detail != null) detail.text = PlantWallMapModel.GroupedReadout(s);
+        string summary = PlantWallMapModel.Summary(s, alarmContext);
+        if (summary != lastSummary) { lastSummary = summary; metrics.text = summary; }
+        if (detail != null)
+        {
+            string grouped = PlantWallMapModel.GroupedReadout(s);
+            if (grouped != lastDetail) { lastDetail = grouped; detail.text = grouped; }
+        }
     }
 }
