@@ -46,6 +46,14 @@ namespace ReactorSim
         public double FeedwaterDeliveredFrac { get; private set; }
         public const double RatedBoilOffPerSec = 0.0005;              // SG level fraction per s at rated steam
 
+        // Preserve the most recent computed outputs across a snapshot restore; the next step recomputes them.
+        internal void RestoreMeasuredFlows(double turbineSteamKw, double dumpSteamKw, double feedDelivered)
+        {
+            TurbineSteamKW = Math.Max(0, Physics.Sanitize(turbineSteamKw, 0));
+            DumpSteamKW = Math.Max(0, Physics.Sanitize(dumpSteamKw, 0));
+            FeedwaterDeliveredFrac = Math.Max(0, Physics.Sanitize(feedDelivered, 0));
+        }
+
         public double SecondaryTempC
         {
             get { return Physics.SaturationTempK(SecondaryPressureBar) - 273.15; }

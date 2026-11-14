@@ -22,9 +22,13 @@ public static class PlantWallMapModel
         switch (name)
         {
             case "PrimaryHot": case "PrimaryCold": value = s.PrimaryFlowFrac; break;
-            case "Feedwater": value = s.FeedwaterFlowFrac; break;
+            case "Feedwater": value = s.FeedwaterDeliveredFrac; break;
             case "CoolingSupply": case "CoolingReturn": value = s.CoolingWaterFrac; break;
             case "Grid": value = s.GridOutputFrac; break;
+            case "Steam": case "TurbineExhaust": value = s.TurbineSteamKW / Physics.RatedThermalKW; break;
+            case "SteamDump": value = s.DumpSteamKW / Physics.RatedThermalKW; break;
+            case "SteamHeader": value = (s.TurbineSteamKW + s.DumpSteamKW) / Physics.RatedThermalKW; break;
+            case "Shaft": value = s.TurbineRpm / Physics.TurbineRatedRpm; break;
             default: return double.NaN;
         }
         return Finite(value) ? Math.Max(0, Math.Min(1, value)) : double.NaN;
@@ -67,7 +71,11 @@ public static class PlantWallMapModel
                 if (!Finite(s.Power) || !Finite(s.FuelTempC)) return Status.Unavailable;
                 return s.Scrammed || LampPredicates.Evaluate("FUEL_TEMP_HI", s, c) || LampPredicates.Evaluate("HIGH_FLUX", s, c) ? Status.Alarm : Status.Normal;
             case "Safety": return s.Scrammed ? Status.Alarm : Status.Normal;
-            case "PrimaryPump": case "Pressurizer": return Primary(s);
+            case "PrimaryPump": return Primary(s);
+            case "Pressurizer":
+                var primary = Primary(s);
+                return primary == Status.Unavailable || primary == Status.Alarm ? primary :
+                    s.ReliefOpen ? Status.Warning : primary;
             case "SteamGenerator":
                 if (!Finite(s.SecondaryPressureBar) || !Finite(s.SecondaryLevelFrac)) return Status.Unavailable;
                 if (LampPredicates.Evaluate("SG_LOW_LEVEL_TRIP", s, c)) return Status.Alarm;

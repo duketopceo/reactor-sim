@@ -30,6 +30,24 @@ namespace ReactorSim.Tests
         }
 
         [Fact]
+        public void MeasuredFlowsAreCapturedAndRestoredWithoutConfusingCommandsForOutput()
+        {
+            var plant = new Plant();
+            plant.LoadPreset("full-power");
+            plant.Apply(PlantIntent.SetSteamDump(0.3));
+            for (int i = 0; i < 5; i++) plant.Step(1.0);
+            var captured = plant.CaptureState();
+            Assert.Equal(plant.Thermal.FeedwaterDeliveredFrac, captured.FeedwaterDeliveredFrac);
+            Assert.Equal(plant.Thermal.DumpSteamKW, captured.DumpSteamKW);
+            var restored = new Plant();
+            restored.RestoreState(PlantSnapshot.FromJson(captured.ToJson()));
+            var roundTrip = restored.CaptureState();
+            Assert.Equal(captured.FeedwaterDeliveredFrac, roundTrip.FeedwaterDeliveredFrac);
+            Assert.Equal(captured.DumpSteamKW, roundTrip.DumpSteamKW);
+            Assert.Equal(captured.TurbineSteamKW, roundTrip.TurbineSteamKW);
+        }
+
+        [Fact]
         public void SnapshotJson_RoundTripsFreshPlant()
         {
             var p = new Plant();

@@ -75,6 +75,8 @@ namespace ReactorSim
         // Balance of plant (defaults = a snapshot written before the BOP existed)
         public double SteamDumpFrac;
         public double TurbineSteamKW;
+        public double DumpSteamKW;
+        public double FeedwaterDeliveredFrac;
         public double FeedwaterAvailabilityFrac = 1.0;
         public bool BopAutoLoad = true;
         public double GridDemandFrac;
@@ -140,6 +142,7 @@ namespace ReactorSim
 
             sb.AppendFormat(ic, "\"steamDumpFrac\":{0:G17},\"turbineSteamKW\":{1:G17},\"feedwaterAvailabilityFrac\":{2:G17},",
                 SteamDumpFrac, TurbineSteamKW, FeedwaterAvailabilityFrac);
+            sb.AppendFormat(ic, "\"dumpSteamKW\":{0:G17},\"feedwaterDeliveredFrac\":{1:G17},", DumpSteamKW, FeedwaterDeliveredFrac);
             sb.AppendFormat(ic, "\"bopAutoLoad\":{0},\"gridDemandFrac\":{1:G17},\"vacuumPumpFrac\":{2:G17},\"coolingWaterFrac\":{3:G17},",
                 BopAutoLoad ? "true" : "false", GridDemandFrac, VacuumPumpFrac, CoolingWaterFrac);
             sb.AppendFormat(ic, "\"turbineRpm\":{0:G17},\"generatorSynced\":{1},\"turbineTripped\":{2},",
@@ -230,6 +233,8 @@ namespace ReactorSim
 
             s.SteamDumpFrac = PlantIntent.ExtractJsonDouble(json, "steamDumpFrac", 0.0);
             s.TurbineSteamKW = PlantIntent.ExtractJsonDouble(json, "turbineSteamKW", 0.0);
+            s.DumpSteamKW = PlantIntent.ExtractJsonDouble(json, "dumpSteamKW", 0.0);
+            s.FeedwaterDeliveredFrac = PlantIntent.ExtractJsonDouble(json, "feedwaterDeliveredFrac", 0.0);
             s.FeedwaterAvailabilityFrac = PlantIntent.ExtractJsonDouble(json, "feedwaterAvailabilityFrac", 1.0);
             s.BopAutoLoad = PlantIntent.ExtractJsonBool(json, "bopAutoLoad", true);
             s.GridDemandFrac = PlantIntent.ExtractJsonDouble(json, "gridDemandFrac", 0.0);

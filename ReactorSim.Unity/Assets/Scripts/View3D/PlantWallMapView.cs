@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using ReactorSim;
+using ReactorSim.Instruments;
 using TMPro;
 using UnityEngine;
 
@@ -12,6 +13,7 @@ public sealed class PlantWallMapView : MonoBehaviour
     private readonly Dictionary<Transform, Vector3> rods = new Dictionary<Transform, Vector3>();
     private MaterialPropertyBlock block;
     private TextMeshPro metrics;
+    private Renderer fuel;
 
     private void Awake()
     {
@@ -31,6 +33,7 @@ public sealed class PlantWallMapView : MonoBehaviour
                 if (r != null && end > 5) routes[r] = t.name.Substring(5, end - 5);
             }
             if (t.name.StartsWith("RodBank_") && t.parent != null) rods[t] = t.localPosition;
+            if (t.name == "Core_Fuel") fuel = t.GetComponent<Renderer>();
             if (t.name == "MetricsSocket")
             {
                 var go = new GameObject("LiveMetrics");
@@ -47,7 +50,24 @@ public sealed class PlantWallMapView : MonoBehaviour
 
     private void Update()
     {
-        PlantSnapshot s = bridge != null ? bridge.GetSnapshot() : null;
+        ApplySnapshot(bridge != null ? bridge.GetSnapshot() : null);
+    }
+
+    // Kept separate from snapshot acquisition so the actual scene binding can be exercised in play mode.
+    public void ApplySnapshot(PlantSnapshot s)
+    {
+        if (fuel != null)
+        {
+            bool available = s != null && !double.IsNaN(s.Power) && !double.IsInfinity(s.Power) &&
+                !double.IsNaN(s.FuelTempC) && !double.IsInfinity(s.FuelTempC);
+            Color tint = available ? Color.Lerp(ThemeColors.ToColor(ReactorSim.Ui.Theme.CoreGlowCold),
+                ThemeColors.ToColor(ReactorSim.Ui.Theme.CoreGlowHot), (float)GlowMapping.FuelTemperatureLevel(s.FuelTempC)) : ThemeColors.TextDim;
+            fuel.GetPropertyBlock(block);
+            block.SetColor("_Color", tint);
+            block.SetColor("_BaseColor", tint);
+            block.SetColor("_EmissionColor", tint * (available ? (float)GlowMapping.RackEmission(s.Power) : 0f));
+            fuel.SetPropertyBlock(block);
+        }
         foreach (var pair in routes)
         {
             double activity = PlantWallMapModel.RouteActivity(pair.Value, s);
@@ -55,7 +75,7 @@ public sealed class PlantWallMapView : MonoBehaviour
             // Unknown routes retain their authored circuit color, including after a reading disappears.
             if (double.IsNaN(activity)) { pair.Key.SetPropertyBlock(null); continue; }
             Color baseColor = material != null && material.HasProperty("_BaseColor") ? material.GetColor("_BaseColor") :
-                material != null && material.HasProperty("_Color") ? material.color : Color.white;
+                material != null && material.HasProperty("_Color") ? material.color : ThemeColors.TextBody;
             Color color = baseColor * Mathf.Lerp(0.3f, 1f, (float)activity);
             pair.Key.GetPropertyBlock(block);
             block.SetColor("_Color", color);
@@ -66,6 +86,8 @@ public sealed class PlantWallMapView : MonoBehaviour
         foreach (var pair in rods)
         {
             double insertion = PlantWallMapModel.BankInsertion(pair.Key.name.Substring(8), s);
+            var rodRenderer = pair.Key.GetComponent<Renderer>();
+            if (rodRenderer != null) rodRenderer.enabled = !double.IsNaN(insertion);
             if (double.IsNaN(insertion)) { pair.Key.localPosition = pair.Value; continue; }
             // Move down in the mounted board's vertical direction, preserving the imported FBX axes.
             Vector3 offset = pair.Key.parent.InverseTransformVector(-transform.up * (0.3f * (float)insertion * transform.lossyScale.y));
@@ -84,6 +106,7 @@ public sealed class PlantWallMapView : MonoBehaviour
             }
             pair.Value.GetPropertyBlock(block);
             block.SetColor("_Color", color);
+            block.SetColor("_BaseColor", color);
             block.SetColor("_EmissionColor", color);
             pair.Value.SetPropertyBlock(block);
         }
@@ -103,7 +126,7 @@ public sealed class PlantWallMapView : MonoBehaviour
             "   COND " + PlantWallMapModel.Reading(s.CondenserPressureBar, "bar", 2) + "\n" +
             "RHO " + PlantWallMapModel.Reading(s.TotalReactivityPcm, "pcm", 0) +
             "   BORON " + PlantWallMapModel.Reading(s.BoronPpm, "ppm", 0) +
-            "   FEED " + PlantWallMapModel.Reading(s.FeedwaterFlowFrac * 100, "%") +
+            "   FEED " + PlantWallMapModel.Reading(s.FeedwaterDeliveredFrac * 100, "% rated") +
             "   OUTPUT " + PlantWallMapModel.Reading(s.GeneratorKw, "kW", 0);
     }
 }
