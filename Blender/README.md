@@ -46,6 +46,12 @@ map changes. The .blend files are opened read-only and never re-saved.
 
 ## Living reactor assets
 
+The separate plant-overview wall is generated with
+`blender -b --python-exit-code 1 --python Blender/scripts/make_plant_overview.py`.
+Export it with `export_unity.py -- PlantOverview` and sync as below. Its labeled,
+colored pipework is schematic; `Status_*`, `LabelSocket_*`, and `MetricsSocket`
+are reserved for Unity integration and do not yet display live state.
+
 Run from the repository root using the installed Blender executable (`blender`
 below). `--python-exit-code 1` makes script errors fail the build.
 

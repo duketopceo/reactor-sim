@@ -11,7 +11,7 @@ BLEND_DIR = os.path.dirname(SCRIPT_DIR)
 EXPORT_DIR = os.path.join(BLEND_DIR, "exports")
 os.makedirs(EXPORT_DIR, exist_ok=True)
 
-BLENDS = ["ControlRoom", "PanelKits", "PlantEquipment"]
+BLENDS = ["ControlRoom", "PanelKits", "PlantEquipment", "PlantOverview"]
 REACTOR_BLENDS = ["ReactorCore", "VesselInternals", "RotatingEquipment"]
 BLENDS += REACTOR_BLENDS
 

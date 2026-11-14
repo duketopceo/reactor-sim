@@ -184,6 +184,21 @@ public static class ControlRoomSceneBuilder
         // U6: window in the south wall beside the door, and the reactor hall beyond it (primitives, no Blender asset).
         BuildReactorWindow(crRoot.transform);
 
+        // The overview is a separate read-only surface, rebuilt with the room.
+        var wallMapPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(FbxDir + "/PlantOverview.fbx");
+        var northWall = FindDeep(crRoot.transform, "Wall_North");
+        var northRenderer = northWall != null ? northWall.GetComponent<Renderer>() : null;
+        if (wallMapPrefab != null && northRenderer != null)
+        {
+            var map = (GameObject)PrefabUtility.InstantiatePrefab(wallMapPrefab, crRoot.transform);
+            map.name = "WholePlantOverview";
+            map.transform.localScale = Vector3.one * 0.5f;
+            var bounds = northRenderer.bounds;
+            map.transform.position = new Vector3(bounds.center.x, bounds.min.y + 1.15f, bounds.min.z - 0.10f);
+            map.AddComponent<PlantWallMapView>().bridge = bridge;
+        }
+        else Debug.LogWarning("[Phase2SceneBuilder] Plant overview asset or north wall missing.");
+
         // U16: procedure clipboards on the bench in front of each chair (children of crRoot, so a rebuild replaces them).
         PlaceClipboard(crRoot.transform, "SEAT_A1", "CLIPBOARD_A1", "Startup checklist", new[] { "cold-start-to-grid" });
         PlaceClipboard(crRoot.transform, "SEAT_A2", "CLIPBOARD_A2", "Startup checklist", new[] { "cold-start-to-grid" });

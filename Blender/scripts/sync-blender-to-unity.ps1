@@ -6,7 +6,7 @@ $ExportDir = Join-Path $RepoRoot "Blender\exports"
 $Dest = Join-Path $RepoRoot "ReactorSim.Unity\Assets\Blender"
 New-Item -ItemType Directory -Force -Path $Dest | Out-Null
 $Copied = 0
-foreach ($fbx in @("ControlRoom.fbx", "PanelKits.fbx", "PlantEquipment.fbx", "ReactorCore.fbx", "VesselInternals.fbx", "RotatingEquipment.fbx")) {
+foreach ($fbx in @("ControlRoom.fbx", "PanelKits.fbx", "PlantEquipment.fbx", "PlantOverview.fbx", "ReactorCore.fbx", "VesselInternals.fbx", "RotatingEquipment.fbx")) {
   $src = Join-Path $ExportDir $fbx
   if (Test-Path $src) {
     Copy-Item -LiteralPath $src -Destination (Join-Path $Dest $fbx) -Force
