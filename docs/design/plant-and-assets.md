@@ -139,7 +139,7 @@ Layout rule: **one zone ≈ one glance.** Critical state (power, rod demand vs p
 * **Cooperative roles:** reactor operator (zones 1–2), BOP operator (3–5), supervisor (7–8). Cross-trained tasks (SCRAM, alarm acknowledge) reachable from both desks.
 * **Sightlines/readability:** centre board visible from every desk; red/amber/white lamp semantics are consistent; text size ≥ legible at 2.5 m.
 * **Alarm response:** annunciator → first-out → desk or field action (walk to a skid) → feedback lamp. Walking time is a *game* cost; no real procedure is reproduced.
-* **Safe maintenance abstraction:** maintenance is a short interaction with tag-out, no real step-by-step; players never enter irradiated areas.
+* **Radiation and maintenance gameplay:** controlled-access areas outside the operating containment can carry modeled, clearly displayed radiation exposure. Maintenance and isolation are fictional game abstractions, not real-world procedures. The operating containment remains inaccessible; any later access requires a separately designed and tested plant state and route.
 * **Loading/performance boundaries:** control room + support always resident; containment cutaway is a lightweight low-poly proxy; turbine hall and exterior stream additively; LOD2 and occlusion at doors/airlocks.
 
 ## 5. Blender → Unity workflow

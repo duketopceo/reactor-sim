@@ -6,6 +6,21 @@ Build an original, walkable nuclear-plant operations game: operate the reactor a
 
 This roadmap describes intended work, not a release promise. Progress is measured by the acceptance gates below rather than dates or completion percentages. Final crew size, severity of health effects, online transport and economy balance remain open until designed and playtested.
 
+## CE plan index and dependencies
+
+| Phase | Execution plan | Depends on | Status |
+|---|---|---|---|
+| 1 | [Trustworthy plant, controls and audio](docs/plans/2026-11-14-ce-phase-1-trustworthy-plant-plan.md) | Current baseline | In progress |
+| 2 | [Player and first connected buildings](docs/plans/2026-11-14-ce-phase-2-player-buildings-plan.md) | Phase 1 playable baseline | Planned |
+| 3 | [Shared plant and visible crew](docs/plans/2026-11-14-ce-phase-3-shared-crew-plan.md) | Phase 2 route and player | Planned |
+| 4 | [Radiation and controlled access](docs/plans/2026-11-14-ce-phase-4-radiation-access-plan.md) | Phase 2 route; Phase 3 for co-op | Planned |
+| 5 | [Field operations and maintenance](docs/plans/2026-11-14-ce-phase-5-field-maintenance-plan.md) | Phases 2 and 4; Phase 3 for co-op | Planned |
+| 6 | [Plant campus](docs/plans/2026-11-14-ce-phase-6-plant-campus-plan.md) | Phases 2 and 5 vertical slice | Planned |
+| 7 | [Operations, progression and assistant](docs/plans/2026-11-14-ce-phase-7-operations-progression-plan.md) | Phase 5 task loop; Phase 6 for campus-wide work | Planned |
+| 8 | [Release hardening](docs/plans/2026-11-14-ce-phase-8-release-hardening-plan.md) | Accepted scope from Phases 1–7 | Planned |
+
+Plans may be designed in parallel, but a co-op or whole-plant claim is gated on the listed shared-world and field-work dependencies. The first execution target is Phase 1; future phases are not started or complete merely because a plan exists.
+
 ## Current baseline — November 2026
 
 - A deterministic PWR-style core models point kinetics, delayed neutrons, reactivity, rods, chemistry, xenon/iodine, decay heat, primary/secondary heat transfer and pressurizer behavior. The balance-of-plant model includes turbine/generator, condenser, feedwater, cooling and grid trips.
