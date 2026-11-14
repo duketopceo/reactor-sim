@@ -23,6 +23,7 @@
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\CsvReader.cs" Link="Unity\CsvReader.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\GaugeSources.cs" Link="Unity\GaugeSources.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\LampPredicates.cs" Link="Unity\LampPredicates.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\PlantWallMapModel.cs" Link="Unity\PlantWallMapModel.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\OperatorMath.cs" Link="Unity\OperatorMath.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\ClockReadout.cs" Link="Unity\ClockReadout.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\AlarmTracker.cs" Link="Unity\AlarmTracker.cs" />

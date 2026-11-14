@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SRC="$ROOT/Blender/exports"
 DEST="$ROOT/ReactorSim.Unity/Assets/Blender"
 mkdir -p "$DEST"
-for f in ControlRoom.fbx PanelKits.fbx PlantEquipment.fbx ReactorCore.fbx VesselInternals.fbx RotatingEquipment.fbx; do
+for f in ControlRoom.fbx PanelKits.fbx PlantEquipment.fbx PlantOverview.fbx ReactorCore.fbx VesselInternals.fbx RotatingEquipment.fbx; do
   if [ -f "$SRC/$f" ]; then cp "$SRC/$f" "$DEST/$f"; echo "Copied $f"; else echo "Missing $SRC/$f (run Blender export first)" >&2; exit 1; fi
 done
 cp "$ROOT/assets/manifest.csv" "$DEST/ReactorManifest.csv"
