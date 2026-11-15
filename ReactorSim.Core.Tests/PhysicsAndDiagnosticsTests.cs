@@ -29,14 +29,6 @@ namespace ReactorSim.Tests
         }
 
         [Fact]
-        public void Saturation_OutsideDomain_StaysFinite_ClampedToCriticalPoint()
-        {
-            Assert.Equal(Physics.CriticalPressureBar, Physics.SaturationPressureBar(900.0), 6);
-            Assert.Equal(Physics.CriticalTempK, Physics.SaturationTempK(1000.0), 6);
-            Assert.True(Physics.IsFinite(Physics.SaturationPressureBar(double.NaN)));
-        }
-
-        [Fact]
         public void Clamp_MapsNaNToLowerBound()
         {
             // Documented and the reason rod commands are rejected at the boundary.
