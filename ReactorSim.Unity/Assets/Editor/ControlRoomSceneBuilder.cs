@@ -207,6 +207,17 @@ public static class ControlRoomSceneBuilder
             map.transform.position = new Vector3(doorRenderer.bounds.center.x + inward * 2.8f,
                 roomFloor + 0.85f, windowBounds.center.z + inward * 0.18f);
             map.AddComponent<PlantWallMapView>().bridge = bridge;
+            // U2: every wall component node is a click target that selects it for the detail plate (read-only, no control).
+            foreach (string component in WallDetailModel.Components)
+            {
+                var node = FindDeep(map.transform, "System_" + component);
+                if (node == null || node.GetComponent<DiegeticInteractable>() != null) continue;
+                FitCollider(node, 0.1f);
+                var pick = node.gameObject.AddComponent<DiegeticInteractable>();
+                pick.wallComponent = component;
+                pick.rowId = "wall:" + component;
+                pick.rowLabel = WallDetailModel.Title(component);
+            }
         }
         else Debug.LogWarning("[Phase2SceneBuilder] Plant overview asset, door, window, or floor missing.");
 

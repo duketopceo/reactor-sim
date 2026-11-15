@@ -148,5 +148,57 @@ expect 0 "glowmid waived on purpose passes" "$tmp/glownomid" --only glowoff,glow
 waived_out="$(bash scripts/check-captures.sh "$tmp/glownomid" --only glowoff,glowidle,glowfull --allow-skip glowmid 2>&1)"
 case "$waived_out" in *"NOT graded"*) echo "ok   the waived glowmid check says it was not graded" ;; *) echo "FAIL the waived glowmid check did not say it was ungraded"; failures=$((failures + 1)) ;; esac
 
+# status wall readability cases (U2): mkwall <dir> <glyph px> <contrast> <fits true|false> [nomeasure] ; nomeasure drops the text measurement
+mkwall() {
+  local d="$1/1600x900"
+  mkdir -p "$d"
+  head -c 30000 /dev/zero > "$d/w.png"
+  local m="\"glyphHeightPx\":$2,\"contrast\":$3,"
+  [ "${5:-}" = nomeasure ] && m=""
+  cat > "$d/captures.json" <<EOF
+{"captures":[
+ {"pose":"wall","label":"wall","file":"w.png",${m}"detailFits":$4},
+ {"pose":"wallidle","label":"wallidle","file":"w.png",${m}"detailFits":$4}
+]}
+EOF
+}
+mkwall "$tmp/wallok" 12.0 7.0 true
+mkwall "$tmp/wallglyph" 9.9 7.0 true
+mkwall "$tmp/wallglyphedge" 10.0 7.0 true
+mkwall "$tmp/wallcontrast" 12.0 4.4 true
+mkwall "$tmp/wallcontrastedge" 12.0 4.5 true
+mkwall "$tmp/wallfit" 12.0 7.0 false
+mkwall "$tmp/wallnone" 12.0 7.0 true nomeasure
+expect 0 "wall text that is large, contrasty and fits passes" "$tmp/wallok" --only wall,wallidle
+expect 1 "wall glyph just under 10 px fails" "$tmp/wallglyph" --only wall,wallidle
+expect 0 "wall glyph exactly 10 px passes" "$tmp/wallglyphedge" --only wall,wallidle
+expect 1 "wall contrast just under 4.5 fails" "$tmp/wallcontrast" --only wall,wallidle
+expect 0 "wall contrast exactly 4.5 passes" "$tmp/wallcontrastedge" --only wall,wallidle
+expect 1 "wall text that overflows its plate fails" "$tmp/wallfit" --only wall,wallidle
+expect 1 "a wall capture with no text measurement fails instead of passing" "$tmp/wallnone" --only wall,wallidle
+# only one of the two wall poses captured: the missing one is a failure
+mkdir -p "$tmp/wallhalf/1600x900"
+head -c 30000 /dev/zero > "$tmp/wallhalf/1600x900/w.png"
+echo '{"captures":[{"pose":"wall","label":"wall","file":"w.png","glyphHeightPx":12,"contrast":7,"detailFits":true}]}' > "$tmp/wallhalf/1600x900/captures.json"
+expect 1 "a missing wallidle capture fails" "$tmp/wallhalf" --only wall,wallidle
+# both wall poses are in the default required list: a full run without them fails, with them passes
+mkfull() {   # mkfull <dir> <with wall: yes|no>
+  local d="$1/1600x900"
+  mkdir -p "$d"
+  head -c 30000 /dev/zero > "$d/f.png"
+  local body='{"pose":"seat","label":"seat","file":"f.png"}'
+  for pz in stand tooltip rejected drag checklist pause tablet clipboard menu; do body="$body,{\"pose\":\"$pz\",\"label\":\"$pz\",\"file\":\"f.png\"}"; done
+  body="$body,{\"pose\":\"crt\",\"label\":\"crt\",\"file\":\"f.png\",\"glyphHeightPx\":12,\"contrast\":7}"
+  if [ "$2" = yes ]; then
+    body="$body,{\"pose\":\"wall\",\"label\":\"wall\",\"file\":\"f.png\",\"glyphHeightPx\":12,\"contrast\":7,\"detailFits\":true}"
+    body="$body,{\"pose\":\"wallidle\",\"label\":\"wallidle\",\"file\":\"f.png\",\"glyphHeightPx\":12,\"contrast\":7,\"detailFits\":true}"
+  fi
+  echo "{\"captures\":[$body]}" > "$d/captures.json"
+}
+mkfull "$tmp/fullwith" yes
+mkfull "$tmp/fullwithout" no
+expect 0 "a full default run with the wall poses passes" "$tmp/fullwith"
+expect 1 "a full default run without the wall poses fails" "$tmp/fullwithout"
+
 [ "$failures" -eq 0 ] && echo "check-captures budget self-test: PASS" || echo "check-captures budget self-test: FAILED ($failures)"
 exit "$failures"

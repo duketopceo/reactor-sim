@@ -105,6 +105,7 @@ public static class PlantFeedbackPlayCapture
             metrics.ForceMeshUpdate();
             if (metrics.textBounds.size.x > metrics.rectTransform.rect.width || metrics.textBounds.size.y > metrics.rectTransform.rect.height)
                 throw new InvalidOperationException("Live metrics overflow their backing panel");
+            CheckFlowCues(view, map);
             CaptureLiveDetail(cam, view, map, panel, dir);
             view.ApplySnapshot(view.bridge != null ? view.bridge.GetSnapshot() : null);
             var renderers = map.GetComponentsInChildren<Renderer>();
@@ -124,8 +125,11 @@ public static class PlantFeedbackPlayCapture
         catch (Exception ex) { Debug.LogError("[PlantFeedbackPlayCapture] FAIL " + ex); Finish(1); }
     }
 
-    // The grouped-readings plate under the summary plate: apply two different snapshots, require the text to follow each one, stay inside
-    // its backing plate, and save a close capture of each (live-detail-a.png, live-detail-b.png) so the change can be seen as well as asserted.
+    // U2: the wall's click-to-select detail plate and route direction cues, exercised through the real components. Every wall node is
+    // clicked through DiegeticInteractable's own OnMouseDown (select, move, clear, prompt), the plate text must follow the model for a
+    // normal, a changed and an all-NaN snapshot and stay inside its backing plate for every component (this is the overflow assertion
+    // at the capture size), and a close capture of the prompt and of a selected component is saved (live-detail-prompt.png,
+    // live-detail-a.png, live-detail-b.png) so the result can be looked at as well as asserted.
     private static void CaptureLiveDetail(Camera cam, PlantWallMapView view, Transform map, Transform summaryPlate, string dir)
     {
         var plate = ControlRoomSceneBuilder.FindDeep(map, "LiveDetailPlate");
@@ -134,25 +138,134 @@ public static class PlantFeedbackPlayCapture
         if (plate == null || tmp == null) throw new InvalidOperationException("Live detail plate or text missing");
         var a = new PlantSnapshot { BankInsertion = new[] { 0.1, 0.2, 0.3, 0.4 }, Power = 0.42, FuelTempC = 456, PrimaryPressureBar = 155.2, BoronPpm = 1180, SimSeconds = 3725 };
         var b = new PlantSnapshot { BankInsertion = new[] { 0.5, 0.5, 0.5, 0.5 }, Power = 0.87, FuelTempC = 512, PrimaryPressureBar = 156.8, BoronPpm = 1090, SimSeconds = 3730 };
+        double nan = double.NaN;
+        var missing = new PlantSnapshot { Power = nan, FuelTempC = nan, TotalReactivityPcm = nan, PeriodSeconds = nan, PrimaryFlowFrac = nan,
+            PrimaryTempC = nan, PrimaryLevelFrac = nan, PrimaryPressureBar = nan, PrimarySatMarginC = nan, HeaterPowerFrac = nan,
+            SprayFrac = nan, SecondaryPressureBar = nan, SecondaryTempC = nan, SecondaryLevelFrac = nan, SteamDemandFrac = nan,
+            DumpSteamKW = nan, TurbineRpm = nan, TurbineSteamKW = nan, GeneratorKw = nan, GridFrequencyHz = nan, GridOutputFrac = nan,
+            CondenserPressureBar = nan, HotwellInventoryFrac = nan, VacuumPumpFrac = nan, CoolingWaterFrac = nan,
+            FeedwaterDeliveredFrac = nan, FeedwaterFlowFrac = nan, FeedwaterAvailabilityFrac = nan, BoronPpm = nan, Ph = nan,
+            BankInsertion = new[] { nan, nan, nan, nan } };
+        var snapshots = new[] { a, b, missing };
+
+        view.ClearSelection();
+        view.ApplySnapshot(a);
+        tmp.ForceMeshUpdate();
+        if (tmp.text != WallDetailModel.Prompt) throw new InvalidOperationException("With nothing selected the plate does not show the prompt: " + tmp.text.Replace("\n", " | "));
+        AssertInsidePlate(tmp, "the prompt");
+        CloseCapture(cam, plate, map, Path.Combine(dir, "live-detail-prompt.png"));
+
+        foreach (string component in WallDetailModel.Components)
+        {
+            var node = ControlRoomSceneBuilder.FindDeep(map, "System_" + component);
+            var click = node != null ? node.GetComponent<DiegeticInteractable>() : null;
+            if (click == null || !click.IsWallNode || click.wallComponent != component || node.GetComponent<Collider>() == null)
+                throw new InvalidOperationException("Wall node System_" + component + " has no click target (collider + wall DiegeticInteractable)");
+            node.SendMessage("OnMouseDown");   // the real click path
+            if (view.SelectedComponent != component) throw new InvalidOperationException("Clicking " + component + " selected " + (view.SelectedComponent ?? "nothing"));
+            for (int i = 0; i < snapshots.Length; i++)
+            {
+                view.ApplySnapshot(snapshots[i]);
+                tmp.ForceMeshUpdate();
+                string want = WallDetailModel.DetailText(component, snapshots[i]);
+                if (tmp.text != want) throw new InvalidOperationException(component + " plate text does not follow the model: " + tmp.text.Replace("\n", " | "));
+                if (i == 2 && (tmp.text.Contains("NaN") || tmp.text.Contains("Infinity"))) throw new InvalidOperationException(component + " shows a raw NaN: " + tmp.text.Replace("\n", " | "));
+                AssertInsidePlate(tmp, component + " snapshot " + i);
+            }
+            node.SendMessage("OnMouseDown");   // clicking it again clears
+            if (view.SelectedComponent != null) throw new InvalidOperationException("Clicking " + component + " again did not clear the selection");
+            view.ApplySnapshot(a);
+            tmp.ForceMeshUpdate();
+            if (tmp.text != WallDetailModel.Prompt) throw new InvalidOperationException("The plate did not return to the prompt after clearing " + component);
+        }
+
+        // Clicking another component moves the selection, and the highlight follows it.
+        var first = ControlRoomSceneBuilder.FindDeep(map, "System_Reactor");
+        var second = ControlRoomSceneBuilder.FindDeep(map, "System_Turbine");
+        var firstRenderer = first.GetComponent<Renderer>();
+        var secondRenderer = second.GetComponent<Renderer>();
+        var props = new MaterialPropertyBlock();
+        first.SendMessage("OnMouseDown");
+        view.ApplySnapshot(a);
+        firstRenderer.GetPropertyBlock(props);
+        Color lit = props.GetColor("_Color");
+        if (!firstRenderer.HasPropertyBlock() || lit.maxColorComponent <= 0f) throw new InvalidOperationException("The selected component is not highlighted");
+        second.SendMessage("OnMouseDown");
+        if (view.SelectedComponent != "Turbine") throw new InvalidOperationException("Clicking another component did not move the selection");
+        view.ApplySnapshot(a);
+        if (firstRenderer.HasPropertyBlock()) throw new InvalidOperationException("The previous component is still highlighted after the selection moved");
+        if (!secondRenderer.HasPropertyBlock()) throw new InvalidOperationException("The newly selected component is not highlighted");
+        view.ClearSelection();
+        if (secondRenderer.HasPropertyBlock()) throw new InvalidOperationException("The highlight stayed after the selection was cleared");
+
+        // Captures of a selected component under two different snapshots.
+        first.SendMessage("OnMouseDown");
         string[] seen = new string[2];
-        var snapshots = new[] { a, b };
-        string[] expect = { "CORE 42.0 %", "CORE 87.0 %" };
-        string[] expectTemp = { "456.0 C", "512.0 C" };
+        var shown = new[] { a, b };
         for (int i = 0; i < 2; i++)
         {
-            view.ApplySnapshot(snapshots[i]);
+            view.ApplySnapshot(shown[i]);
             tmp.ForceMeshUpdate();
             seen[i] = tmp.text;
-            if (!seen[i].Contains(expect[i]) || !seen[i].Contains(expectTemp[i]))
-                throw new InvalidOperationException("Live detail did not show snapshot " + i + ": " + seen[i].Replace("\n", " | "));
-            if (tmp.textBounds.size.x > tmp.rectTransform.rect.width + 0.001f || tmp.textBounds.size.y > tmp.rectTransform.rect.height + 0.001f)
-                throw new InvalidOperationException("Live detail overflows its backing plate in snapshot " + i);
-            cam.transform.position = plate.position + map.forward * 2.2f;
-            cam.transform.LookAt(plate.position);
-            Capture(cam, Path.Combine(dir, i == 0 ? "live-detail-a.png" : "live-detail-b.png"));
+            AssertInsidePlate(tmp, "reactor capture " + i);
+            CloseCapture(cam, plate, map, Path.Combine(dir, i == 0 ? "live-detail-a.png" : "live-detail-b.png"));
         }
         if (seen[0] == seen[1]) throw new InvalidOperationException("Live detail text did not change between snapshots");
-        Debug.Log("[PlantFeedbackPlayCapture] OK live detail follows the snapshot: A=" + seen[0].Split('\n')[0] + " B=" + seen[1].Split('\n')[0]);
+        if (!seen[0].Contains("PWR 42.0 %") || !seen[1].Contains("PWR 87.0 %")) throw new InvalidOperationException("Reactor readout does not match the supplied snapshots");
+        view.ClearSelection();
+        Debug.Log("[PlantFeedbackPlayCapture] OK wall detail: prompt, click select/move/clear on " + WallDetailModel.Components.Length + " components, text inside the plate for normal/changed/NaN snapshots");
+    }
+
+    private static void AssertInsidePlate(TMPro.TextMeshPro tmp, string what)
+    {
+        if (tmp.textBounds.size.x > tmp.rectTransform.rect.width + 0.001f || tmp.textBounds.size.y > tmp.rectTransform.rect.height + 0.001f)
+            throw new InvalidOperationException("Wall detail text overflows its backing plate (" + what + "): " + tmp.textBounds.size + " in " + tmp.rectTransform.rect.size);
+    }
+
+    private static void CloseCapture(Camera cam, Transform plate, Transform map, string file)
+    {
+        cam.transform.position = plate.position + map.forward * 2.2f;
+        cam.transform.LookAt(plate.position);
+        Capture(cam, file);
+    }
+
+    // U2 (R4): one arrowhead per directed route, off at zero activity and for a missing reading, on while the model gives the route a
+    // direction, and calibrated: the first point of every route's authored path lands on that route's own first pipe segment.
+    private static void CheckFlowCues(PlantWallMapView view, Transform map)
+    {
+        if (view.FlowCueCount != PlantWallMapModel.DirectedRoutes.Length)
+            throw new InvalidOperationException("Expected " + PlantWallMapModel.DirectedRoutes.Length + " flow cues, found " + view.FlowCueCount);
+        view.ApplySnapshot(new PlantSnapshot());
+        foreach (string route in PlantWallMapModel.DirectedRoutes)
+        {
+            var cue = view.CueFor(route);
+            if (cue == null) throw new InvalidOperationException("No flow cue for " + route);
+            if (cue.gameObject.activeSelf) throw new InvalidOperationException("Flow cue " + route + " is shown at zero activity");
+        }
+        var flowing = new PlantSnapshot { PrimaryFlowFrac = 0.8, FeedwaterDeliveredFrac = 0.6, GridOutputFrac = 0.5,
+            TurbineSteamKW = ReactorSim.Physics.RatedThermalKW * 0.6, DumpSteamKW = ReactorSim.Physics.RatedThermalKW * 0.2 };
+        view.ApplySnapshot(flowing);
+        foreach (string route in PlantWallMapModel.DirectedRoutes)
+        {
+            var cue = view.CueFor(route);
+            if (!cue.gameObject.activeSelf) throw new InvalidOperationException("Flow cue " + route + " is not shown while the route flows");
+            var pipe = ControlRoomSceneBuilder.FindDeep(map, "Pipe_" + route + "_00");
+            var pipeRenderer = pipe != null ? pipe.GetComponent<Renderer>() : null;
+            if (pipeRenderer == null) throw new InvalidOperationException("Pipe_" + route + "_00 missing");
+            var first = PlantWallMapModel.RoutePath(route)[0];
+            Bounds near = pipeRenderer.bounds;
+            near.Expand(0.06f);
+            Vector3 world = view.BoardToWorld(first[0], first[1]);
+            if (!near.Contains(world))
+                throw new InvalidOperationException("Flow cue calibration is off for " + route + ": path start " + world + " is outside " + near);
+        }
+        if (view.CueFor("Shaft") != null) throw new InvalidOperationException("A route with no known flow sign has a cue");
+        view.ApplySnapshot(new PlantSnapshot { PrimaryFlowFrac = double.NaN, FeedwaterDeliveredFrac = double.NaN, GridOutputFrac = double.NaN,
+            TurbineSteamKW = double.NaN, DumpSteamKW = double.NaN });
+        foreach (string route in PlantWallMapModel.DirectedRoutes)
+            if (view.CueFor(route).gameObject.activeSelf) throw new InvalidOperationException("Flow cue " + route + " is shown for a missing reading");
+        view.ApplySnapshot(flowing);
+        Debug.Log("[PlantFeedbackPlayCapture] OK flow cues: " + view.FlowCueCount + " routes, hidden at zero and NaN, shown while flowing, calibrated to their pipes");
     }
 
     private static void CheckReliefBindings()

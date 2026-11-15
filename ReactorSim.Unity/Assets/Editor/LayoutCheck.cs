@@ -54,6 +54,7 @@ public static class LayoutCheck
             var ctx = Load();
             failures = CheckAnchors(ctx);
             failures += CheckWalkPaths(ctx);
+            failures += CheckWall(ctx);
             int rowFailures = 0, warnings = 0;
             foreach (var row in ctx.Rows)
             {
@@ -270,6 +271,53 @@ public static class LayoutCheck
             }
             Debug.Log("[LayoutCheck] anchor " + n + " pos=" + t.position.ToString("F2") + " forward-vs-board=" + diff);
         }
+        return failures;
+    }
+
+    // Status-wall click targets (Phase 1 U2, R3): every wall component node needs a collider and a wall DiegeticInteractable, and the
+    // click must reach it with nothing in the way from the standing centre and the seat (the first collider the sight line meets is the
+    // node's own). The door-side map itself is never covered: nothing here adds geometry over it.
+    private static int CheckWall(Context ctx)
+    {
+        int failures = 0;
+        var map = ControlRoomSceneBuilder.FindDeep(ctx.Root, "WholePlantOverview");
+        if (map == null || map.GetComponent<PlantWallMapView>() == null)
+        {
+            Debug.LogError("[LayoutCheck] FAIL wall: WholePlantOverview with a PlantWallMapView is missing");
+            return 1;
+        }
+        var eyes = new List<KeyValuePair<string, Vector3>>();
+        foreach (var pair in new[] { new KeyValuePair<string, bool>("STAND_Center", false), new KeyValuePair<string, bool>("SEAT_A1", true) })
+        {
+            var anchor = ControlRoomSceneBuilder.FindDeep(ctx.Root, pair.Key);
+            if (anchor == null) { Debug.LogError("[LayoutCheck] FAIL wall: anchor " + pair.Key + " missing"); failures++; continue; }
+            eyes.Add(new KeyValuePair<string, Vector3>(pair.Key, new Vector3(anchor.position.x, OperatorMath.EyeY(anchor.position.y, pair.Value), anchor.position.z)));
+        }
+        Physics.SyncTransforms();
+        ctx.Colliders = Object.FindObjectsByType<Collider>(FindObjectsSortMode.None);
+        foreach (string component in WallDetailModel.Components)
+        {
+            var node = ControlRoomSceneBuilder.FindDeep(map, "System_" + component);
+            var col = node != null ? node.GetComponent<Collider>() : null;
+            var click = node != null ? node.GetComponent<DiegeticInteractable>() : null;
+            if (col == null || click == null || click.wallComponent != component)
+            {
+                Debug.LogError("[LayoutCheck] FAIL wall " + component + ": no collider + wall DiegeticInteractable on System_" + component);
+                failures++;
+                continue;
+            }
+            foreach (var eye in eyes)
+            {
+                Collider hit;
+                bool seen = FirstHit(ctx.Colliders, eye.Value, col.bounds.center, out hit);
+                if (!seen || hit != col)
+                {
+                    Debug.LogError("[LayoutCheck] FAIL wall " + component + " from " + eye.Key + ": the sight line meets " + (hit != null ? hit.name : "nothing") + " first");
+                    failures++;
+                }
+            }
+        }
+        Debug.Log("[LayoutCheck] wall: " + WallDetailModel.Components.Length + " component nodes checked from " + eyes.Count + " eye points, " + failures + " failing");
         return failures;
     }
 

@@ -114,6 +114,23 @@ namespace ReactorSim.Core.Tests
         }
 
         [Fact]
+        public void ParsePoses_KnowsTheWallReadabilityPoses()
+        {
+            Assert.Equal(new[] { "wall", "wallidle" }, CaptureMath.ParsePoses("wall,wallidle").ToArray());
+            Assert.Contains("wall", CaptureMath.KnownPoses);
+            Assert.Contains("wallidle", CaptureMath.KnownPoses);
+        }
+
+        [Fact]
+        public void GlyphHeightFromLineBox_UsesTheCapHeightRatioAndNeverInvents()
+        {
+            Assert.Equal(13.0, CaptureMath.GlyphHeightFromLineBoxPx(20.0), 9);
+            Assert.True(CaptureMath.GlyphHeightFromLineBoxPx(20.0) < 20.0);
+            Assert.Equal(0.0, CaptureMath.GlyphHeightFromLineBoxPx(0.0));
+            Assert.Equal(0.0, CaptureMath.GlyphHeightFromLineBoxPx(-3.0));
+        }
+
+        [Fact]
         public void ParsePoses_RejectsAnUnknownPoseNamingItAndTheKnownOnes()
         {
             var ex = Assert.Throws<FormatException>(() => CaptureMath.ParsePoses("seat,bogus"));

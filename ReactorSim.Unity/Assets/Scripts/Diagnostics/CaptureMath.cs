@@ -13,6 +13,18 @@ namespace ReactorSim
         /// <summary>Glyph height as a multiple of the character cell width of a monospace face (cell width is about 0.6 em, cap height about 0.7 em).</summary>
         public const double GlyphToCellRatio = 0.7 / 0.6;
 
+        /// <summary>
+        /// Cap height of the default TextMeshPro face (Liberation Sans) over its ascender-to-descender line box, rounded down
+        /// (0.729 em cap over 1.117 em box is 0.65), so the estimate under-reads rather than flatters the text.
+        /// </summary>
+        public const double CapHeightToLineBox = 0.65;
+
+        /// <summary>Estimated glyph (cap) height in pixels from the projected ascender-to-descender height of a character box.</summary>
+        public static double GlyphHeightFromLineBoxPx(double lineBoxPx)
+        {
+            return lineBoxPx > 0.0 ? lineBoxPx * CapHeightToLineBox : 0.0;
+        }
+
         /// <summary>Pixels per metre on a face at distance (m), for a vertical field of view (degrees) and window height (px).</summary>
         public static double PixelsPerMetre(double windowHeightPx, double verticalFovDeg, double distanceM)
         {
@@ -106,7 +118,7 @@ namespace ReactorSim
         /// <summary>Poses the capture run can show, in the default order. "crt" expands to every CRT screen.</summary>
         public static readonly string[] KnownPoses =
         {
-            "menu", "seat", "stand", "crt", "tooltip", "rejected", "drag", "checklist", "pause", "tablet", "clipboard", "bar", "dial", "gallery", "away", "hall", "glowoff", "glowidle", "glowmid", "glowfull"
+            "menu", "seat", "stand", "crt", "tooltip", "rejected", "drag", "checklist", "pause", "tablet", "clipboard", "bar", "dial", "wall", "wallidle", "gallery", "away", "hall", "glowoff", "glowidle", "glowmid", "glowfull"
         };
 
         /// <summary>Parses "1600x900". Throws FormatException with the offending text on anything else.</summary>

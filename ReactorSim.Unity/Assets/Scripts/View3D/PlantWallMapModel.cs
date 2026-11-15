@@ -49,6 +49,45 @@ public static class PlantWallMapModel
         return Finite(value) ? Math.Max(0, Math.Min(1, value)) : double.NaN;
     }
 
+    // Original gameplay design choice: below this activity a route shows no direction cue, so numerical dust near zero never draws an
+    // arrow on a route that is not carrying anything.
+    public const double FlowDirectionMin = 0.005;
+
+    // Routes whose flow sign the model knows: the snapshot value behind each is a non-negative magnitude (loop flow, delivered feed,
+    // steam heat rate, grid output) of a one-way process stream, and the drawn polyline runs from source to sink. The cooling circuit
+    // is left out (its drawn order is not a modeled sign), as are Shaft (rotation), Surge, Chemistry and Safety (no flow source).
+    public static readonly string[] DirectedRoutes =
+        { "PrimaryHot", "PrimaryCold", "SteamHeader", "Steam", "SteamDump", "TurbineExhaust", "Feedwater", "Grid" };
+
+    // Source-to-sink polyline of a directed route in board coordinates (x right, z up), as authored in
+    // Blender/scripts/make_plant_overview.py; PlantWallMapModelTests compares it with that script. Null for undirected routes.
+    public static double[][] RoutePath(string name)
+    {
+        switch (name)
+        {
+            case "PrimaryHot": return new[] { P(-2.35, 2.15), P(-1.45, 2.15) };
+            case "PrimaryCold": return new[] { P(-1.15, 1.45), P(-1.15, 0.72), P(-1.80, 0.72), P(-2.65, 0.72), P(-2.65, 1.33) };
+            case "SteamHeader": return new[] { P(-0.85, 2.15), P(-0.55, 2.15) };
+            case "Steam": return new[] { P(-0.55, 2.15), P(-0.05, 2.15) };
+            case "SteamDump": return new[] { P(-0.55, 2.15), P(-0.55, 1.15), P(-0.05, 1.15), P(-0.05, 1.10) };
+            case "TurbineExhaust": return new[] { P(0.28, 1.83), P(0.28, 1.10) };
+            case "Feedwater": return new[] { P(-0.06, 0.95), P(-0.70, 0.95), P(-0.70, 1.65), P(-0.85, 1.65) };
+            case "Grid": return new[] { P(1.50, 2.15), P(2.35, 2.15) };
+            default: return null;
+        }
+    }
+
+    private static double[] P(double x, double z) { return new[] { x, z }; }
+
+    // +1 = flowing forward along RoutePath, 0 = no direction cue. Only a directed route with a finite activity above FlowDirectionMin
+    // gets one; an unknown, missing or idle route never does.
+    public static int RouteDirection(string name, PlantSnapshot s)
+    {
+        if (Array.IndexOf(DirectedRoutes, name) < 0) return 0;
+        double activity = RouteActivity(name, s);
+        return Finite(activity) && activity > FlowDirectionMin ? 1 : 0;
+    }
+
     // The snapshot orders banks D, C, B, A; the asset labels them A, B, C, D.
     public static double BankInsertion(string bank, PlantSnapshot s)
     {
