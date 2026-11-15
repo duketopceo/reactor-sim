@@ -78,6 +78,7 @@ run in a sandboxed CI container is broken by definition.
 | `--scenario bop-manual` | U10.2 manual: load rejection → overspeed trip → reset → spin-up → sync → 50 % load |
 | `--scenario bop-vacuum` | U10.3 loss of circulating water → low-vacuum trip → stop valve shut → SG relief; snapshot keeps the trip |
 | `--scenario bop` | All U10 |
+| `--scenario startup-boron` | U4 boron band: prints critical bank A insertion versus boron (1100 to 1400 ppm) at the step-5 state; fails unless every boron the procedure accepts leaves bank A critical between 30 and 48 % inserted, the old 1200 ppm target sits at about 50 %, and steps 5 to 7 reach criticality by bank A trim alone |
 | `--scenario startup-grid` | U4 operator policy walks `cold-start-to-grid` (13 steps, `procedures.json`) from `SandboxStart.Apply` with Player intents only: every step ticks in order, generator synced, grid output at the procedure target, no SCRAM or BOP trip, finite state each tick. Prints per-step game minutes and the final state hash; a per-step 45-minute cap fails naming the step and live values |
 | `--verify [--check <id>] [-v]` / `--list` | Determinism / numerics / edge-case contract. `STARTUP-01`: the startup run twice (same step minutes, intents, state hash); a SCRAM from power unticks the rod step and later but keeps the lineup ticked; the playtest order (throttle 0.05 to 0.11 first) leaves step 1 current and the plant subcritical |
 

@@ -140,7 +140,8 @@ namespace ReactorSim.Clipboard
                 case "heater_power_at_least": return Pct(s.HeaterPowerFrac);
                 case "primary_pressure_at_least": return s.PrimaryPressureBar.ToString("0", ic) + " bar";
                 case "primary_temp_at_least": return s.PrimaryTempC.ToString("0", ic) + " C";
-                case "boron_at_most": return s.BoronPpm.ToString("0", ic) + " ppm";
+                case "boron_at_most":
+                case "boron_band_until_bank_a_pulled": return s.BoronPpm.ToString("0", ic) + " ppm";
                 case "shutdown_banks_out":
                     return "D " + Pct(s.BankInsertion[0]) + " C " + Pct(s.BankInsertion[1]) + " B " + Pct(s.BankInsertion[2]);
                 case "bank_a_insertion_at_most": return Pct(s.BankInsertion[3]);

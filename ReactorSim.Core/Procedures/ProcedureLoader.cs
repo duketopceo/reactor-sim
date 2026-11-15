@@ -1,5 +1,5 @@
 // ReactorSim.Core — loads procedures.json (U16). Core never touches Unity: parse from a string or path.
-// Shape: { "procedures": [ { "id", "title", "steps": [ { "id", "text", "phase", "control", "target", "rows": [..], "when", "value" } ] } ] }
+// Shape: { "procedures": [ { "id", "title", "steps": [ { "id", "text", "phase", "control", "target", "rows": [..], "when", "value", "value2" (optional) } ] } ] }
 // Unknown keys, unknown predicates, empty ids and duplicate ids are errors.
 
 using System;
@@ -82,6 +82,10 @@ namespace ReactorSim
                     case "value":
                         if (!(kv.Value is double)) throw new ProcedureException("step value must be a number");
                         s.Value = (double)kv.Value;
+                        break;
+                    case "value2":
+                        if (!(kv.Value is double)) throw new ProcedureException("step value2 must be a number");
+                        s.Value2 = (double)kv.Value;
                         break;
                     case "rows":
                         var rows = kv.Value as List<object>;
