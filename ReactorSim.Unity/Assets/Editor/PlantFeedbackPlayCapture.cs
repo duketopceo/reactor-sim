@@ -105,7 +105,7 @@ public static class PlantFeedbackPlayCapture
             metrics.ForceMeshUpdate();
             if (metrics.textBounds.size.x > metrics.rectTransform.rect.width || metrics.textBounds.size.y > metrics.rectTransform.rect.height)
                 throw new InvalidOperationException("Live metrics overflow their backing panel");
-            CheckFlowCues(view, map);
+            CheckFlowCues(cam, view, map, dir);
             CaptureLiveDetail(cam, view, map, panel, dir);
             view.ApplySnapshot(view.bridge != null ? view.bridge.GetSnapshot() : null);
             var renderers = map.GetComponentsInChildren<Renderer>();
@@ -231,7 +231,7 @@ public static class PlantFeedbackPlayCapture
 
     // U2 (R4): one arrowhead per directed route, off at zero activity and for a missing reading, on while the model gives the route a
     // direction, and calibrated: the first point of every route's authored path lands on that route's own first pipe segment.
-    private static void CheckFlowCues(PlantWallMapView view, Transform map)
+    private static void CheckFlowCues(Camera cam, PlantWallMapView view, Transform map, string dir)
     {
         if (view.FlowCueCount != PlantWallMapModel.DirectedRoutes.Length)
             throw new InvalidOperationException("Expected " + PlantWallMapModel.DirectedRoutes.Length + " flow cues, found " + view.FlowCueCount);
@@ -264,6 +264,17 @@ public static class PlantFeedbackPlayCapture
             TurbineSteamKW = double.NaN, DumpSteamKW = double.NaN });
         foreach (string route in PlantWallMapModel.DirectedRoutes)
             if (view.CueFor(route).gameObject.activeSelf) throw new InvalidOperationException("Flow cue " + route + " is shown for a missing reading");
+        view.ApplySnapshot(flowing);
+        // A look at the whole wall with every directed route flowing and one component selected (wall-flow.png).
+        var back = ControlRoomSceneBuilder.FindDeep(map, "Board_Back");
+        if (back == null) throw new InvalidOperationException("Board_Back missing");
+        view.ClickComponent("SteamGenerator");
+        view.ApplySnapshot(flowing);
+        Vector3 boardCenter = back.GetComponent<Renderer>().bounds.center;
+        cam.transform.position = boardCenter + map.forward * 3.4f;
+        cam.transform.LookAt(boardCenter);
+        Capture(cam, Path.Combine(dir, "wall-flow.png"));
+        view.ClearSelection();
         view.ApplySnapshot(flowing);
         Debug.Log("[PlantFeedbackPlayCapture] OK flow cues: " + view.FlowCueCount + " routes, hidden at zero and NaN, shown while flowing, calibrated to their pipes");
     }
