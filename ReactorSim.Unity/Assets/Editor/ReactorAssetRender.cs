@@ -25,7 +25,6 @@ public static class ReactorAssetRender
             // Edit mode never runs Awake, so wake the water atmosphere (bubbles, core halo) by hand and let the bubbles settle.
             var atmosphere = hall.GetComponent<ReactorWaterAtmosphere>();
             typeof(ReactorWaterAtmosphere).GetMethod("Awake", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(atmosphere, null);
-            var bubbles = hall.GetComponentInChildren<ParticleSystem>(true);
             float mz = HallDimensions.ModuleZ;
             var stand = HallSightline.EyeInHallSpace(HallSightline.Stand());
             var seat = HallSightline.EyeInHallSpace(HallSightline.Seat());
@@ -35,7 +34,7 @@ public static class ReactorAssetRender
             {
                 motion.Apply(snapshot, power, false, 0);
                 atmosphere.ApplyPower((float)power);
-                if (bubbles != null) { bubbles.Clear(true); bubbles.Simulate(9f, true, true); }
+                atmosphere.Settle(9f);
                 string suffix = power == 0 ? "shutdown" : "power";
                 Render(hall, new Vector3(-0.9f, HallAssetPlacer.CoreBase + 2.5f, mz - 2.4f),
                     new Vector3(0, HallAssetPlacer.CoreBase + 2.1f, mz), 50,

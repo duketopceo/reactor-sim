@@ -14,36 +14,41 @@ public sealed class ReactorWaterAtmosphere : MonoBehaviour
     private Texture2D haloTexture;
     private Mesh haloMesh;
 
+    // Faint, sparse bubble streams rise at the sides of the pane, clear of the fuel array in the middle of the window.
+    // Offsets are hall-space x and z from the anchor: x clear of the fuel footprint, z a little either side of it. Rate scales per stream.
+    private static readonly Vector3[] StreamOffsets =
+    {
+        new Vector3(-2.05f, 0f, 0.00f), new Vector3(-1.35f, 0f, 0.35f), new Vector3(1.45f, 0f, -0.15f), new Vector3(2.15f, 0f, 0.30f),
+    };
+    private static readonly float[] StreamRateScale = { 1f, 0.7f, 0.85f, 0.6f };
+    private const float BaseRate = 0.9f;     // per stream, bubbles per second at zero power (decay heat keeps a trickle)
+    private const float PowerRate = 1.8f;    // extra per stream at rated power
+    private const float BubbleAlpha = 0.4f;
+    private readonly System.Collections.Generic.List<ParticleSystem> streams = new System.Collections.Generic.List<ParticleSystem>();
+
     private void Awake()
     {
         if (bridge == null) bridge = FindAnyObjectByType<PlantBridge>();
         var go = new GameObject("Pool_VisibleBubbles");
         go.layer = gameObject.layer;
         go.transform.SetParent(transform, false);
-        go.transform.localPosition = new Vector3(0f, HallDimensions.VesselBase + 3.8f, HallDimensions.ModuleZ - 2.9f);   // in the water between the glass and the module
-        bubbles = go.AddComponent<ParticleSystem>();
-        bubbles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-        bubbles.useAutoRandomSeed = false;
-        bubbles.randomSeed = 2718;
-        var main = bubbles.main;
-        main.loop = true;
-        main.duration = 12f;
-        main.prewarm = true;
-        main.startLifetime = new ParticleSystem.MinMaxCurve(6f, 10f);
-        main.startSpeed = 0f;
-        main.startSize = new ParticleSystem.MinMaxCurve(0.06f, 0.16f);
-        main.startColor = ThemeColors.WithAlpha(ThemeColors.StatusNormal, 0.45f);
-        main.maxParticles = 400;
-        main.simulationSpace = ParticleSystemSimulationSpace.Local;
-        var shape = bubbles.shape;
-        shape.shapeType = ParticleSystemShapeType.Box;
-        shape.scale = new Vector3(4f, 2.5f, 0.8f);
-        var velocity = bubbles.velocityOverLifetime;
-        velocity.enabled = true;
-        velocity.space = ParticleSystemSimulationSpace.Local;
-        velocity.y = 0.65f;
-        var emission = bubbles.emission;
-        emission.rateOverTime = 20f;
+        // The anchor sits low in the water between the glass and the module; bubbles rise through the fuel band.
+        go.transform.localPosition = new Vector3(0f, HallDimensions.VesselBase + 2.4f, HallDimensions.ModuleZ - 2.9f);
+        for (int i = 0; i < StreamOffsets.Length; i++)
+        {
+            // The first stream is the anchor object itself; the others are children offset from it.
+            GameObject host = go;
+            if (i > 0)
+            {
+                host = new GameObject("Pool_BubbleStream" + i);
+                host.layer = gameObject.layer;
+                host.transform.SetParent(go.transform, false);
+            }
+            if (i == 0) go.transform.localPosition += StreamOffsets[0];
+            else host.transform.localPosition = StreamOffsets[i] - StreamOffsets[0];
+            streams.Add(ConfigureStream(host, 2718 + i * 31));
+        }
+        bubbles = streams[0];
 
         particleTexture = new Texture2D(32, 32, TextureFormat.RGBA32, false) { name = "PoolBubbleTexture" };
         for (int y = 0; y < 32; y++) for (int x = 0; x < 32; x++)
@@ -65,10 +70,62 @@ public sealed class ReactorWaterAtmosphere : MonoBehaviour
         if (shader != null)
         {
             particleMaterial = new Material(shader) { name = "PoolBubbleMaterial", mainTexture = particleTexture };
-            go.GetComponent<ParticleSystemRenderer>().sharedMaterial = particleMaterial;
+            foreach (var stream in streams) stream.GetComponent<ParticleSystemRenderer>().sharedMaterial = particleMaterial;
         }
-        bubbles.Play();
+        foreach (var stream in streams) stream.Play();
         BuildHalo(shader);
+    }
+
+    private static ParticleSystem ConfigureStream(GameObject host, int seed)
+    {
+        var ps = host.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var main = ps.main;
+        main.loop = true;
+        main.duration = 12f;
+        main.prewarm = true;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(5f, 9f);
+        main.startSpeed = 0f;
+        main.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.08f);   // mostly pin-prick, a few larger
+        main.startColor = ThemeColors.WithAlpha(ThemeColors.StatusNormal, BubbleAlpha);
+        main.maxParticles = 40;
+        main.simulationSpace = ParticleSystemSimulationSpace.Local;
+        ps.useAutoRandomSeed = false;
+        ps.randomSeed = (uint)seed;
+        var shape = ps.shape;
+        shape.shapeType = ParticleSystemShapeType.Box;
+        shape.scale = new Vector3(0.3f, 0.1f, 0.3f);
+        var velocity = ps.velocityOverLifetime;
+        velocity.enabled = true;
+        velocity.space = ParticleSystemSimulationSpace.Local;
+        // The three velocity curves must share one mode, so x and z are zero-width ranges beside the y range.
+        velocity.x = new ParticleSystem.MinMaxCurve(0f, 0f);
+        velocity.y = new ParticleSystem.MinMaxCurve(0.28f, 0.5f);
+        velocity.z = new ParticleSystem.MinMaxCurve(0f, 0f);
+        var noise = ps.noise;
+        noise.enabled = true;
+        noise.strength = 0.06f;
+        noise.frequency = 0.5f;
+        var fade = new Gradient();
+        fade.SetKeys(new[] { new GradientColorKey(ThemeColors.TextBody, 0f), new GradientColorKey(ThemeColors.TextBody, 1f) },
+                     new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.2f), new GradientAlphaKey(1f, 0.7f), new GradientAlphaKey(0f, 1f) });
+        var colour = ps.colorOverLifetime;
+        colour.enabled = true;
+        colour.color = fade;
+        var emission = ps.emission;
+        emission.rateOverTime = BaseRate;
+        return ps;
+    }
+
+    /// <summary>Render hook: clears the streams and lets them run for the given seconds, so a still shows settled bubbles.</summary>
+    public void Settle(float seconds)
+    {
+        foreach (var stream in streams)
+        {
+            if (stream == null) continue;
+            stream.Clear(true);
+            stream.Simulate(seconds, false, true);
+        }
     }
 
     // A camera-facing-the-window quad of soft blue light just in front of the fuel: bloom without a real-time light or post-processing.
@@ -116,16 +173,24 @@ public sealed class ReactorWaterAtmosphere : MonoBehaviour
         if (haloMaterial.HasProperty("_Color")) haloMaterial.SetColor("_Color", c);
     }
 
-    /// <summary>Test and render hook: the halo brightness for a power fraction (the same call Update makes).</summary>
-    public void ApplyPower(float power) { SetHalo(power); }
+    private void SetEmission(float power)
+    {
+        for (int i = 0; i < streams.Count; i++)
+        {
+            var emission = streams[i].emission;
+            emission.rateOverTime = (BaseRate + PowerRate * power) * StreamRateScale[i];
+        }
+    }
+
+    /// <summary>Test and render hook: the halo brightness and bubble rate for a power fraction (the same calls Update makes).</summary>
+    public void ApplyPower(float power) { SetEmission(power); SetHalo(power); }
 
     private void Update()
     {
         if (bubbles == null) return;
         PlantSnapshot s = bridge != null ? bridge.GetSnapshot() : null;
         float power = s == null || double.IsNaN(s.Power) || double.IsInfinity(s.Power) ? 0f : Mathf.Clamp01((float)s.Power);
-        var emission = bubbles.emission;
-        emission.rateOverTime = 20f + 25f * power;
+        SetEmission(power);
         SetHalo(power);
     }
 
