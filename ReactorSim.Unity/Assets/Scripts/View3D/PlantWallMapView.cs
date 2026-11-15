@@ -40,7 +40,7 @@ public sealed class PlantWallMapView : MonoBehaviour
     private Material cueMaterial;
     private Mesh cueMesh;
     private const float CueSpeedMin = 0.2f, CueSpeedSpan = 0.6f;   // board units per second at idle-visible and full activity (design choice)
-    private const float CueLength = 0.15f, CueHalfWidth = 0.07f, CueLift = 0.055f;   // board units; the arrowhead is wider than the 0.055 pipe
+    private const float CueLength = 0.26f, CueHalfWidth = 0.11f, CueLift = 0.055f;   // board units; the arrowhead is wider than the 0.055 pipe
 
     /// <summary>The selected wall component, or null.</summary>
     public string SelectedComponent { get { return selection.Selected; } }
@@ -157,7 +157,7 @@ public sealed class PlantWallMapView : MonoBehaviour
                 double sx = path[i + 1][0] - path[i][0], sz = path[i + 1][1] - path[i][1];
                 length += (float)System.Math.Sqrt(sx * sx + sz * sz);
             }
-            cues.Add(new FlowCue { Route = route, Cue = go.transform, Path = path, Length = length });
+            cues.Add(new FlowCue { Route = route, Cue = go.transform, Path = path, Length = length, Phase = length * ((cues.Count * 0.37f) % 1f) });   // staggered so arrows on a shared junction do not stack
         }
     }
 
