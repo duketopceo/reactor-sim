@@ -25,6 +25,8 @@
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\LampPredicates.cs" Link="Unity\LampPredicates.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\PlantWallMapModel.cs" Link="Unity\PlantWallMapModel.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\Audio\ReactorSoundMix.cs" Link="Unity\ReactorSoundMix.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\Audio\AudioCategories.cs" Link="Unity\AudioCategories.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\Audio\AudioPriority.cs" Link="Unity\AudioPriority.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\OperatorMath.cs" Link="Unity\OperatorMath.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\ClockReadout.cs" Link="Unity\ClockReadout.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\AlarmTracker.cs" Link="Unity\AlarmTracker.cs" />

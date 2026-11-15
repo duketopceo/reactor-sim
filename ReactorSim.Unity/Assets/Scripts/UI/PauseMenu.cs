@@ -4,7 +4,7 @@ using UnityEngine.SceneManagement;
 using ReactorSim.Ui;
 
 /// <summary>
-/// U11 escape menu for the control room: resume, reset sandbox, master volume, alarm mute, quit to menu.
+/// U11 escape menu for the control room: resume, reset sandbox, master and category volumes, alarm mute, quit to menu.
 /// Opening pauses the sim clock through the Player-class PauseClock intent (it restores the prior state on
 /// close, so an already-paused sim stays paused). While open, the 3D room's mouse look and control clicks
 /// are switched off so clicks on this menu do not also reach the controls behind it.
@@ -16,9 +16,6 @@ public class PauseMenu : MonoBehaviour
     private GameObject root;
     private bool open;
     private bool pausedByMenu;
-    private bool alarmMuted;
-    private float nextAudioScan;
-    private ProceduralPlantAudio plantAudio;
     private readonly RoomInputGate inputGate = new RoomInputGate();
 
     private void Awake()
@@ -34,7 +31,6 @@ public class PauseMenu : MonoBehaviour
         {
             if (open) Close(); else Open();
         }
-        if (alarmMuted) ApplyAlarmMute();
     }
 
     /// <summary>True while the escape menu is showing (the operator tablet will not raise over it).</summary>
@@ -79,13 +75,11 @@ public class PauseMenu : MonoBehaviour
         RuntimeUi.MakeButton(col, "Resume", Close);
         RuntimeUi.MakeButton(col, sandbox ? "Reset sandbox (cold shutdown)" : "Restart mission", ResetSession);
         RuntimeUi.MakeDivider(col);
-        RuntimeUi.MakeLabel(col, "Master volume", TextRole.Body, TextAnchor.MiddleLeft, ThemeColors.TextBody);
-        RuntimeUi.MakeSlider(col, AudioListener.volume, v => AudioListener.volume = v);
-        RuntimeUi.MakeToggle(col, "Mute alarm sounds", alarmMuted, v =>
-        {
-            alarmMuted = v;
-            ApplyAlarmMute();
-        });
+        AddVolume(col, "Master", UserSettings.MasterVolume, v => { UserSettings.MasterVolume = v; AudioListener.volume = v; });
+        AddVolume(col, "Plant", UserSettings.PlantVolume, v => UserSettings.PlantVolume = v);
+        AddVolume(col, "Alarms", UserSettings.AlarmVolume, v => UserSettings.AlarmVolume = v);
+        AddVolume(col, "Voice", UserSettings.VoiceVolume, v => UserSettings.VoiceVolume = v);
+        RuntimeUi.MakeToggle(col, "Mute alarm sounds (overrides Alarms)", UserSettings.AlarmMuted, v => UserSettings.AlarmMuted = v);
         RuntimeUi.MakeDivider(col);
         if (sandbox)
             RuntimeUi.MakeToggle(col, "Hide startup checklist panel", UserSettings.ChecklistHidden, v => UserSettings.ChecklistHidden = v);
@@ -103,24 +97,18 @@ public class PauseMenu : MonoBehaviour
         root.SetActive(false);
     }
 
+    // A labelled 0-1 volume slider; the level is saved and applied live (UserSettings, read by each audio source).
+    private static void AddVolume(Transform col, string label, float value, System.Action<float> apply)
+    {
+        RuntimeUi.MakeLabel(col, label + " volume", TextRole.Body, TextAnchor.MiddleLeft, ThemeColors.TextBody);
+        RuntimeUi.MakeSlider(col, value, apply);
+    }
+
     // A labelled slider over [lo, hi]; the setting is saved and applied live (UserSettings).
     private static void AddSetting(Transform col, string label, float lo, float hi, float value, System.Action<float> apply)
     {
         RuntimeUi.MakeLabel(col, label, TextRole.Body, TextAnchor.MiddleLeft, ThemeColors.TextBody);
         RuntimeUi.MakeSlider(col, OperatorMath.ToSlider(value, lo, hi), t => apply(OperatorMath.FromSlider(t, lo, hi)));
-    }
-
-    // Alarm sounds belong to ProceduralPlantAudio (klaxon loop + one-shot sfx source); muted from outside.
-    private void ApplyAlarmMute()
-    {
-        if (plantAudio == null && Time.unscaledTime >= nextAudioScan)
-        {
-            plantAudio = FindAnyObjectByType<ProceduralPlantAudio>();
-            nextAudioScan = Time.unscaledTime + 1f;
-        }
-        if (plantAudio == null) return;
-        if (plantAudio.scramKlaxon != null) plantAudio.scramKlaxon.mute = alarmMuted;
-        if (plantAudio.sfxSource != null) plantAudio.sfxSource.mute = alarmMuted;
     }
 
     private void ResetSession()

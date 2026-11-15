@@ -14,12 +14,12 @@ This is a source audit of every presentation surface: the desk, the status wall,
 | Rod banks A-D | `BankInsertion` (fraction, array order D, C, B, A) | Actual | Wall and hall via `PlantWallMapModel.BankInsertion` | None | U5 |
 | Primary pumps and loop | `PrimaryFlowFrac` (fraction), `PrimaryTempC` (C), `PrimaryLevelFrac` (fraction) | Actual, aggregate | Hall rotor, wall loop brightness and status | Individual pump readings: `N/M` | U2 direction cue |
 | Pressurizer | `PrimaryPressureBar` (bar), `PrimarySatMarginC` (C), `HeaterPowerFrac`, `SprayFrac` (fraction) | Actual | Wall lamp and readouts | None | U2 |
-| Primary relief | `ReliefOpen` (bool) | Actual | Wall readout `RELIEF OPEN/CLOSED`; hall jet when an anchor exists | Hall anchor absent in the placed hall | U3 anchor, U6 sound |
+| Primary relief | `ReliefOpen` (bool) | Actual | Wall readout `RELIEF OPEN/CLOSED`; hall jet when an anchor exists | Hall anchor absent in the placed hall | U3 anchor (sound: done, U6) |
 | Steam generator | `SecondaryPressureBar` (bar), `SecondaryTempC` (C), `SecondaryLevelFrac` (fraction) | Actual, one shared secondary state | Wall status and readouts | Per-generator readings: `N/M` | U2 |
-| Secondary relief | `SecondaryReliefOpen` (bool, opens above 75 bar) | Actual | Wall readout; hall jet when an anchor exists | Hall anchor absent in the placed hall | U3 anchor, U6 sound |
+| Secondary relief | `SecondaryReliefOpen` (bool, opens above 75 bar) | Actual | Wall readout; hall jet when an anchor exists | Hall anchor absent in the placed hall | U3 anchor (sound: done, U6) |
 | Turbine throttle | `SteamDemandFrac` (fraction) | Command, labeled `% command` | Wall SG readout | None | none |
 | Steam to turbine | `TurbineSteamKW` (kW heat) | Actual delivered heat rate | Wall steam and exhaust brightness, turbine steam sound | Steam mass flow: not modeled | U5 trip check |
-| Bypass steam | `DumpSteamKW` (kW heat) | Actual | Wall bypass brightness and `DUMP` readout | Hall visual and sound: none yet | U3 visual, U6 sound |
+| Bypass steam | `DumpSteamKW` (kW heat) | Actual | Wall bypass brightness and `DUMP` readout | Hall visual: none yet (sound: `ReactorSoundMix.DumpSteam`, positioned bypass source, U6) | U3 visual |
 | Feedwater | `FeedwaterDeliveredFrac` (rated), `FeedwaterFlowFrac` (command), `FeedwaterAvailabilityFrac` (fraction) | Delivered is actual; pump is a command | Wall route and readouts, `FEED_FAIL` predicate | None | U5 starvation check |
 | Turbine and shaft | `TurbineRpm` (rpm), `TurbineTripped` (bool) | Actual | Hall rotor, turbine sound, wall shaft and lamp | None | U5 coastdown check |
 | Generator and grid | `GeneratorSynced` (bool), `GeneratorKw` (kW), `GridOutputFrac` (rated), `GridFrequencyHz` (Hz) | Actual | Wall status, route, readouts, generator sound | None | U2 |
@@ -34,14 +34,14 @@ This is a source audit of every presentation surface: the desk, the status wall,
 
 | Layer | Source | Current state | Phase 1 owner |
 |---|---|---|---|
-| Pump hum | `PrimaryFlowFrac` | `ProceduralPlantAudio`, not hall-positioned | U6 positioning |
-| Turbine and steam | `TurbineRpm`, `TurbineSteamKW` | Follows delivered steam, so a tripped turbine is silent | U6 |
-| Relief steam | `ReliefOpen`, `SecondaryReliefOpen` | One merged level in `ReactorSoundMix.Relief`; only primary relief stings (`AlarmFeedback`) | U6 splits into primary and secondary |
-| Bypass steam | `DumpSteamKW` | No sound | U6 |
-| Generator and cooling | `GeneratorSynced`, `GeneratorKw`, `CoolingWaterFrac`, `VacuumPumpFrac` | Procedural loops | U6 categories |
-| Horn and stings | Horn alarms (`scram`, `bop-trip`, `high-pressure`, `high-fuel-temp`) via `AlarmTracker`, acknowledged by `AlarmAckSeq` | Works; no category volume | U6 categories and priority |
-| Voice | `VoiceAnnouncer` edge-triggered keys | Only SCRAM interrupts; no priority queue | U6 priority |
-| Volume | `AudioListener.volume` from the pause menu | Master only, not persisted; alarm mute toggle | U6 categories and persistence |
+| Pump hum | `PrimaryFlowFrac` | `ProceduralPlantAudio` (non-spatial), Plant category gain | Hall positioning left to U5 listening pass |
+| Turbine and steam | `TurbineRpm`, `TurbineSteamKW` | Follows delivered steam, so a tripped turbine is silent; Plant category gain | none |
+| Relief steam | `ReliefOpen`, `SecondaryReliefOpen` | `ReactorSoundMix.PrimaryRelief` and `SecondaryRelief` each drive their own positioned source in `ReactorSoundscape`; each relief lift has its own sting (`AlarmFeedback`, Alarms category) | none |
+| Bypass steam | `DumpSteamKW` | `ReactorSoundMix.DumpSteam` drives a positioned bypass source; sounds while the turbine is tripped and bypass steam flows | none |
+| Generator and cooling | `GeneratorSynced`, `GeneratorKw`, `CoolingWaterFrac`, `VacuumPumpFrac` | Procedural loops, Plant category gain | none |
+| Horn and stings | Horn alarms (`scram`, `bop-trip`, `high-pressure`, `high-fuel-temp`) via `AlarmTracker`, acknowledged by `AlarmAckSeq` | Horn volume is the Alarms category gain (0 while alarm mute is on); `AudioPriority` ranks the horn names, SCRAM highest | none |
+| Voice | `VoiceAnnouncer` edge-triggered keys | Lines in one tick are collected and `AudioPriority.Pick` plays the highest rank; a higher-ranked alarm line interrupts a lower one; Voice category gain | none |
+| Volume | `AudioListener.volume` (Master) and per-source category gains from the pause menu | Master, Plant, Alarms and Voice sliders persisted in `UserSettings` (`reactorsim.volume.*`, full when absent); alarm mute toggle overrides Alarms for the session | none |
 
 ## Relief-anchor limitation
 
