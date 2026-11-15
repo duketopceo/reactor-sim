@@ -145,6 +145,7 @@ public static class HallBuilder
 
         // ---- the module, crane, trays ----
         SmrModuleMesh.Build(T, new SmrModuleMesh.Materials { vessel = steel, dark = dark, containment = paint, skin = skin });
+        BuildReliefAnchors(T, steel, dark);
         PolarCrane.Build(T, cranePaint, dark, deckY + HallDimensions.CraneRailAboveDeck, Rh, D);
         CableTray.Build(T, dark, Rh - 0.45f, deckY + 3.6f, 0.15f * Mathf.PI, 0.85f * Mathf.PI);
 
@@ -197,6 +198,72 @@ public static class HallBuilder
         FinishHall(root, windowBounds);
         root.AddComponent<ReactorWaterAtmosphere>();
         return root;
+    }
+
+    /// <summary>
+    /// The relief and bypass steam anchors (Phase 1 U3, KTD5): empties on the module's own relief lines, authored here rather than
+    /// imported from the legacy PlantEquipment asset, which is never placed in the hall. PlantEquipmentBinder finds them by name prefix
+    /// and gives each a steam jet. Each line also runs down from its anchor to a sparger (a short perforated pipe end, in view of the
+    /// observation window at the fuel-display depth) with its own sparger anchor, where the binder puts a rising bubble plume and
+    /// ReactorSoundscape puts the matching sound. +Z of each anchor points up, which is the direction the jet's cone and the plume emit.
+    /// </summary>
+    public static void BuildReliefAnchors(Transform hall, Material steel, Material dark)
+    {
+        var group = new GameObject("ReliefAnchors");
+        group.transform.SetParent(hall, false);
+        MakeAnchor(group.transform, ReliefAnchors.PrimaryName, ReliefAnchors.Primary());
+        for (int i = 0; i < ReliefAnchors.SecondaryCount; i++)
+            MakeAnchor(group.transform, ReliefAnchors.SecondaryName(i), ReliefAnchors.Secondary(i));
+        MakeAnchor(group.transform, ReliefAnchors.BypassName, ReliefAnchors.Bypass());
+
+        MakeAnchor(group.transform, ReliefAnchors.SpargerPrimaryName, ReliefAnchors.SpargerPrimary());
+        MakeAnchor(group.transform, ReliefAnchors.SpargerSecondaryName, ReliefAnchors.SpargerSecondary());
+        MakeAnchor(group.transform, ReliefAnchors.SpargerBypassName, ReliefAnchors.SpargerBypass());
+
+        // The relief lines: PORV, the SG relief header (one tube joining the two valves, then the line down), the bypass tee.
+        var pipe = new MeshBuilder();
+        BuildDowncomer(pipe, ReliefAnchors.PrimaryDowncomer(), 0.05f);
+        BuildDowncomer(pipe, ReliefAnchors.SecondaryDowncomer(), 0.05f);
+        BuildDowncomer(pipe, ReliefAnchors.BypassDowncomer(), 0.05f);
+        pipe.AddTube(HallVec(ReliefAnchors.Secondary(0)), HallVec(ReliefAnchors.SecondaryHeader()), 0.07f, 10, true);
+        pipe.AddTube(HallVec(ReliefAnchors.Secondary(1)), HallVec(ReliefAnchors.SecondaryHeader()), 0.07f, 10, true);
+        pipe.Attach(group.transform, "ReliefLines", steel);
+
+        // The spargers: a short horizontal pipe along z (end-on to the window, so it stays narrow on the glass and off the fuel array behind it),
+        // with end caps, three band rings, and a row of dark perforations on top.
+        var body = new MeshBuilder();
+        var holes = new MeshBuilder();
+        foreach (double[] sp in new[] { ReliefAnchors.SpargerPrimary(), ReliefAnchors.SpargerSecondary(), ReliefAnchors.SpargerBypass() })
+        {
+            Vector3 c = HallVec(sp);
+            float half = ReliefAnchors.SpargerHalfLength; const float r = 0.07f;
+            body.AddTube(c + Vector3.back * half, c + Vector3.forward * half, r, 12, true);
+            for (int k = -1; k <= 1; k++) PipeSweep.Flange(body, c + Vector3.forward * (k * 0.09f), Vector3.forward, r, 12);
+            for (int k = -1; k <= 1; k++)
+            {
+                Vector3 h = c + new Vector3(0f, r, k * 0.07f);
+                holes.AddBox(h - new Vector3(0.025f, 0.012f, 0.025f), h + new Vector3(0.025f, 0.02f, 0.025f));
+            }
+        }
+        body.Attach(group.transform, "Spargers", steel);
+        holes.Attach(group.transform, "SpargerPerforations", dark);
+    }
+
+    private static Vector3 HallVec(double[] p) { return new Vector3((float)p[0], (float)p[1], (float)p[2]); }
+
+    private static void BuildDowncomer(MeshBuilder b, double[][] corners, float radius)
+    {
+        var pts = new List<Vector3>();
+        foreach (double[] c in corners) pts.Add(HallVec(c));
+        PipeSweep.Sweep(b, pts, radius, 0.3f, 10);
+    }
+
+    private static void MakeAnchor(Transform parent, string name, double[] hallPosition)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        go.transform.localPosition = new Vector3((float)hallPosition[0], (float)hallPosition[1], (float)hallPosition[2]);
+        go.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
     }
 
     /// <summary>Layer, static flags, culling masks, binder and the frustum gate. Run after every piece is parented under the root.</summary>

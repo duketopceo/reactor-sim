@@ -82,6 +82,7 @@ public static class ReactorAssetCheck
             Require(block.GetColor("_EmissionColor").maxColorComponent > low, "core emission increases with power");
             Require(glow.sharedMaterial.IsKeywordEnabled("_EMISSION"), "Unity core material has emission enabled");
             AssetManifestCheck.Validate(hall);
+            CheckReliefAnchors(hall);
             Debug.Log("[ReactorAssetCheck] PASS");
             if (Application.isBatchMode) EditorApplication.Exit(0);
         }
@@ -91,6 +92,58 @@ public static class ReactorAssetCheck
             if (Application.isBatchMode) EditorApplication.Exit(1);
             else throw;
         }
+    }
+
+    // Phase 1 U3 (KTD5): the relief and bypass anchors are authored into the hall itself. The binder finds them by name prefix, so a missing
+    // or misplaced anchor means a relief with no jet; the sound and the jet must come from one place; and the anchors must not cost the budget.
+    private static void CheckReliefAnchors(GameObject hall)
+    {
+        Require(hall.GetComponentsInChildren<Transform>(true).Length > 1, "hall has children");
+        CheckAnchor(hall, ReliefAnchors.PrimaryName, ReliefAnchors.Primary());
+        for (int i = 0; i < ReliefAnchors.SecondaryCount; i++)
+            CheckAnchor(hall, ReliefAnchors.SecondaryName(i), ReliefAnchors.Secondary(i));
+        CheckAnchor(hall, ReliefAnchors.BypassName, ReliefAnchors.Bypass());
+        CheckAnchor(hall, ReliefAnchors.SpargerPrimaryName, ReliefAnchors.SpargerPrimary());
+        CheckAnchor(hall, ReliefAnchors.SpargerSecondaryName, ReliefAnchors.SpargerSecondary());
+        CheckAnchor(hall, ReliefAnchors.SpargerBypassName, ReliefAnchors.SpargerBypass());
+        int primary = 0, secondary = 0, bypass = 0, sPrimary = 0, sSecondary = 0, sBypass = 0;
+        foreach (Transform t in hall.GetComponentsInChildren<Transform>(true))
+        {
+            if (t.name.StartsWith("VFX_PORV_SteamJet")) primary++;
+            else if (t.name.StartsWith("VFX_SGRelief_SteamJet")) secondary++;
+            else if (t.name.StartsWith("VFX_Bypass_SteamJet")) bypass++;
+            else if (t.name.StartsWith("VFX_PORV_Sparger")) sPrimary++;
+            else if (t.name.StartsWith("VFX_SGRelief_Sparger")) sSecondary++;
+            else if (t.name.StartsWith("VFX_Bypass_Sparger")) sBypass++;
+        }
+        Require(primary == 1 && secondary == ReliefAnchors.SecondaryCount && bypass == 1,
+            "exactly one PORV, " + ReliefAnchors.SecondaryCount + " SG relief and one bypass anchor bind (found " + primary + "/" + secondary + "/" + bypass + ")");
+        Require(sPrimary == 1 && sSecondary == 1 && sBypass == 1,
+            "exactly one PORV, one SG relief and one bypass sparger anchor bind (found " + sPrimary + "/" + sSecondary + "/" + sBypass + ")");
+        // The relief lines and the spargers are real geometry the operator sees through the window; they must be built and under water.
+        foreach (string meshName in new[] { "ReliefLines", "Spargers", "SpargerPerforations" })
+        {
+            Transform m = Find(hall, meshName);
+            var filter = m.GetComponent<MeshFilter>();
+            Require(filter != null && filter.sharedMesh != null && filter.sharedMesh.triangles.Length > 0, meshName + " has geometry");
+            Require(m.GetComponent<Renderer>().bounds.max.y < hall.transform.position.y + HallDimensions.WaterDepth, meshName + " stays under the water surface");
+        }
+        Require(Find(hall, "Spargers").GetComponent<Renderer>().bounds.min.y > hall.transform.position.y + HallDimensions.VesselBandLow - 1.0f, "spargers sit at the fuel-display depth, in the window's band");
+        int triangles, renderers, lights;
+        HallBuilder.Stats(hall, out triangles, out renderers, out lights);
+        Require(triangles <= HallDimensions.MaxHallTriangles, "hall triangles " + triangles + " <= " + HallDimensions.MaxHallTriangles + " with the anchors");
+        Require(lights <= HallDimensions.MaxRealtimeLights, "hall lights " + lights + " <= " + HallDimensions.MaxRealtimeLights + " with the anchors");
+    }
+
+    private static void CheckAnchor(GameObject hall, string name, double[] expectedHall)
+    {
+        Transform anchor = Find(hall, name);
+        Vector3 local = hall.transform.InverseTransformPoint(anchor.position);
+        var expected = new Vector3((float)expectedHall[0], (float)expectedHall[1], (float)expectedHall[2]);
+        Require(Vector3.Distance(local, expected) < 0.01f, name + " is at its ReliefAnchors position");
+        Require(anchor.GetComponent<Renderer>() == null && anchor.GetComponent<MeshFilter>() == null, name + " adds no geometry");
+        Require(anchor.gameObject.layer == ControlRoomSceneBuilder.HallLayer, name + " is on the hall layer");
+        Require(Vector3.Dot(anchor.forward, hall.transform.up) > 0.99f, name + " points up, the direction its jet emits");
     }
 
     public static Transform Find(GameObject root, string name)

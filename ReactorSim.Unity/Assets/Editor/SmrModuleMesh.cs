@@ -64,9 +64,9 @@ public static class SmrModuleMesh
         AddPenetration(pipes, R, C, 330f, ct - 2.2f, 0.08f);    // reactor vent
         // ---- steam and feedwater lines: out of the containment head, up, then sideways to the pool wall ----
         // The lines run sideways (+x) to the pool wall, which is nearer the module axis than the pool radius now the module is off the pool axis.
-        float run = HallDimensions.PipeRunHeight, wall = Mathf.Sqrt(Mathf.Max(1f, HallDimensions.PoolRadius * HallDimensions.PoolRadius - Mathf.Pow(-HallDimensions.ModuleZ + 0.6f, 2f))) - 0.1f;
-        AddLine(pipes, new Vector3(0.85f, ct - 0.2f, -0.55f), run, wall, 0.24f);
-        AddLine(pipes, new Vector3(0.85f, ct - 0.2f, 0.55f), run, wall, 0.17f);
+        float run = HallDimensions.PipeRunHeight, wall = HallDimensions.SteamLineWallX;
+        AddLine(pipes, new Vector3(HallDimensions.SteamLineStartX, ct - 0.2f, HallDimensions.SteamLineZ), run, wall, 0.24f);
+        AddLine(pipes, new Vector3(HallDimensions.SteamLineStartX, ct - 0.2f, HallDimensions.FeedLineZ), run, wall, 0.17f);
         // lifting lugs on the containment head
         for (int i = 0; i < 3; i++)
         {
@@ -113,10 +113,11 @@ public static class SmrModuleMesh
         AddHead(c2, C, ct - 0.9f, 0.9f, 14);
         c2.Attach(lod1.transform, "Smr_Containment_LOD1", m.containment);
         var c3 = new MeshBuilder();
-        c3.AddTube(new Vector3(0.85f, ct - 0.2f, -0.55f), new Vector3(0.85f, run, -0.55f), 0.24f, 6, true);
-        c3.AddTube(new Vector3(0.85f, run, -0.55f), new Vector3(wall, run, -0.55f), 0.24f, 6, true);
-        c3.AddTube(new Vector3(0.85f, ct - 0.2f, 0.55f), new Vector3(0.85f, run, 0.55f), 0.17f, 6, true);
-        c3.AddTube(new Vector3(0.85f, run, 0.55f), new Vector3(wall, run, 0.55f), 0.17f, 6, true);
+        float sx = HallDimensions.SteamLineStartX, sz = HallDimensions.SteamLineZ, fz = HallDimensions.FeedLineZ;
+        c3.AddTube(new Vector3(sx, ct - 0.2f, sz), new Vector3(sx, run, sz), 0.24f, 6, true);
+        c3.AddTube(new Vector3(sx, run, sz), new Vector3(wall, run, sz), 0.24f, 6, true);
+        c3.AddTube(new Vector3(sx, ct - 0.2f, fz), new Vector3(sx, run, fz), 0.17f, 6, true);
+        c3.AddTube(new Vector3(sx, run, fz), new Vector3(wall, run, fz), 0.17f, 6, true);
         c3.Attach(lod1.transform, "Smr_Pipes_LOD1", m.dark);
 
         var group = root.AddComponent<LODGroup>();

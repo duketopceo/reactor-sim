@@ -92,8 +92,29 @@ namespace ReactorSim
         /// </summary>
         public static double AxisHeightThroughEdge(View v, double edgeY)
         {
+            return HeightThroughEdgeAt(v, edgeY, HallDimensions.ModuleFromWall);
+        }
+
+        /// <summary>Height above the pool floor at which the sight line through a point `edgeY` high on the window wall reaches a plane `beyondWall` metres behind the glass.</summary>
+        public static double HeightThroughEdgeAt(View v, double edgeY, double beyondWall)
+        {
             double eye = HallDimensions.EyeAbovePoolFloor((float)v.eyeHeight);
-            return edgeY + (edgeY - eye) * HallDimensions.ModuleFromWall / Math.Max(1e-9, v.back);
+            return edgeY + (edgeY - eye) * beyondWall / Math.Max(1e-9, v.back);
+        }
+
+        /// <summary>The lowest and highest heights (above the pool floor) the opening frames on a plane `beyondWall` metres behind the glass.</summary>
+        public static void VisibleBandAt(View v, double beyondWall, out double low, out double high)
+        {
+            double sillY = HallDimensions.RoomFloorAbovePoolFloor + HallDimensions.WindowSill;
+            low = HeightThroughEdgeAt(v, sillY, beyondWall);
+            high = HeightThroughEdgeAt(v, sillY + HallDimensions.WindowHeight, beyondWall);
+        }
+
+        /// <summary>Margin in metres by which the sight line to a point at hall-space x, `beyondWall` metres behind the glass, crosses the wall inside the opening's side edges.</summary>
+        public static double EdgeMarginAt(View v, double hallX, double beyondWall)
+        {
+            double crossing = CrossingAlong(v.along, hallX + HallDimensions.VesselShiftX, v.back, beyondWall);
+            return HallDimensions.WindowWidth * 0.5 - Math.Abs(crossing);
         }
 
         /// <summary>The lowest and highest vessel heights (above the pool floor) the opening frames on the module axis.</summary>
