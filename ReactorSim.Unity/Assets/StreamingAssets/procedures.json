@@ -47,12 +47,13 @@
         {
           "id": "dilute-boron",
           "phase": "B. Approach",
-          "text": "Dilute boron down to about 1200 ppm, then stop the dilution. Boron is the slow, coarse control.",
+          "text": "Dilute boron down to about 1300 ppm (between 1250 and 1350), then stop the dilution. Do not go lower: bank A is meant to finish the approach. Boron is the slow, coarse control.",
           "control": "Dilute rate knob",
-          "target": "Boron 1200 ppm or lower, then dilute to zero",
+          "target": "Boron 1250 to 1350 ppm, then dilute to zero",
           "rows": ["dilute_ctl", "boron_ppm"],
-          "when": "boron_at_most",
-          "value": 1200
+          "when": "boron_band_until_bank_a_pulled",
+          "value": 1350,
+          "value2": 1250
         },
         {
           "id": "withdraw-bank-a",

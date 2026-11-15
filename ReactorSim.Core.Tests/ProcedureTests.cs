@@ -59,7 +59,10 @@ namespace ReactorSim.Tests
         public void ColdStartToGrid_BoronAndBankATargetsAreTheCorrectedOnes()
         {
             var proc = Procedure("cold-start-to-grid");
-            Assert.Equal(1200.0, proc.Steps.Single(s => s.Predicate == "boron_at_most").Value);
+            var band = proc.Steps.Single(s => s.Predicate == "boron_band_until_bank_a_pulled");
+            Assert.Equal(1350.0, band.Value);
+            Assert.Equal(1250.0, band.Value2);
+            Assert.Equal("dilute-boron", band.Id);
             Assert.Equal(0.5, proc.Steps.Single(s => s.Predicate == "bank_a_insertion_at_most").Value);
             // Vacuum and heaters (lineup) come before any rod movement.
             int rods = proc.Steps.FindIndex(s => s.Predicate == "shutdown_banks_out");
@@ -102,6 +105,49 @@ namespace ReactorSim.Tests
         {
             string st = "{\"id\":\"a\",\"text\":\"t\",\"rows\":[],\"when\":\"power_at_least\",\"value\":1}";
             Assert.Throws<ProcedureException>(() => ProcedureLoader.Parse("{\"procedures\":[{\"id\":\"p\",\"steps\":[" + st + "," + st + "]}]}"));
+        }
+
+        [Fact]
+        public void BoronBand_RejectsOverDilutionWhileBankAIsIn_AndReleasesOnceBankAIsPulled()
+        {
+            Func<double, double, bool> ok = (ppm, bankA) => ProcedurePredicates.Evaluate(
+                "boron_band_until_bank_a_pulled", 1350, 1250, new PlantSnapshot { BoronPpm = ppm, BankInsertion = new[] { 0.0, 0.0, 0.0, bankA } });
+            Assert.True(ok(1300, 1.0));      // inside the band
+            Assert.True(ok(1350, 1.0));      // edges are inclusive
+            Assert.True(ok(1250, 1.0));
+            Assert.False(ok(1351, 1.0));     // not diluted far enough
+            Assert.False(ok(1249, 1.0));     // diluted past the band with bank A still in
+            Assert.False(ok(1200, 0.9));     // the old 1200 ppm target is now too low
+            Assert.True(ok(1200, 0.5));      // bank A at half: lower bound released (later steps dilute on purpose)
+            Assert.True(ok(300, 0.1));
+            Assert.False(ok(1400, 0.1));     // the upper bound always holds
+        }
+
+        [Fact]
+        public void BoronBand_OverDilutionUnticksStepFiveAndEverythingAfter()
+        {
+            var proc = Procedure("cold-start-to-grid");
+            int dil = proc.Steps.FindIndex(s => s.Id == "dilute-boron");
+            var snap = new PlantSnapshot
+            {
+                PrimaryFlowFrac = 1.0, HeaterPowerFrac = 1.0, PrimaryPressureBar = 155, CondenserPressureBar = 0.08,
+                BankInsertion = new[] { 0.0, 0.0, 0.0, 1.0 }, BoronPpm = 1300,
+            };
+            Assert.Equal(dil + 1, proc.Evaluate(snap).CurrentIndex);   // step 5 ticked, step 6 current
+            snap.BoronPpm = 1100;                                      // diluted past the band, bank A still in
+            Assert.Equal(dil, proc.Evaluate(snap).CurrentIndex);
+        }
+
+        [Fact]
+        public void Loader_Value2IsOptional_AndMustBeANumber()
+        {
+            string without = "{\"procedures\":[{\"id\":\"p\",\"steps\":[{\"id\":\"a\",\"text\":\"t\",\"when\":\"boron_at_most\",\"value\":1200}]}]}";
+            Assert.Equal(0.0, ProcedureLoader.Parse(without)[0].Steps[0].Value2);        // old documents still load
+            string with = without.Replace("\"value\":1200", "\"value\":1350,\"value2\":1250");
+            Assert.Equal(1250.0, ProcedureLoader.Parse(with)[0].Steps[0].Value2);
+            Assert.Throws<ProcedureException>(() => ProcedureLoader.Parse(without.Replace("\"value\":1200", "\"value\":1,\"value2\":\"x\"")));
+            // boron_at_most is unchanged by the second parameter.
+            Assert.True(ProcedurePredicates.Evaluate("boron_at_most", 1200, new PlantSnapshot { BoronPpm = 1200 }));
         }
 
         [Fact]

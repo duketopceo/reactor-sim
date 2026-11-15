@@ -29,6 +29,7 @@ namespace ReactorSim
         public string[] Rows = new string[0];   // inventory row ids to highlight
         public string Predicate;                 // key into ProcedurePredicates
         public double Value;                     // predicate parameter (ignored by parameterless predicates)
+        public double Value2;                    // optional second parameter ("value2" in data, 0 when absent); a band's lower bound
     }
 
     public class Procedure
@@ -43,7 +44,7 @@ namespace ReactorSim
             bool prefix = true;
             for (int i = 0; i < Steps.Count; i++)
             {
-                prefix = prefix && ProcedurePredicates.Evaluate(Steps[i].Predicate, Steps[i].Value, snap);
+                prefix = prefix && ProcedurePredicates.Evaluate(Steps[i].Predicate, Steps[i].Value, Steps[i].Value2, snap);
                 ticked[i] = prefix;
             }
             return new ProcedureState(this, ticked);
@@ -81,24 +82,33 @@ namespace ReactorSim
 
     public static class ProcedurePredicates
     {
-        private static readonly Dictionary<string, Func<PlantSnapshot, double, bool>> Table =
-            new Dictionary<string, Func<PlantSnapshot, double, bool>>
+        // Bank A insertion at or below which the boron band's lower bound no longer applies (original design
+        // choice: the step 6 target, "bank A about half").
+        internal const double BankAReleaseInsertion = 0.5;
+
+        private static readonly Dictionary<string, Func<PlantSnapshot, double, double, bool>> Table =
+            new Dictionary<string, Func<PlantSnapshot, double, double, bool>>
             {
-                { "primary_flow_at_least",      (s, v) => s.PrimaryFlowFrac >= v },
-                { "heater_power_at_least",      (s, v) => s.HeaterPowerFrac >= v },
-                { "primary_pressure_at_least",  (s, v) => s.PrimaryPressureBar >= v },
-                { "primary_temp_at_least",      (s, v) => s.PrimaryTempC >= v },
-                { "boron_at_most",              (s, v) => s.BoronPpm <= v },
-                { "shutdown_banks_out",         (s, v) => s.BankInsertion[0] < v && s.BankInsertion[1] < v && s.BankInsertion[2] < v },
-                { "bank_a_insertion_at_most",   (s, v) => s.BankInsertion[3] <= v },
-                { "critical_power_at_least",    (s, v) => s.IsCritical && s.Power >= v },
-                { "power_at_least",             (s, v) => s.Power >= v },
-                { "steam_demand_at_least",      (s, v) => s.SteamDemandFrac >= v },
-                { "turbine_rpm_at_least",       (s, v) => s.TurbineRpm >= v },
-                { "condenser_pressure_at_most", (s, v) => s.CondenserPressureBar <= v },
-                { "turbine_auto_load_on",       (s, v) => s.BopAutoLoad },
-                { "generator_synced",           (s, v) => s.GeneratorSynced },
-                { "grid_output_at_least",       (s, v) => s.GridOutputFrac >= v },
+                { "primary_flow_at_least",      (s, v, v2) => s.PrimaryFlowFrac >= v },
+                { "heater_power_at_least",      (s, v, v2) => s.HeaterPowerFrac >= v },
+                { "primary_pressure_at_least",  (s, v, v2) => s.PrimaryPressureBar >= v },
+                { "primary_temp_at_least",      (s, v, v2) => s.PrimaryTempC >= v },
+                { "boron_at_most",              (s, v, v2) => s.BoronPpm <= v },
+                // Band for the approach: at or below value (ppm) and, until bank A has been pulled to half
+                // or beyond, at or above value2. Diluting past the band while bank A is still in would put
+                // the critical bank A position before the half-way mark (see docs/STARTUP.md); once bank A
+                // is at half or less the lower bound is released, because later steps dilute on purpose.
+                { "boron_band_until_bank_a_pulled", (s, v, v2) => s.BoronPpm <= v && (s.BoronPpm >= v2 || s.BankInsertion[3] <= BankAReleaseInsertion) },
+                { "shutdown_banks_out",         (s, v, v2) => s.BankInsertion[0] < v && s.BankInsertion[1] < v && s.BankInsertion[2] < v },
+                { "bank_a_insertion_at_most",   (s, v, v2) => s.BankInsertion[3] <= v },
+                { "critical_power_at_least",    (s, v, v2) => s.IsCritical && s.Power >= v },
+                { "power_at_least",             (s, v, v2) => s.Power >= v },
+                { "steam_demand_at_least",      (s, v, v2) => s.SteamDemandFrac >= v },
+                { "turbine_rpm_at_least",       (s, v, v2) => s.TurbineRpm >= v },
+                { "condenser_pressure_at_most", (s, v, v2) => s.CondenserPressureBar <= v },
+                { "turbine_auto_load_on",       (s, v, v2) => s.BopAutoLoad },
+                { "generator_synced",           (s, v, v2) => s.GeneratorSynced },
+                { "grid_output_at_least",       (s, v, v2) => s.GridOutputFrac >= v },
             };
 
         public static IEnumerable<string> Names { get { return Table.Keys; } }
@@ -107,10 +117,15 @@ namespace ReactorSim
 
         public static bool Evaluate(string name, double value, PlantSnapshot snap)
         {
-            Func<PlantSnapshot, double, bool> f;
+            return Evaluate(name, value, 0.0, snap);
+        }
+
+        public static bool Evaluate(string name, double value, double value2, PlantSnapshot snap)
+        {
+            Func<PlantSnapshot, double, double, bool> f;
             if (!Table.TryGetValue(name ?? "", out f))
                 throw new ProcedureException("unknown procedure predicate \"" + name + "\"");
-            return f(snap, value);
+            return f(snap, value, value2);
         }
     }
 }
