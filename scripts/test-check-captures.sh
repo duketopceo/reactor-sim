@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Self-test for the hall budget gate in scripts/check-captures.sh: builds fake capture runs and checks the verdicts, including
+# Self-test for the hall and control-room budget gates in scripts/check-captures.sh: builds fake capture runs and checks the verdicts, including
 # that a deliberately over-budget run FAILS (a gate that cannot fail proves nothing). Needs python3 only; runs on any box.
 #   bash scripts/test-check-captures.sh      exit 0 = every case behaved
 set -uo pipefail
@@ -147,6 +147,55 @@ expect 1 "a missing glowmid is not silently skipped" "$tmp/glownomid" --only glo
 expect 0 "glowmid waived on purpose passes" "$tmp/glownomid" --only glowoff,glowidle,glowfull --allow-skip glowmid
 waived_out="$(bash scripts/check-captures.sh "$tmp/glownomid" --only glowoff,glowidle,glowfull --allow-skip glowmid 2>&1)"
 case "$waived_out" in *"NOT graded"*) echo "ok   the waived glowmid check says it was not graded" ;; *) echo "FAIL the waived glowmid check did not say it was ungraded"; failures=$((failures + 1)) ;; esac
+
+# control-room budget (--room-budget): seat and stand poses graded as a rise over the baseline.
+# mkroom <dir> <seat p95> <seat p99> <seat draws> <stand p95> <stand p99> <stand draws>   (gallery and away fixed at the "base" values)
+mkroom() {
+  local d="$1/1600x900"
+  mkdir -p "$d"
+  head -c 30000 /dev/zero > "$d/g.png"
+  cat > "$d/captures.json" <<EOF
+{"captures":[
+ {"pose":"gallery","label":"gallery","file":"g.png","frameMsP95":4.0,"frameMsP99":5.0,"drawCalls":100},
+ {"pose":"away","label":"gallery-away","file":"g.png","frameMsP95":3.0,"frameMsP99":3.0,"drawCalls":50},
+ {"pose":"seat","label":"seat","file":"g.png","frameMsP95":$2,"frameMsP99":$3,"drawCalls":$4},
+ {"pose":"stand","label":"stand","file":"g.png","frameMsP95":$5,"frameMsP99":$6,"drawCalls":$7}
+]}
+EOF
+}
+mkroom "$tmp/rbase" 10.0 12.0 1000 10.0 12.0 1000
+mkroom "$tmp/rok" 12.0 15.0 1100 13.0 17.0 1120      # inside: +2/+3/+100 and +3/+5/+120 (draws exactly on the limit)
+mkroom "$tmp/rslow" 15.0 15.0 1000 10.0 12.0 1000    # seat p95 +5 ms
+mkroom "$tmp/rslow99" 10.0 19.0 1000 10.0 12.0 1000  # seat p99 +7 ms
+mkroom "$tmp/rdraws" 10.0 12.0 1000 10.0 12.0 1121   # stand draws +121
+mkroom "$tmp/rb95" 14.0 12.0 1000 10.0 12.0 1000     # seat p95 exactly +4 ms
+mkroom "$tmp/rb99" 10.0 18.0 1000 10.0 12.0 1000     # seat p99 exactly +6 ms
+mkroom "$tmp/rb95x" 14.01 12.0 1000 10.0 12.0 1000
+mkroom "$tmp/rb99x" 10.0 18.01 1000 10.0 12.0 1000
+expect 0 "room poses inside the room budget pass" "$tmp/rok" --baseline "$tmp/rbase" --budget-only --room-budget
+expect 1 "seat p95 over the room budget fails" "$tmp/rslow" --baseline "$tmp/rbase" --budget-only --room-budget
+expect 1 "seat p99 over the room budget fails" "$tmp/rslow99" --baseline "$tmp/rbase" --budget-only --room-budget
+expect 1 "stand draw calls over the room budget fail" "$tmp/rdraws" --baseline "$tmp/rbase" --budget-only --room-budget
+expect 0 "room p95 exactly on the limit passes" "$tmp/rb95" --baseline "$tmp/rbase" --budget-only --room-budget
+expect 1 "room p95 just over the limit fails" "$tmp/rb95x" --baseline "$tmp/rbase" --budget-only --room-budget
+expect 0 "room p99 exactly on the limit passes" "$tmp/rb99" --baseline "$tmp/rbase" --budget-only --room-budget
+expect 1 "room p99 just over the limit fails" "$tmp/rb99x" --baseline "$tmp/rbase" --budget-only --room-budget
+expect 0 "without --room-budget a slow seat pose is not graded" "$tmp/rslow" --baseline "$tmp/rbase" --budget-only
+expect 2 "--room-budget without a baseline is a usage error" "$tmp/rok" --room-budget
+# a run or baseline without the seat/stand poses cannot be graded: a failure, never a pass
+expect 1 "a new run without seat and stand fails the room budget" "$tmp/inside" --baseline "$tmp/rbase" --budget-only --room-budget
+expect 1 "a baseline without seat and stand fails the room budget" "$tmp/rok" --baseline "$tmp/base" --budget-only --room-budget
+mkdir -p "$tmp/rnop95/1600x900"
+head -c 30000 /dev/zero > "$tmp/rnop95/1600x900/g.png"
+cat > "$tmp/rnop95/1600x900/captures.json" <<EOF
+{"captures":[
+ {"pose":"gallery","label":"gallery","file":"g.png","frameMsP95":4.0,"frameMsP99":5.0,"drawCalls":100},
+ {"pose":"away","label":"gallery-away","file":"g.png","frameMsP95":3.0,"frameMsP99":3.0,"drawCalls":50},
+ {"pose":"seat","label":"seat","file":"g.png","drawCalls":1000},
+ {"pose":"stand","label":"stand","file":"g.png","drawCalls":1000}
+]}
+EOF
+expect 1 "room poses without frame-time percentiles fail instead of passing" "$tmp/rnop95" --baseline "$tmp/rbase" --budget-only --room-budget
 
 [ "$failures" -eq 0 ] && echo "check-captures budget self-test: PASS" || echo "check-captures budget self-test: FAILED ($failures)"
 exit "$failures"
