@@ -4,7 +4,7 @@ using ReactorSim;
 // Pure sound levels derived from the same snapshot as the instruments.
 public struct ReactorSoundMix
 {
-    public float Core, Water, Relief, Cooling, Generator, DetectorRate, TurbineSteam;
+    public float Core, Water, PrimaryRelief, SecondaryRelief, DumpSteam, Cooling, Generator, DetectorRate, TurbineSteam;
 
     private static float Unit(double value)
     {
@@ -21,7 +21,10 @@ public struct ReactorSoundMix
             Core = 0.035f + 0.12f * (float)Math.Sqrt(power),
             Water = 0.025f + 0.15f * flow,
             TurbineSteam = Unit(s.TurbineSteamKW / Physics.RatedThermalKW),
-            Relief = s.ReliefOpen || s.SecondaryReliefOpen ? 0.22f : 0,
+            PrimaryRelief = s.ReliefOpen ? 0.22f : 0,
+            SecondaryRelief = s.SecondaryReliefOpen ? 0.22f : 0,
+            // Bypass (dump) steam: a hiss that grows with the heat rate dumped to the condenser; independent of the turbine.
+            DumpSteam = 0.3f * (float)Math.Sqrt(Unit(s.DumpSteamKW / Physics.RatedThermalKW)),
             Cooling = 0.10f * cooling,
             Generator = s.GeneratorSynced ? 0.12f * Unit(s.GridOutputFrac) : 0,
             DetectorRate = 0.35f + 5.65f * (float)Math.Sqrt(power)
