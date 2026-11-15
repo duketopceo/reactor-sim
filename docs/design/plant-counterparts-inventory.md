@@ -1,32 +1,52 @@
 # Plant counterpart binding inventory
 
-This is a source audit of the current scene, not visual or audio sign-off. The shared source for current readings is the frame-cached `PlantBridge.GetSnapshot()`. Fractions below are fractions of the simulation's rated values unless called a command. The whole-plant map is a schematic; its activity brightness is not a calibrated flow meter.
+This is a source audit of every presentation surface: the desk, the status wall, the reactor hall and the sound. It is not visual or audio sign-off. Every cue reads the frame-cached `PlantBridge.GetSnapshot()`; field names below are `PlantSnapshot` fields. Fractions are of the simulation's rated value unless labeled a command. The whole-plant map is a schematic; its activity brightness is not a calibrated flow meter.
 
-| Counterpart | Simulation source | Current representation | Remaining work |
+**Unavailable rule.** A reading with no authoritative source is shown as the single token `N/M` (not measured) on every text surface, with no unit, and as `PlantWallMapModel.Status.Unavailable` on lamps and nodes. It is never approximated from a neighbouring value. `PlantWallMapModelTests` locks this in, together with the two labeling rules below.
+
+**Labeling rules.** A demanded rate is labeled `% command` and never as delivered flow. A heat rate is labeled `kW heat` and never as steam mass flow.
+
+## Visual and readout counterparts
+
+| Counterpart | Snapshot field (unit) | Actual or command | States shown | Unavailable | Phase 1 owner |
+|---|---|---|---|---|---|
+| Core/fuel | `Power` (fraction), `FuelTempC` (C), `TotalReactivityPcm` (pcm), `PeriodSeconds` (s) | Actual | Glow tint and emission (`GlowMapping`), wall readouts | Glow is an artistic cue, not measured light | U5 visual pass |
+| Rod banks A-D | `BankInsertion` (fraction, array order D, C, B, A) | Actual | Wall and hall via `PlantWallMapModel.BankInsertion` | None | U5 |
+| Primary pumps and loop | `PrimaryFlowFrac` (fraction), `PrimaryTempC` (C), `PrimaryLevelFrac` (fraction) | Actual, aggregate | Hall rotor, wall loop brightness and status | Individual pump readings: `N/M` | U2 direction cue |
+| Pressurizer | `PrimaryPressureBar` (bar), `PrimarySatMarginC` (C), `HeaterPowerFrac`, `SprayFrac` (fraction) | Actual | Wall lamp and readouts | None | U2 |
+| Primary relief | `ReliefOpen` (bool) | Actual | Wall readout `RELIEF OPEN/CLOSED`; hall jet when an anchor exists | Hall anchor absent in the placed hall | U3 anchor, U6 sound |
+| Steam generator | `SecondaryPressureBar` (bar), `SecondaryTempC` (C), `SecondaryLevelFrac` (fraction) | Actual, one shared secondary state | Wall status and readouts | Per-generator readings: `N/M` | U2 |
+| Secondary relief | `SecondaryReliefOpen` (bool, opens above 75 bar) | Actual | Wall readout; hall jet when an anchor exists | Hall anchor absent in the placed hall | U3 anchor, U6 sound |
+| Turbine throttle | `SteamDemandFrac` (fraction) | Command, labeled `% command` | Wall SG readout | None | none |
+| Steam to turbine | `TurbineSteamKW` (kW heat) | Actual delivered heat rate | Wall steam and exhaust brightness, turbine steam sound | Steam mass flow: not modeled | U5 trip check |
+| Bypass steam | `DumpSteamKW` (kW heat) | Actual | Wall bypass brightness and `DUMP` readout | Hall visual and sound: none yet | U3 visual, U6 sound |
+| Feedwater | `FeedwaterDeliveredFrac` (rated), `FeedwaterFlowFrac` (command), `FeedwaterAvailabilityFrac` (fraction) | Delivered is actual; pump is a command | Wall route and readouts, `FEED_FAIL` predicate | None | U5 starvation check |
+| Turbine and shaft | `TurbineRpm` (rpm), `TurbineTripped` (bool) | Actual | Hall rotor, turbine sound, wall shaft and lamp | None | U5 coastdown check |
+| Generator and grid | `GeneratorSynced` (bool), `GeneratorKw` (kW), `GridOutputFrac` (rated), `GridFrequencyHz` (Hz) | Actual | Wall status, route, readouts, generator sound | None | U2 |
+| Condenser, hotwell, cooling | `CondenserPressureBar` (bar), `HotwellInventoryFrac`, `CoolingWaterFrac` (fraction), `VacuumPumpFrac` (command) | Pressure, inventory and cooling actual; vacuum pump is a command | Wall status, cooling path, cooling sound | Separate condenser equipment: none | U2 |
+| Chemistry | `BoronPpm` (ppm), `Ph`, `BorateRate`, `DiluteRate`, `NaohRate`, `IonExchangeRate` (commands) | Concentrations actual; rates are commands | Wall lamp and readouts; drawn route is static | Chemistry route flow: `N/M` | U2 |
+| Surge and safety routes | none | n/a | Static markings; safety lamp follows `Scrammed` | Route flow: `N/M` (`SAFETY FLOW N/M`) | none |
+| Pool atmosphere | `Power` | Decorative | `ReactorWaterAtmosphere` bubble streams | Not a measurement of boiling or flow | none |
+| Alarms and mode | `Mode`, alarm predicates (`LampPredicates`, desk `LampContext`), `AlarmAckSeq` | Actual | Desk and wall lamps, horn | First-out: `N/M` (alarm list is unordered) | U6 priority, U5 acknowledgement check |
+| Clock and procedure | `SimSeconds` (s); procedure state lives outside the snapshot | Clock actual | Wall `CLOCK`; clipboard shows procedure | Procedure step on the wall: `N/M` | none |
+
+## Audio layers
+
+| Layer | Source | Current state | Phase 1 owner |
 |---|---|---|---|
-| Core/fuel | `Power`, `FuelTempC` | Wall and hall use `GlowMapping`; temperature changes tint and power changes emission. | Verify visually at cold, intermediate and full power. The glow is an artistic cue, not measured light. |
-| Rod banks A-D | `BankInsertion` in D/C/B/A array order | Wall and hall both use `PlantWallMapModel.BankInsertion`. | Verify all four bank movements and SCRAM against the desk. |
-| Primary pumps and loop | `PrimaryFlowFrac` | Hall rotor and pump sound use flow; wall loop brightness and status use flow and shared alarm predicates. | Add directional cue and verify loss-of-flow behavior; values are aggregate, not individual pump measurements. |
-| Pressurizer and primary relief | `PrimaryPressureBar`, `PrimarySatMarginC`, `HeaterPowerFrac`, `SprayFrac`, `ReliefOpen` | Wall pressurizer lamp uses pressure/margin and relief status; relief sound follows the boolean. | Separate heater, spray and relief visuals and readable values. The currently placed hall FBXs do not contain the older `PlantEquipment` relief anchors. |
-| Steam generator | `SecondaryPressureBar`, `SecondaryTempC`, `SecondaryLevelFrac`, `SecondaryReliefOpen` | Wall status uses shared alarm predicates and relief state. | Add level and temperature/pressure readings and dedicated relief geometry. The snapshot exposes a shared secondary state, not independent generator readings. |
-| Steam to turbine | `TurbineSteamKW` | Wall steam and exhaust brightness use heat rate; turbine steam sound uses this output instead of the throttle command. | Audition in-game and verify the full trip and no-pressure scenarios. Heat rate is not steam mass flow. |
-| Steam dump | `DumpSteamKW` | Dedicated wall bypass brightness uses calculated dump heat. | Verify the bypass still indicates activity when the turbine is tripped; the hall has no separate dump geometry. |
-| Feedwater | `FeedwaterDeliveredFrac`, `FeedwaterFlowFrac`, `FeedwaterAvailabilityFrac` | Wall route and summary use delivered fraction. Feed-pump status uses the command and the shared `FEED_FAIL` predicate. | Clearly distinguish pump command, delivered flow and supply availability; verify starvation. |
-| Turbine and shaft | `TurbineRpm`, `TurbineTripped` | Hall rotor and turbine sound follow RPM; wall shaft brightness follows RPM and turbine lamp follows trip. | Add a clear miniature rotor cue and verify coastdown and trip. |
-| Generator and grid | `GeneratorSynced`, `GeneratorKw`, `GridOutputFrac`, `GridFrequencyHz` | Wall status and electrical route, summary output/frequency and generator sound follow the snapshot. | Add visible breaker/sync state and readable generation and frequency. |
-| Condenser, hotwell and cooling | `CondenserPressureBar`, `HotwellInventoryFrac`, `CoolingWaterFrac`, `VacuumPumpFrac` | Wall status and cooling path follow snapshot fields; cooling sound uses cooling and vacuum controls. | Add distinct vacuum, inventory and cooling readouts and corresponding visible equipment. |
-| Chemistry | `BoronPpm`, `Ph`, `BorateRate`, `DiluteRate`, `NaohRate`, `IonExchangeRate` | Wall chemistry lamp and boron summary follow the snapshot. The drawn chemistry route is static. | Show chemistry readings and commanded rates with accurate labels; the snapshot has no measured flow for that specific drawn route. |
-| Surge and safety routes | No specific measured route flow in the snapshot | Static circuit markings; wall safety lamp follows SCRAM. | Mark route flow unavailable, and add only state/paths supported by the simulation. |
-| Pool atmosphere | `Power` modulates `ReactorWaterAtmosphere` particles | Bubbles are decorative, with a baseline even at zero power. | Keep them explicitly atmospheric; do not present them as a measurement of boiling or coolant flow. |
-| Alarms and operating mode | Snapshot plus `LampPredicates` and desk `LampContext` | Desk and wall use shared predicates, including the desk's configured short-period context. | Verify counts and acknowledgement behavior across desk, tablet and wall; first-out is not currently exposed as a wall readout. |
-| Procedure and clock | `SimSeconds`; procedure state maintained outside the snapshot | Existing clipboard/mission UI shows procedure progress; wall currently omits it. | Add an authoritative clock and procedure readout without inferring first-out or an active step. |
+| Pump hum | `PrimaryFlowFrac` | `ProceduralPlantAudio`, not hall-positioned | U6 positioning |
+| Turbine and steam | `TurbineRpm`, `TurbineSteamKW` | Follows delivered steam, so a tripped turbine is silent | U6 |
+| Relief steam | `ReliefOpen`, `SecondaryReliefOpen` | One merged level in `ReactorSoundMix.Relief`; only primary relief stings (`AlarmFeedback`) | U6 splits into primary and secondary |
+| Bypass steam | `DumpSteamKW` | No sound | U6 |
+| Generator and cooling | `GeneratorSynced`, `GeneratorKw`, `CoolingWaterFrac`, `VacuumPumpFrac` | Procedural loops | U6 categories |
+| Horn and stings | Horn alarms (`scram`, `bop-trip`, `high-pressure`, `high-fuel-temp`) via `AlarmTracker`, acknowledged by `AlarmAckSeq` | Works; no category volume | U6 categories and priority |
+| Voice | `VoiceAnnouncer` edge-triggered keys | Only SCRAM interrupts; no priority queue | U6 priority |
+| Volume | `AudioListener.volume` from the pause menu | Master only, not persisted; alarm mute toggle | U6 categories and persistence |
 
 ## Relief-anchor limitation
 
-The old `PlantEquipment` Blender asset defines separate primary and steam-generator relief anchors, but `HallAssetPlacer` currently places `ReactorCore`, `VesselInternals` and `RotatingEquipment`, not `PlantEquipment`. Splitting the binder's signals prevents mixing the two states when those anchors are present; it does not by itself add visible relief jets to the current hall. New hall geometry or appropriate authored anchors and a visual check are still needed.
+`HallAssetPlacer` places `ReactorCore`, `VesselInternals` and `RotatingEquipment`. The legacy `PlantEquipment` asset holds old relief anchors but is a separate whole plant and is never placed in the hall (see `docs/design/reactor-core-assets.md`). `PlantEquipmentBinder` already binds the two relief signals separately to any `VFX_PORV_SteamJet*` and `VFX_SGRelief*` anchors under the hall root, so the remaining work is authoring those anchors into the hall (Phase 1 U3).
 
-## Verification and remaining work
+## Verification
 
-`PlantWallMapModel.GroupedReadout` is mounted on a second plate (`LiveDetail`) beneath the summary plate and shows core, rod banks, primary, steam generator and feed, turbine, generator, grid, condenser, cooling, chemistry and the simulation clock with units; first-out and procedure step are shown as N/M because no authoritative source exists. The per-component `ComponentReadout` text is still not displayed, and the plate layout needs an in-game readability pass. Pump and pressurizer status mappings are separate, and the safety lamp no longer implies the unmodeled safety system is healthy merely because SCRAM is clear.
-
-Automated model tests cover pump/pressurizer independence, missing and invalid readings, and turbine steam after a trip. A Unity play-mode fixture checks the two relief signals independently against temporary authored anchor types; those anchors remain absent from the currently placed hall assets. A listening pass, custom short-period tuning check, and the full visual scenario matrix remain to be done.
+`PlantWallMapModel.GroupedReadout` is shown on the `LiveDetail` plate and was confirmed live in play mode. The per-component `ComponentReadout` text is not yet displayed (Phase 1 U2). Model tests cover pump and pressurizer independence, missing and invalid readings, turbine steam after a trip, the unavailable rule and both labeling rules. A Unity play-mode fixture checks the two relief signals against temporary anchors. A listening pass and the full visual scenario matrix remain (Phase 1 U5).
