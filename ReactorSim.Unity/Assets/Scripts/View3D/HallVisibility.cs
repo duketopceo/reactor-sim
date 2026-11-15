@@ -31,7 +31,7 @@ public class HallVisibility : MonoBehaviour
         if (hallRoot == null) return;
         Camera cam = viewCamera != null ? viewCamera : Camera.main;
         bool visible = true;
-        if (cam != null)
+        if (cam != null && !ReactorInspectionView.Active)
         {
             Matrix4x4 vp = cam.projectionMatrix * cam.worldToCameraMatrix;
             for (int r = 0; r < 4; r++)

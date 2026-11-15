@@ -120,7 +120,7 @@ PR1 made the type system and made the menus uGUI. What remains uneven: some labe
 - **Build and checkout:** a dedicated Windows checkout, never the owner's or another agent's.
 - **Captures:** `scripts/capture-playtest.sh --sizes 1920x1080` (poses: seat, stand, crt, tooltip, rejected, drag, checklist, pause, tablet, clipboard, menu) on master (before) and on the branch (after); `RoomRender.Run` for room views (seat, stand, top). Grade with `bash scripts/check-captures.sh <dir>` (glyph height at least 10 px, contrast at least 4.5, PNG present).
 - **Per-page captures:** each CRT page and each tablet page is shown; if the stock poses cover only some, the capture run is extended through the existing poses option, not by editing `CaptureMode.cs`.
-- **Delivery:** `before-*.png` and `after-*.png` copied to `~/Downloads/claude/reactor-renders/pr3/`, all read by eye; anything muddy, blown out, overlapping, or cramped is fixed and recaptured.
+- **Delivery:** `before-*.png` and `after-*.png` copied to `a local renders folder`, all read by eye; anything muddy, blown out, overlapping, or cramped is fixed and recaptured.
 - **Fallback:** if rendering fails over ssh, retry through the interactive-session scheduled task the script uses; if impossible, visuals are owner-run and reported as such.
 
 ## Gate

@@ -6,8 +6,8 @@ using ReactorSim;
 // Builds the reactor hall behind the control-room window (U6): a circular hall with a deep pool, the integral SMR module (see
 // SmrModuleMesh) standing in it, tinted water as stacked translucent layers, a polar crane, cable trays and hall lights.
 // Everything is collider-free original geometry on HallLayer under one "ReactorHall" root, plus a separate frustum gate object
-// (HallVisibility) that switches the root off when the window is out of view. The room floor sits just above the hall deck (see
-// HallDimensions.GalleryEyeAboveWater), so the window looks down only a couple of metres onto the water.
+// (HallVisibility) that switches the root off when the window is out of view. The room floor sits below the water surface (see
+// HallDimensions.GalleryEyeAboveWater, negative since the aquarium rework), so the window is a pane in the water at eye level.
 //
 // Local hall space: origin on the pool axis at the pool floor, y up, the control-room window towards -z. The root is placed and
 // turned so that local -z points at the room. All numbers come from HallDimensions.
@@ -40,8 +40,16 @@ public static class HallBuilder
         concrete.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
         float ce = HallPalette.ConcreteEmission;
         if (concrete.HasProperty("_EmissionColor")) concrete.SetColor("_EmissionColor", new Color(ce, ce, ce * 1.1f));
+        // A visibly cool submerged wall gives the gallery a sense of water depth without obscuring the core.
+        Material underwaterWall = makeMaterial("M_HallUnderwater", new Color(0.13f, 0.34f, 0.42f), false, false);
+        underwaterWall.EnableKeyword("_EMISSION");
+        underwaterWall.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+        if (underwaterWall.HasProperty("_EmissionColor")) underwaterWall.SetColor("_EmissionColor", new Color(0.02f, 0.10f, 0.16f));
         Material deck = makeMaterial("M_HallDeck", Rgb(HallPalette.Deck), false, false);
         Material tile = makeMaterial("M_PoolTile", Rgb(HallPalette.PoolTile), false, false);
+        tile.EnableKeyword("_EMISSION");
+        tile.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+        if (tile.HasProperty("_EmissionColor")) tile.SetColor("_EmissionColor", new Color(0.02f, 0.12f, 0.19f));
         Material steel = makeMaterial("M_HallSteel", Rgb(HallPalette.Stainless), false, false);
         Material dark = makeMaterial("M_HallSteelDark", Rgb(HallPalette.DarkSteel), false, false);
         Material paint = makeMaterial("M_ContainmentPaint", Rgb(HallPalette.ContainmentPaint), false, false);
@@ -74,15 +82,21 @@ public static class HallBuilder
         // it the room's own wall is there)
         var arcWall = new MeshBuilder();
         var chordWall = new MeshBuilder();
+        var submergedWall = new MeshBuilder();
         for (int i = 0; i + 1 < hallEdge.Count; i++)
         {
             float midAngle = 0.5f * (ang[i] + ang[i + 1]);
             bool chord = ClipRadius(midAngle, D, Rh) < Rh - 0.001f;
             var seg = new List<Vector2> { hallEdge[i], hallEdge[i + 1] };
             if (chord) chordWall.AddWallStrip(seg, 0f, roomFloorLocal, true);
-            else arcWall.AddWallStrip(seg, 0f, ceilY, true);
+            else
+            {
+                submergedWall.AddWallStrip(seg, 0f, water, true);
+                arcWall.AddWallStrip(seg, water, ceilY, true);
+            }
         }
         arcWall.Attach(T, "Hall_Wall", concrete);
+        submergedWall.Attach(T, "Hall_SubmergedWall", underwaterWall);
         chordWall.Attach(T, "Hall_NearWall", concrete);
 
         var deckMesh = new MeshBuilder();
@@ -110,6 +124,24 @@ public static class HallBuilder
             (k <= shallowLayers ? wShallow : wDeep).AddFan(Vector2.zero, ScaleAll(poolCircle, 0.995f), water - k * (water / (layers + 1f)), true);
         wShallow.Attach(T, "Pool_VolumeShallow", waterVolumeShallow);
         wDeep.Attach(T, "Pool_VolumeDeep", waterVolumeDeep);
+
+        // Depth veils: thin vertical tinted sheets across the pool at growing distance from the glass. Each one adds a little
+        // water colour to whatever lies behind it, so the module (two sheets) reads clearer than the far wall (eight): a
+        // distance gradient from the window with no fog setting, no real-time light and 8 x 12 triangles. Two sit between the glass and
+        // the module, the rest behind it; none cuts through the module.
+        Material waterVeil = makeMaterial("M_PoolVeil", new Color(0.05f, 0.30f, 0.48f, 0.09f), true, false);
+        waterVeil.EnableKeyword("_EMISSION");
+        waterVeil.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+        if (waterVeil.HasProperty("_EmissionColor")) waterVeil.SetColor("_EmissionColor", new Color(0.004f, 0.030f, 0.050f));
+        var veils = new MeshBuilder();
+        float moduleFront = HallDimensions.ModuleZ - HallDimensions.ContainmentDiameter * 0.5f - 0.1f;
+        float moduleBack = HallDimensions.ModuleZ + HallDimensions.ContainmentDiameter * 0.5f + 0.1f;
+        foreach (float vz in new[] { -D + 0.9f, 0.5f * (-D + moduleFront), moduleBack + 0.2f, -2f, 1f, 4f, 7f, 10f })
+        {
+            float half = Mathf.Sqrt(Mathf.Max(0.01f, Rp * Rp - vz * vz)) * 0.99f;
+            veils.AddBox(new Vector3(-half, 0.3f, vz - 0.01f), new Vector3(half, water - 0.05f, vz + 0.01f));
+        }
+        veils.Attach(T, "Pool_DepthVeils", waterVeil);
 
         // ---- the module, crane, trays ----
         SmrModuleMesh.Build(T, new SmrModuleMesh.Materials { vessel = steel, dark = dark, containment = paint, skin = skin });
@@ -161,7 +193,9 @@ public static class HallBuilder
         }
         FuelRackMesh.BuildSharedLight(T, new Vector3(0f, ledge + HallDimensions.RackCellHeight + 1.6f, Rp - 2.3f));
 
+        HallAssetPlacer.Build(root);
         FinishHall(root, windowBounds);
+        root.AddComponent<ReactorWaterAtmosphere>();
         return root;
     }
 
@@ -171,7 +205,7 @@ public static class HallBuilder
         foreach (var tr in root.GetComponentsInChildren<Transform>(true))
         {
             tr.gameObject.layer = ControlRoomSceneBuilder.HallLayer;
-            if (tr.GetComponent<MeshRenderer>() != null)
+            if (tr.GetComponent<MeshRenderer>() != null && !HallAssetPlacer.IsMoving(tr))
                 GameObjectUtility.SetStaticEditorFlags(tr.gameObject, StaticEditorFlags.BatchingStatic);
         }
         foreach (var l in root.GetComponentsInChildren<Light>(true)) l.cullingMask = 1 << ControlRoomSceneBuilder.HallLayer;

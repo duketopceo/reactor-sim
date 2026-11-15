@@ -122,6 +122,7 @@ public static class ControlRoomSceneBuilder
             // Ok controls and malformed names both get an interactable so a malformed name is reported at play.
             // Hit area: at least HitArea.MinPixels on screen at the default field of view and the playtest window height (R7).
             FitCollider(t, (float)HitArea.MinSideMetres(OperatorMath.FovDefault, 900.0));
+            ExpandColliderToAux(t);
             var inter = t.gameObject.AddComponent<DiegeticInteractable>();
             inter.binder = binder;
             DesignData.Row row;
@@ -183,9 +184,37 @@ public static class ControlRoomSceneBuilder
         // U6: window in the south wall beside the door, and the reactor hall beyond it (primitives, no Blender asset).
         BuildReactorWindow(crRoot.transform);
 
+        // The overview is a separate read-only surface, rebuilt with the room.
+        var wallMapPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(FbxDir + "/PlantOverview.fbx");
+        var door = FindDeep(crRoot.transform, "Door_Leaf");
+        var doorRenderer = door != null ? door.GetComponent<Renderer>() : null;
+        var glass = FindDeep(crRoot.transform, "Window_Glass");
+        var glassRenderer = glass != null ? glass.GetComponent<Renderer>() : null;
+        var floor = FindDeep(crRoot.transform, "Floor");
+        var floorRenderer = floor != null ? floor.GetComponent<Renderer>() : null;
+        if (wallMapPrefab != null && doorRenderer != null && glassRenderer != null && floorRenderer != null)
+        {
+            // Keep the FBX's imported axis conversion on its child; orient only a wrapper.
+            var map = new GameObject("WholePlantOverview");
+            map.transform.SetParent(crRoot.transform, false);
+            PrefabUtility.InstantiatePrefab(wallMapPrefab, map.transform);
+            map.transform.localScale = Vector3.one * 0.4f;
+            var windowBounds = glassRenderer.bounds;
+            float inward = floorRenderer.bounds.center.z > windowBounds.center.z ? 1f : -1f;
+            // From inside, left of the door has the same X sign as the inward Z direction.
+            map.transform.rotation = inward > 0f ? Quaternion.identity : Quaternion.Euler(0f, 180f, 0f);
+            float roomFloor = windowBounds.min.y - HallDimensions.WindowSill;
+            map.transform.position = new Vector3(doorRenderer.bounds.center.x + inward * 2.8f,
+                roomFloor + 0.85f, windowBounds.center.z + inward * 0.18f);
+            map.AddComponent<PlantWallMapView>().bridge = bridge;
+        }
+        else Debug.LogWarning("[Phase2SceneBuilder] Plant overview asset, door, window, or floor missing.");
+
         // U16: procedure clipboards on the bench in front of each chair (children of crRoot, so a rebuild replaces them).
         PlaceClipboard(crRoot.transform, "SEAT_A1", "CLIPBOARD_A1", "Startup checklist", new[] { "cold-start-to-grid" });
         PlaceClipboard(crRoot.transform, "SEAT_A2", "CLIPBOARD_A2", "Startup checklist", new[] { "cold-start-to-grid" });
+
+        MarkStaticBatching(crRoot);
 
         // RoomCam: reuse imported camera if present, else create one.
         Camera cam = Camera.main;
@@ -215,14 +244,19 @@ public static class ControlRoomSceneBuilder
             cam.gameObject.AddComponent<CameraShake>();
         if (cam.GetComponent<OperatorController>() == null)
             cam.gameObject.AddComponent<OperatorController>();
+        if (cam.GetComponent<ReactorInspectionView>() == null)
+            cam.gameObject.AddComponent<ReactorInspectionView>();
 
         // Audio root
-        if (GameObject.Find("AudioRoot") == null)
-        {
-            var audioGo = new GameObject("AudioRoot");
-            var audio = audioGo.AddComponent<ProceduralPlantAudio>();
-            audio.bridge = bridge;
-        }
+        var audioGo = GameObject.Find("AudioRoot");
+        if (audioGo == null) audioGo = new GameObject("AudioRoot");
+        var audio = audioGo.GetComponent<ProceduralPlantAudio>() ?? audioGo.AddComponent<ProceduralPlantAudio>();
+        audio.bridge = bridge;
+        var voice = audioGo.GetComponent<VoiceAnnouncer>() ?? audioGo.AddComponent<VoiceAnnouncer>();
+        voice.bridge = bridge;
+        if (voice.clips == null || voice.clips.Length == 0) voice.clips = LoadVoiceClips();
+        var soundscape = audioGo.GetComponent<ReactorSoundscape>() ?? audioGo.AddComponent<ReactorSoundscape>();
+        soundscape.bridge = bridge;
 
         // U11: mission readout (HUD + runner). Idempotent; the HUD shows the live hint in the sandbox too.
         if (GameObject.Find("MissionUI") == null)
@@ -402,19 +436,10 @@ public static class ControlRoomSceneBuilder
 
         // Glass: translucent, solid for movement, never a click target (Ignore Raycast, so OnMouse rays pass to controls).
         var glass = WindowBox(win.transform, "Window_Glass", xl, xr, ySill, yHead, zMid, 0.04f,
-                              MakeMaterial("M_WindowGlass", new Color(0.75f, 0.88f, 1f, 0.05f), true, false), true);
+                              MakeMaterial("M_WindowGlass", new Color(0.10f, 0.55f, 0.80f, 0.20f), true, false), true);
         glass.GetComponent<BoxCollider>().size = new Vector3(1f, 1f, 1.5f); // a little thicker than the pane so nothing slips past
 
-        // Gallery rail on the hall side of the glass: one top rail with posts (visual only; a mid rail cut across the view of the module).
-        float zRail = zOuter - inward * 0.35f;
-        Material railMat = MakeMaterial("M_GalleryRail", new Color(0.62f, 0.65f, 0.7f), false, false);
-        WindowBox(win.transform, "Rail_Top", xl, xr, y0 + 1.0f, y0 + 1.05f, zRail, 0.05f, railMat, false);
-        int posts = Mathf.CeilToInt((xr - xl) / 1.3f);
-        for (int i = 0; i <= posts; i++)
-        {
-            float px = Mathf.Lerp(xl + 0.03f, xr - 0.03f, (float)i / posts);
-            WindowBox(win.transform, "Rail_Post_" + i, px - 0.025f, px + 0.025f, ySill, y0 + 1.05f, zRail, 0.05f, railMat, false);
-        }
+        // No rail on the hall side of the glass: a rail across the pane was a gallery leftover and only cut the view of the module.
 
         // The hall is only seen through this opening, so the frustum gate tests the opening (padded a little).
         var gateBounds = new Bounds(new Vector3(wx, 0.5f * (ySill + yHead), zMid), new Vector3(WindowWidth + 0.6f, WindowHeight + 0.6f, 1.2f));
@@ -672,6 +697,80 @@ public static class ControlRoomSceneBuilder
         return has;
     }
 
+    // Draw-call budget: every renderer of the room that never moves is flagged for static batching, so the many small kit
+    // meshes (shared materials) combine at build/enter-play instead of costing a draw each. Not flagged: anything under a
+    // moving or bound pivot (INT_, BIND_, CRT_, PART_ covers, out-of-service parts), the reactor hall (HallBuilder flags its
+    // own), procedure clipboards, the plant-overview wall (its view drives it), screens and counter windows (their materials
+    // are swapped at runtime), anything with its own behaviour, and disabled renderers (collision proxies).
+    public static int MarkStaticBatching(GameObject crRoot)
+    {
+        int flagged = 0;
+        foreach (var r in crRoot.GetComponentsInChildren<MeshRenderer>(true))
+        {
+            var go = r.gameObject;
+            if (!r.enabled || go.layer == HallLayer || go.GetComponent<MonoBehaviour>() != null) continue;
+            if (StaticExcluded(go.transform, crRoot.transform)) continue;
+            bool screenMaterial = false;
+            foreach (var m in r.sharedMaterials)
+                if (m != null && m.name.IndexOf("CrtScreen", System.StringComparison.OrdinalIgnoreCase) >= 0) { screenMaterial = true; break; }
+            if (screenMaterial) continue;
+            GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
+            flagged++;
+        }
+        Debug.Log("[Phase2SceneBuilder] " + flagged + " room renderers flagged for static batching.");
+        return flagged;
+    }
+
+    private static bool StaticExcluded(Transform t, Transform stop)
+    {
+        for (; t != null && t != stop; t = t.parent)
+        {
+            string n = t.name;
+            if (n.StartsWith("INT_") || n.StartsWith("BIND_") || n.StartsWith("CRT_") || n.StartsWith("OOS_Part_")
+                || n.IndexOf("_PART_", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || n.StartsWith("CLIPBOARD_") || n == "WholePlantOverview" || n.StartsWith("TaskLight_")
+                || n.StartsWith("Window_") || n.StartsWith("Door_"))
+                return true;
+        }
+        return false;
+    }
+
+    // The kit's auxiliary cover pivots (PART_Guard / PART_ScramCover) are siblings of the INT_ pivot, so the fitted
+    // box would miss clicks on the guard or SCRAM cover. Grow the box to include their meshes (local space of `t`).
+    private static void ExpandColliderToAux(Transform t)
+    {
+        var ctl = FindCtlRoot(t);
+        var box = t.GetComponent<BoxCollider>();
+        if (ctl == null || box == null) return;
+        Bounds b = new Bounds(box.center, box.size);
+        bool any = false;
+        foreach (Transform aux in ctl.GetComponentsInChildren<Transform>(true))
+        {
+            if (aux == t || aux.IsChildOf(t)) continue;
+            string n = aux.name;
+            if (!n.EndsWith("_PART_Guard", System.StringComparison.OrdinalIgnoreCase)
+                && !n.EndsWith("_PART_ScramCover", System.StringComparison.OrdinalIgnoreCase)) continue;
+            foreach (var mf in aux.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (mf.sharedMesh == null) continue;
+                var mr = mf.GetComponent<MeshRenderer>();
+                if (mr == null || !mr.enabled) continue;
+                Bounds mb = mf.sharedMesh.bounds;
+                Vector3 c = mb.center, e = mb.extents;
+                for (int i = 0; i < 8; i++)
+                {
+                    var corner = c + new Vector3((i & 1) == 0 ? -e.x : e.x, (i & 2) == 0 ? -e.y : e.y, (i & 4) == 0 ? -e.z : e.z);
+                    Vector3 p = t.InverseTransformPoint(mf.transform.TransformPoint(corner));
+                    b.Encapsulate(p);
+                    any = true;
+                }
+            }
+        }
+        if (!any) return;
+        box.center = b.center;
+        box.size = b.size;
+    }
+
     // Sizes a BoxCollider on `t` to the meshes at or below it (an empty pivot has none of its own); never thinner than
     // minSide metres so a small control stays clickable.
     private static void FitCollider(Transform t, float minSide)
@@ -692,5 +791,17 @@ public static class ControlRoomSceneBuilder
             box.size = new Vector3(Mathf.Max(b.size.x, min), Mathf.Max(b.size.y, min), Mathf.Max(b.size.z, min));
         }
         box.isTrigger = false;
+    }
+
+    // The Kokoro voice lines (tools/voice): every AudioClip under Assets/Audio/Voice, named by file stem.
+    private static AudioClip[] LoadVoiceClips()
+    {
+        var clips = new List<AudioClip>();
+        foreach (var guid in AssetDatabase.FindAssets("t:AudioClip", new[] { "Assets/Audio/Voice" }))
+        {
+            var c = AssetDatabase.LoadAssetAtPath<AudioClip>(AssetDatabase.GUIDToAssetPath(guid));
+            if (c != null) clips.Add(c);
+        }
+        return clips.ToArray();
     }
 }

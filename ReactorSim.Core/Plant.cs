@@ -465,6 +465,8 @@ namespace ReactorSim
 
                 SteamDumpFrac = Thermal.SteamDumpFrac,
                 TurbineSteamKW = Thermal.TurbineSteamKW,
+                DumpSteamKW = Thermal.DumpSteamKW,
+                FeedwaterDeliveredFrac = Thermal.FeedwaterDeliveredFrac,
                 FeedwaterAvailabilityFrac = Thermal.FeedwaterAvailabilityFrac,
                 BopAutoLoad = Bop.AutoLoad,
                 GridDemandFrac = Bop.GridDemandFrac,
@@ -528,6 +530,7 @@ namespace ReactorSim
                 s.SteamDemandFrac, s.SecondaryLevelFrac, s.FeedwaterFlowFrac,
                 s.HeaterPowerFrac, s.SprayFrac, s.ReliefOpen, s.SteamLevelFrac);
             Thermal.SteamDumpFrac = Physics.Clamp(Physics.Sanitize(s.SteamDumpFrac, 0.0), 0.0, 1.0);
+            Thermal.RestoreMeasuredFlows(s.TurbineSteamKW, s.DumpSteamKW, s.FeedwaterDeliveredFrac);
             Bop.Restore(s.BopAutoLoad, s.GridDemandFrac, s.VacuumPumpFrac, s.CoolingWaterFrac,
                         s.TurbineRpm, s.GeneratorSynced, s.TurbineTripped, s.CondenserPressureBar,
                         s.HotwellInventoryFrac, s.BopTripMask, s.BopTripMeasured, s.BopOutOfSyncSeconds);
