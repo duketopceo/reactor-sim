@@ -33,3 +33,6 @@ ReactorSim.Unity/Assets/PlantWallPreview*.meta
 __pycache__/
 Blender/previews/
 *.blend1
+
+# Unity AI Assistant per-user editor settings (generated, not project config)
+ReactorSim.Unity/ProjectSettings/Packages/com.unity.ai.assistant/
