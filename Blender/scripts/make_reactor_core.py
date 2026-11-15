@@ -1,3 +1,5 @@
+# ReactorSim Blender - reactor core assets: fuel assembly, rod banks A-D (withdrawn/inserted pivots, rs_bind), CRDM drives, position scales
+# Regenerable: blender -b --python-exit-code 1 --python Blender/scripts/make_reactor_core.py   (writes Blender/ReactorCore.blend)
 import math
 import os
 import sys

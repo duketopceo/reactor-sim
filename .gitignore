@@ -36,3 +36,25 @@ Blender/previews/
 
 # Unity AI Assistant per-user editor settings (generated, not project config)
 ReactorSim.Unity/ProjectSettings/Packages/com.unity.ai.assistant/
+
+# Unity-generated IDE projects and per-user editor state (regenerated on every open)
+ReactorSim.Unity/*.csproj
+ReactorSim.Unity/*.sln
+ReactorSim.Unity/*.slnx
+ReactorSim.Unity/.vsconfig
+ReactorSim.Unity/.vscode/
+ReactorSim.Unity/Build/
+ReactorSim.Unity/Builds/
+ReactorSim.Unity/*.log
+ReactorSim.Unity/*.apk
+ReactorSim.Unity/*.aab
+*_BurstDebugInformation_DoNotShip/
+*_BackUpThisFolder_ButDontShipItWithYourGame/
+sysinfo.txt
+
+# Blender and render scratch (previews, autosaves, crash dumps)
+Blender/**/*.blend1
+Blender/**/*.blend@
+Blender/**/*.crash.txt
+Blender/exports/*.tmp
+*.fbx.tmp

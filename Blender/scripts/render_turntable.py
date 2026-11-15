@@ -1,3 +1,5 @@
+# ReactorSim Blender - neutral-lit Workbench preview of an opened .blend (a review aid; never satisfies a gate)
+# Usage: blender -b Blender/<name>.blend --python-exit-code 1 --python Blender/scripts/render_turntable.py -- <output-dir> [distance] [root-object] [view]
 """Neutral-lit material preview. Open a blend, then -- output-dir [distance]."""
 import math
 import os

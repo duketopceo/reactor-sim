@@ -1,8 +1,9 @@
 ---
 title: "feat: reactor head framing in the window and README media refresh (PR6)"
 type: feat
-status: active
+status: completed
 date: 2026-11-10
+status_note: landed on master (PR #6)
 ---
 
 # Reactor head framing and README media (PR6)

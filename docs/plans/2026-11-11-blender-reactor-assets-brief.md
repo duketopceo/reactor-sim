@@ -1,6 +1,6 @@
 # Agent brief — accurate "living" reactor assets in Blender
 
-**Date:** 2026-11-11 · **Status:** prep for external agent run (not committed work)
+**Date:** 2026-11-11 · **Status:** completed - executed through [the living reactor core assets plan](2026-11-11-1950-feat-living-reactor-core-assets-plan.md) (PR #11); kept as the original brief
 **Goal:** replace the primitive plant blockout with accurate, detailed, *animated* reactor
 assets — fuel assemblies, control rods, CRDM drives, vessel internals, rotating equipment —
 built in Blender and bound to live sim state.

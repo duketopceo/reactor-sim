@@ -6,6 +6,9 @@
 - `scripts/run.sh` - build and run the console harness
 - `scripts/sync-core-to-unity.sh` - build the Core and copy it into the Unity project
 - `scripts/clean_room_check.sh` - fails if a tracked file path or content (including compressed and UTF-16 data) contains a banned term or a per-user profile path; `--self-test` runs its negative controls
+- `scripts/capture-playtest.sh`, `scripts/check-captures.sh`, `scripts/test-check-captures.sh`, `scripts/fetch-renders.sh`, `scripts/fetch-playtest-logs.sh` - Windows-box capture, grading and fetch (see [TESTING.md](TESTING.md#room-renders-headless))
+- `scripts/scene-signature.sh`, `scripts/core-source-hash.sh`, `scripts/inventory-rollup.py` - scene drift guard, Core freshness hash, control-room inventory rollup
+- `tools/voice/` - renders the assistant voice lines (see its README)
 - `tools/mcp-bridge-config.json` - example MCP client configuration for the bridge
 
 ## Prerequisites

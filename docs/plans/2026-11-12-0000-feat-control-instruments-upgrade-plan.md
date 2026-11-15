@@ -2,10 +2,12 @@
 title: Control Instruments - Detailed Assets and Usable Feedback - Plan
 type: feat
 date: 2026-11-12
+status: in-progress
 artifact_contract: ce-unified-plan/v1
 product_contract_source: ce-plan-bootstrap
 execution: code
 origin: docs/plans/2026-11-09-2010-feat-playtest2-controls-readability-hall-plan.md
+status_note: kit geometry, pose contract and CRT housings landed in PR #11; the baseline captures (U1) and the interaction, budget and acceptance matrix (U5) are not done
 ---
 
 # Control Instruments - Detailed Assets and Usable Feedback - Plan

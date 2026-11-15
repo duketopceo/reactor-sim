@@ -587,7 +587,7 @@ public static class ControlRoomSceneBuilder
             if (!any) { bounds = r.bounds; any = true; } else bounds.Encapsulate(r.bounds);
         }
         Vector3 centre = bounds.center;
-        int tasks = 0, tinted = 0;
+        int tasks = 0, tinted = 0, fixtures = 0;
         foreach (var r in root.GetComponentsInChildren<MeshRenderer>(true))
         {
             string n = r.gameObject.name;
@@ -608,6 +608,21 @@ public static class ControlRoomSceneBuilder
                 tasks++;
                 continue;
             }
+            if (n.StartsWith("Fixture_"))
+            {
+                // Ceiling fixture panels: the exported emission is a bright warm white; cool and lower it to match the mood.
+                var fm = r.sharedMaterials;
+                for (int i = 0; i < fm.Length; i++)
+                {
+                    if (fm[i] == null || !fm[i].HasProperty("_EmissionColor")) continue;
+                    var copy = new Material(fm[i]) { name = fm[i].name + "_" + n };
+                    copy.SetColor("_EmissionColor", copy.GetColor("_EmissionColor") * ThemeColors.ToColor(RoomLighting.FixtureEmissionTint) * RoomLighting.FixtureEmissionScale);
+                    fm[i] = copy;
+                    fixtures++;
+                }
+                r.sharedMaterials = fm;
+                continue;
+            }
             Rgba? tint = null;
             if (n.StartsWith("Wall_")) tint = RoomLighting.WallTint;
             else if (n == "Ceiling") tint = RoomLighting.CeilingTint;
@@ -624,7 +639,7 @@ public static class ControlRoomSceneBuilder
             }
             r.sharedMaterials = mats;
         }
-        Debug.Log("[Phase2SceneBuilder] " + tasks + " task lights, " + tinted + " room surfaces stepped.");
+        Debug.Log("[Phase2SceneBuilder] " + tasks + " task lights, " + tinted + " room surfaces stepped, " + fixtures + " fixture emissions cooled.");
     }
 
     private static void ApplyRoomAmbient()

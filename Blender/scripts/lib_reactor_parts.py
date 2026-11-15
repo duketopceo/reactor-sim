@@ -1,3 +1,5 @@
+# ReactorSim Blender - shared geometry builders (Geometry batching, tubes, rings, boxes) for the reactor core, vessel internals
+# and rotating-equipment generators. Imported by those scripts; not run on its own.
 """Original game-scale PWR geometry, batched by material before export."""
 import math
 import os

@@ -146,3 +146,18 @@ REACTOR_SIM_WIN_HOST=my-windows-box REACTOR_SIM_WIN_REPO='C:\path\to\reactor-sim
 `RoomRender` logs `[RoomRender] OK <path> <bytes>` per image or `[RoomRender] FAIL ...`, and fails on an empty,
 tiny (under 1 KB) or single-flat-colour image. `fetch-renders.sh` exits 0 fetched, 1 nothing found, 2 host
 unreachable or bad usage (same contract as `fetch-playtest-logs.sh`).
+
+### Player captures and their grader
+
+The playable build can render its own views from the real player camera (seat, stand, CRT, tooltip, checklist, window and so
+on). Run on the Windows box, graded on Linux:
+
+```
+REACTOR_SIM_WIN_HOST=my-windows-box REACTOR_SIM_WIN_REPO='C:\path\to\reactor-sim' bash scripts/capture-playtest.sh [--poses a,b] [--dest DIR]
+bash scripts/check-captures.sh <dir> [--only pose,pose] [--baseline <dir> [--budget-only]]
+bash scripts/test-check-captures.sh      # self-test: a deliberately over-budget run must fail
+```
+
+`check-captures.sh` holds the fixed thresholds (CRT glyph height at least 10 px, CRT text contrast at least 4.5, minimum PNG
+size, rack glow rising from off to full, hall budgets against a baseline). The thresholds live in the script, not in the build,
+so a build cannot grade itself; do not loosen them to make a change pass. `scripts/ci.sh` runs the grader self-test.
