@@ -63,9 +63,9 @@ namespace ReactorSim.Core.Tests
         }
 
         [Fact]
-        public void WarmLampsAreWarmAndTheWaterIsCool()
+        public void LampsAndWaterBothLeanCool()
         {
-            Assert.True(HallPalette.HighBayColour[0] > HallPalette.HighBayColour[1] && HallPalette.HighBayColour[1] > HallPalette.HighBayColour[2]);
+            Assert.True(HallPalette.HighBayColour[2] > HallPalette.HighBayColour[1] && HallPalette.HighBayColour[1] > HallPalette.HighBayColour[0]);
             Assert.True(HallPalette.ShallowWater[2] > HallPalette.ShallowWater[0] && HallPalette.DeepWater[2] > HallPalette.DeepWater[0]);
             Assert.True(HallPalette.AlbedoLuminance(HallPalette.DeepWater) < HallPalette.AlbedoLuminance(HallPalette.ShallowWater));
         }

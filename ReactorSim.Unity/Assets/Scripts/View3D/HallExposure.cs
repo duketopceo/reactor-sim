@@ -58,7 +58,7 @@ namespace ReactorSim
     }
 
     /// <summary>
-    /// The hall's colours and light settings (sRGB 0..1 triples, metres), shared by HallBuilder and the tests. Warm high-bay lamps over
+    /// The hall's colours and light settings (sRGB 0..1 triples, metres), shared by HallBuilder and the tests. Dim, cool blue-teal high-bay lamps over
     /// cool water and rack glow; concrete and deck in warm greys, stainless and painted steel separated in value and hue.
     /// </summary>
     public static class HallPalette
@@ -70,12 +70,12 @@ namespace ReactorSim
         public static readonly float[] ContainmentPaint = { 0.66f, 0.64f, 0.58f };
         public static readonly float[] CranePaint = { 0.86f, 0.62f, 0.10f };
         public static readonly float[] DarkSteel = { 0.26f, 0.28f, 0.31f };
-        public static readonly float[] HighBayColour = { 1.00f, 0.88f, 0.72f };
-        public const float HighBayIntensity = 1.1f;
+        public static readonly float[] HighBayColour = { 0.62f, 0.80f, 1.00f };
+        public const float HighBayIntensity = 0.8f;
         public const float HighBayRange = 34f;
         public const float HighBayHeightAboveDeck = 6.0f;
         /// <summary>Linear emission added to concrete so a far wall never goes black under a falling-off light.</summary>
-        public const float ConcreteEmission = 0.04f;
+        public const float ConcreteEmission = 0.025f;
         public const float HighBayLampX = 4.5f;               // the two lamps sit at +-this x, in hall space (pool axis at the origin)
         public const float HighBayLampZ = 2.0f;
         /// <summary>Hall-space {x, y, z} of both high-bay lamps; HallBuilder places the real lights here and the exposure tests measure from here.</summary>
