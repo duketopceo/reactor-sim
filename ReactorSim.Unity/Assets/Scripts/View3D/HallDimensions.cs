@@ -67,6 +67,8 @@ namespace ReactorSim
         /// <summary>The fuel and lower rod-drive band, measured above the pool floor.</summary>
         public static readonly float VesselBandLow = VesselBase + 4.5f;
         public static readonly float VesselBandHigh = VesselBase + 7.5f;
+        /// <summary>Half-width (m) of the fuel array seen from the window: the 3 x 3 assemblies at 0.37 m pitch that Blender/scripts/make_vessel_internals.py builds (3 x 0.37 / 2). Nothing the relief lines add may cross its projected footprint (R9).</summary>
+        public const float FuelArrayHalfWidth = 0.555f;
         /// <summary>The fuel array and its glow, rather than the empty vessel mid-body.</summary>
         public static float SightTargetHeight { get { return VesselBase + 5.2f; } }
         /// <summary>Eye height over the pool floor for a viewpoint at the given eye height over the room floor.</summary>

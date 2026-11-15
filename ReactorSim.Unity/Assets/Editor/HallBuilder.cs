@@ -222,25 +222,26 @@ public static class HallBuilder
 
         // The relief lines: PORV, the SG relief header (one tube joining the two valves, then the line down), the bypass tee.
         var pipe = new MeshBuilder();
-        BuildDowncomer(pipe, ReliefAnchors.PrimaryDowncomer(), 0.07f);
-        BuildDowncomer(pipe, ReliefAnchors.SecondaryDowncomer(), 0.07f);
-        BuildDowncomer(pipe, ReliefAnchors.BypassDowncomer(), 0.09f);
+        BuildDowncomer(pipe, ReliefAnchors.PrimaryDowncomer(), 0.05f);
+        BuildDowncomer(pipe, ReliefAnchors.SecondaryDowncomer(), 0.05f);
+        BuildDowncomer(pipe, ReliefAnchors.BypassDowncomer(), 0.05f);
         pipe.AddTube(HallVec(ReliefAnchors.Secondary(0)), HallVec(ReliefAnchors.SecondaryHeader()), 0.07f, 10, true);
         pipe.AddTube(HallVec(ReliefAnchors.Secondary(1)), HallVec(ReliefAnchors.SecondaryHeader()), 0.07f, 10, true);
         pipe.Attach(group.transform, "ReliefLines", steel);
 
-        // The spargers: a short horizontal pipe along x with end caps, three band rings, and a row of dark perforations on top.
+        // The spargers: a short horizontal pipe along z (end-on to the window, so it stays narrow on the glass and off the fuel array behind it),
+        // with end caps, three band rings, and a row of dark perforations on top.
         var body = new MeshBuilder();
         var holes = new MeshBuilder();
         foreach (double[] sp in new[] { ReliefAnchors.SpargerPrimary(), ReliefAnchors.SpargerSecondary(), ReliefAnchors.SpargerBypass() })
         {
             Vector3 c = HallVec(sp);
-            const float half = 0.28f, r = 0.085f;
-            body.AddTube(c + Vector3.left * half, c + Vector3.right * half, r, 12, true);
-            for (int k = -1; k <= 1; k++) PipeSweep.Flange(body, c + Vector3.right * (k * 0.2f), Vector3.right, r, 12);
+            const float half = 0.24f, r = 0.07f;
+            body.AddTube(c + Vector3.back * half, c + Vector3.forward * half, r, 12, true);
+            for (int k = -1; k <= 1; k++) PipeSweep.Flange(body, c + Vector3.forward * (k * 0.18f), Vector3.forward, r, 12);
             for (int k = -2; k <= 2; k++)
             {
-                Vector3 h = c + new Vector3(k * 0.1f, r, 0f);
+                Vector3 h = c + new Vector3(0f, r, k * 0.09f);
                 holes.AddBox(h - new Vector3(0.025f, 0.012f, 0.025f), h + new Vector3(0.025f, 0.02f, 0.025f));
             }
         }

@@ -225,6 +225,79 @@ namespace ReactorSim.Core.Tests
                 }
         }
 
+        // R9: the fuel array and its glow stay readable. Seen from the stand the module sits on the left of the pane, from the seat on the right,
+        // so the only places clear of the fuel from both are the open water left of it, the narrow gap between the two footprints, and the right
+        // edge of the pane; the spargers and their downcomers sit there.
+        private const double ClearOfFuelOnGlass = 0.06;      // m on the glass between a pipe centre line and the fuel footprint: more than the 0.05 m pipe radius
+
+        /// <summary>The fuel array's footprint on the glass from a viewpoint: {low, high} along the wall from the window centre.</summary>
+        private static double[] FuelFootprintOnGlass(HallSightline.View v)
+        {
+            double a = HallSightline.CrossingAlong(v.along, -HallDimensions.FuelArrayHalfWidth + HallDimensions.VesselShiftX, v.back, HallDimensions.ModuleFromWall);
+            double b = HallSightline.CrossingAlong(v.along, HallDimensions.FuelArrayHalfWidth + HallDimensions.VesselShiftX, v.back, HallDimensions.ModuleFromWall);
+            return new[] { Math.Min(a, b), Math.Max(a, b) };
+        }
+
+        private static double GlassCrossing(HallSightline.View v, double[] p)
+        {
+            return HallSightline.CrossingAlong(v.along, p[0] + HallDimensions.VesselShiftX, v.back, p[2] + HallDimensions.PoolAxisFromWall);
+        }
+
+        private static void AssertClearOfFuel(string what, HallSightline.View v, double lo, double hi)
+        {
+            double[] fuel = FuelFootprintOnGlass(v);
+            Assert.True(hi <= fuel[0] - ClearOfFuelOnGlass || lo >= fuel[1] + ClearOfFuelOnGlass,
+                v.name + ": " + what + " crosses the glass over [" + lo.ToString("0.00") + ", " + hi.ToString("0.00") + "] m, the fuel array covers [" + fuel[0].ToString("0.00") + ", " + fuel[1].ToString("0.00") + "] m");
+        }
+
+        [Fact]
+        public void SpargerSightLinesStayClearOfTheFuelArrayFromTheStandAndTheSeat()
+        {
+            string[] names = { "PORV sparger", "SG relief sparger", "bypass sparger" };
+            double[][] sp = Spargers();
+            for (int i = 0; i < sp.Length; i++)
+                foreach (var v in new[] { HallSightline.Stand(), HallSightline.Seat() })
+                {
+                    double c = GlassCrossing(v, sp[i]);
+                    AssertClearOfFuel(names[i], v, c, c);
+                }
+        }
+
+        [Fact]
+        public void DowncomerPipesStayClearOfTheFuelArrayWhereverTheyRunThroughItsHeightBand()
+        {
+            double bandLow = HallDimensions.VesselBandLow, bandHigh = HallDimensions.VesselBandHigh;
+            double[][][] runs = Downcomers();
+            for (int k = 0; k < runs.Length; k++)
+                for (int i = 0; i + 1 < runs[k].Length; i++)
+                {
+                    double[] a = runs[k][i], b = runs[k][i + 1];
+                    if (Math.Max(a[1], b[1]) < bandLow || Math.Min(a[1], b[1]) > bandHigh) continue;   // never at fuel height
+                    foreach (var v in new[] { HallSightline.Stand(), HallSightline.Seat() })
+                    {
+                        double ca = GlassCrossing(v, a), cb = GlassCrossing(v, b);
+                        AssertClearOfFuel("downcomer " + k + " segment " + i, v, Math.Min(ca, cb), Math.Max(ca, cb));
+                    }
+                }
+        }
+
+        [Fact]
+        public void TheFuelFootprintGuardCatchesAPipeInFrontOfTheFuel()
+        {
+            // Negative control: a pipe 1 m behind the glass on the sight line from each viewpoint to the fuel centre is in front of the fuel.
+            foreach (var v in new[] { HallSightline.Stand(), HallSightline.Seat() })
+            {
+                double centre = HallSightline.CrossingAlong(v.along, HallDimensions.VesselShiftX, v.back, HallDimensions.ModuleFromWall);
+                double hallX = v.along + (centre - v.along) * (v.back + 1.0) / v.back - HallDimensions.VesselShiftX;
+                double[] inFront = { hallX, HallDimensions.SightTargetHeight, -HallDimensions.PoolAxisFromWall + 1.0 };
+                double c = GlassCrossing(v, inFront);
+                Assert.Equal(centre, c, 6);
+                double[] fuel = FuelFootprintOnGlass(v);
+                Assert.True(c > fuel[0] && c < fuel[1], v.name + ": the control should sit over the fuel");
+                Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => AssertClearOfFuel("control", v, c, c));
+            }
+        }
+
         [Fact]
         public void TheHeaderLinkingTheTwoSgReliefValvesCarriesNoAnchorOfItsOwn()
         {

@@ -29,10 +29,18 @@ namespace ReactorSim
 
         /// <summary>Sparger height: the fuel-display depth, so the plume rises through the same part of the pane as the core glow.</summary>
         public static float SpargerY { get { return HallDimensions.SightTargetHeight + 0.2f; } }
-        /// <summary>Distance of the spargers from the glass: in front of the containment (whose near edge is 3.6 - 2.25 = 1.35 m behind the glass) and behind the two depth veils.</summary>
-        public const float SpargerFromGlass = 1.0f;
-        /// <summary>Hall-space x of the three spargers (PORV, SG relief, bypass), about a metre apart so the three plumes read as three sources from the stand and the seat.</summary>
-        public static readonly float[] SpargerX = { -1.7f, -0.75f, 0.2f };
+        /// <summary>
+        /// Distance of the spargers from the glass: close to the pane, in front of the containment (whose near edge is 3.6 - 2.25 = 1.35 m behind the glass).
+        /// Close matters: the stand sees the fuel array on the left of the pane and the seat sees it on the right, and only a sparger near the glass
+        /// crosses the pane at nearly the same place from both poses (parallax grows with depth), so it can sit off the fuel from both.
+        /// </summary>
+        public const float SpargerFromGlass = 0.6f;
+        /// <summary>
+        /// Hall-space x of the three spargers (PORV, SG relief, bypass). Chosen with the fuel footprint (ReliefAnchorsTests): the PORV in the open water
+        /// left of the fuel, the SG relief in the gap between the stand's and the seat's footprints, the bypass towards the right edge of the pane.
+        /// About a metre apart on the glass from both poses, so the three plumes read as three sources and none sits in front of the fuel array.
+        /// </summary>
+        public static readonly float[] SpargerX = { -1.97f, -0.85f, 0.31f };
         /// <summary>Each horizontal run on the way to the sparger sits in its own z lane (offsets from the sparger z) so no two share a line.</summary>
         private static readonly double[] LaneOffsetZ = { 0.0, 0.25, 0.5 };
 
