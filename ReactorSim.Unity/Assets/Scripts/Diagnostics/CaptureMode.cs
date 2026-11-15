@@ -46,6 +46,7 @@ public class CaptureMode : MonoBehaviour
             List<string> list = poseArg != null
                 ? CaptureMath.ParsePoses(poseArg)
                 : CaptureMath.ParsePoses("menu,seat,stand,crt,tooltip,rejected,drag,checklist,pause,tablet,clipboard,gallery,away,hall,glowoff,glowidle,glowmid,glowfull");
+            AudioListener.pause = true; // automated runs are silent: the sources keep running (volumes still update), nothing is output
             var go = new GameObject("CaptureMode");
             DontDestroyOnLoad(go);
             var c = go.AddComponent<CaptureMode>();
