@@ -43,6 +43,7 @@ public static class PlantFeedbackPlayCapture
             if (hall == null || room == null || cam == null) throw new InvalidOperationException("Missing hall, room or camera");
             if (stage == 1)
             {
+                AudioListener.pause = true;   // automated runs are silent
                 hall.SetActive(true);
                 var controller = cam.GetComponent<OperatorController>();
                 if (controller != null) controller.enabled = false;
