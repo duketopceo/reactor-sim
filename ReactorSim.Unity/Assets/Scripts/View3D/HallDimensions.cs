@@ -58,6 +58,12 @@ namespace ReactorSim
         public static float ContainmentTop { get { return ContainmentBase + ContainmentHeight; } }
         /// <summary>Height at which the steam and feedwater stubs run sideways to the pool wall (just under the surface).</summary>
         public static float PipeRunHeight { get { return WaterDepth - 0.45f; } }
+        /// <summary>Module-space x where the steam and feedwater lines leave the containment head.</summary>
+        public const float SteamLineStartX = 0.85f;
+        /// <summary>Module-space z of the steam line (the thicker one, nearer the glass) and of the feedwater line.</summary>
+        public const float SteamLineZ = -0.55f, FeedLineZ = 0.55f;
+        /// <summary>Module-space x of the pool-wall penetration the steam and feedwater lines run to (the pool wall is nearer the module axis than the pool radius, as the module is off the pool axis).</summary>
+        public static float SteamLineWallX { get { return (float)System.Math.Sqrt(System.Math.Max(1.0, PoolRadius * PoolRadius - System.Math.Pow(-ModuleZ + 0.6, 2.0))) - 0.1f; } }
         /// <summary>The fuel and lower rod-drive band, measured above the pool floor.</summary>
         public static readonly float VesselBandLow = VesselBase + 4.5f;
         public static readonly float VesselBandHigh = VesselBase + 7.5f;
@@ -97,6 +103,7 @@ namespace ReactorSim
             if (ContainmentTop >= WaterDepth - 0.5f) bad.Add("the containment head is not under the water");
             if (PipeRunHeight <= ContainmentTop) bad.Add("the steam stubs would run below the containment head");
             if (PipeRunHeight >= WaterDepth) bad.Add("the steam stubs would run above the water");
+            if (SteamLineWallX <= SteamLineStartX + 4.0f) bad.Add("the steam line is too short to carry the relief and bypass anchors");
             if (ContainmentDiameter * 0.5f + 1.0f > PoolRadius) bad.Add("the containment does not fit in the pool");
             if (PoolRadius + 1.0f > HallRadius) bad.Add("the pool does not fit in the hall");
             if (RackLedgeHeight >= WaterDepth - 3.0f) bad.Add("the rack ledge is too shallow to be under water");

@@ -145,6 +145,7 @@ public static class HallBuilder
 
         // ---- the module, crane, trays ----
         SmrModuleMesh.Build(T, new SmrModuleMesh.Materials { vessel = steel, dark = dark, containment = paint, skin = skin });
+        BuildReliefAnchors(T);
         PolarCrane.Build(T, cranePaint, dark, deckY + HallDimensions.CraneRailAboveDeck, Rh, D);
         CableTray.Build(T, dark, Rh - 0.45f, deckY + 3.6f, 0.15f * Mathf.PI, 0.85f * Mathf.PI);
 
@@ -197,6 +198,30 @@ public static class HallBuilder
         FinishHall(root, windowBounds);
         root.AddComponent<ReactorWaterAtmosphere>();
         return root;
+    }
+
+    /// <summary>
+    /// The relief and bypass steam anchors (Phase 1 U3, KTD5): empties on the module's own relief lines, authored here rather than
+    /// imported from the legacy PlantEquipment asset, which is never placed in the hall. PlantEquipmentBinder finds them by name prefix
+    /// and gives each a steam jet; ReactorSoundscape puts the matching sounds at the same ReliefAnchors positions. +Z of each anchor
+    /// points up, which is the direction the jet's cone emits.
+    /// </summary>
+    public static void BuildReliefAnchors(Transform hall)
+    {
+        var group = new GameObject("ReliefAnchors");
+        group.transform.SetParent(hall, false);
+        MakeAnchor(group.transform, ReliefAnchors.PrimaryName, ReliefAnchors.Primary());
+        for (int i = 0; i < ReliefAnchors.SecondaryCount; i++)
+            MakeAnchor(group.transform, ReliefAnchors.SecondaryName(i), ReliefAnchors.Secondary(i));
+        MakeAnchor(group.transform, ReliefAnchors.BypassName, ReliefAnchors.Bypass());
+    }
+
+    private static void MakeAnchor(Transform parent, string name, double[] hallPosition)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        go.transform.localPosition = new Vector3((float)hallPosition[0], (float)hallPosition[1], (float)hallPosition[2]);
+        go.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
     }
 
     /// <summary>Layer, static flags, culling masks, binder and the frustum gate. Run after every piece is parented under the root.</summary>

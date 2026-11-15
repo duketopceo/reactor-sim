@@ -14,12 +14,12 @@ This is a source audit of every presentation surface: the desk, the status wall,
 | Rod banks A-D | `BankInsertion` (fraction, array order D, C, B, A) | Actual | Wall and hall via `PlantWallMapModel.BankInsertion` | None | U5 |
 | Primary pumps and loop | `PrimaryFlowFrac` (fraction), `PrimaryTempC` (C), `PrimaryLevelFrac` (fraction) | Actual, aggregate | Hall rotor, wall loop brightness and status | Individual pump readings: `N/M` | U2 direction cue |
 | Pressurizer | `PrimaryPressureBar` (bar), `PrimarySatMarginC` (C), `HeaterPowerFrac`, `SprayFrac` (fraction) | Actual | Wall lamp and readouts | None | U2 |
-| Primary relief | `ReliefOpen` (bool) | Actual | Wall readout `RELIEF OPEN/CLOSED`; hall jet when an anchor exists | Hall anchor absent in the placed hall | U3 anchor (sound: done, U6) |
+| Primary relief | `ReliefOpen` (bool) | Actual | Wall readout `RELIEF OPEN/CLOSED`; hall jet at `VFX_PORV_SteamJet_Anchor` (`ReliefAnchors.Primary`, containment head, pressurizer end) via `HallSteamModel.PrimaryRelief` | None | none (sound: done, U6) |
 | Steam generator | `SecondaryPressureBar` (bar), `SecondaryTempC` (C), `SecondaryLevelFrac` (fraction) | Actual, one shared secondary state | Wall status and readouts | Per-generator readings: `N/M` | U2 |
-| Secondary relief | `SecondaryReliefOpen` (bool, opens above 75 bar) | Actual | Wall readout; hall jet when an anchor exists | Hall anchor absent in the placed hall | U3 anchor (sound: done, U6) |
+| Secondary relief | `SecondaryReliefOpen` (bool, opens above 75 bar) | Actual | Wall readout; hall jets at `VFX_SGRelief_SteamJet_Anchor_1/2` (`ReliefAnchors.Secondary`, steam line) via `HallSteamModel.SecondaryRelief` | None | none (sound: done, U6) |
 | Turbine throttle | `SteamDemandFrac` (fraction) | Command, labeled `% command` | Wall SG readout | None | none |
 | Steam to turbine | `TurbineSteamKW` (kW heat) | Actual delivered heat rate | Wall steam and exhaust brightness, turbine steam sound | Steam mass flow: not modeled | U5 trip check |
-| Bypass steam | `DumpSteamKW` (kW heat) | Actual | Wall bypass brightness and `DUMP` readout | Hall visual: none yet (sound: `ReactorSoundMix.DumpSteam`, positioned bypass source, U6) | U3 visual |
+| Bypass steam | `DumpSteamKW` (kW heat) | Actual | Wall bypass brightness and `DUMP` readout; hall jet at `VFX_Bypass_SteamJet_Anchor` (`ReliefAnchors.Bypass`, steam line) with intensity `HallSteamModel.Bypass` | None (sound: `ReactorSoundMix.DumpSteam`, bypass source at the same anchor) | none |
 | Feedwater | `FeedwaterDeliveredFrac` (rated), `FeedwaterFlowFrac` (command), `FeedwaterAvailabilityFrac` (fraction) | Delivered is actual; pump is a command | Wall route and readouts, `FEED_FAIL` predicate | None | U5 starvation check |
 | Turbine and shaft | `TurbineRpm` (rpm), `TurbineTripped` (bool) | Actual | Hall rotor, turbine sound, wall shaft and lamp | None | U5 coastdown check |
 | Generator and grid | `GeneratorSynced` (bool), `GeneratorKw` (kW), `GridOutputFrac` (rated), `GridFrequencyHz` (Hz) | Actual | Wall status, route, readouts, generator sound | None | U2 |
@@ -43,9 +43,9 @@ This is a source audit of every presentation surface: the desk, the status wall,
 | Voice | `VoiceAnnouncer` edge-triggered keys | Lines in one tick are collected and `AudioPriority.Pick` plays the highest rank; a higher-ranked alarm line interrupts a lower one; Voice category gain | none |
 | Volume | `AudioListener.volume` (Master) and per-source category gains from the pause menu | Master, Plant, Alarms and Voice sliders persisted in `UserSettings` (`reactorsim.volume.*`, full when absent); alarm mute toggle overrides Alarms for the session | none |
 
-## Relief-anchor limitation
+## Relief anchors
 
-`HallAssetPlacer` places `ReactorCore`, `VesselInternals` and `RotatingEquipment`. The legacy `PlantEquipment` asset holds old relief anchors but is a separate whole plant and is never placed in the hall (see `docs/design/reactor-core-assets.md`). `PlantEquipmentBinder` already binds the two relief signals separately to any `VFX_PORV_SteamJet*` and `VFX_SGRelief*` anchors under the hall root, so the remaining work is authoring those anchors into the hall (Phase 1 U3).
+`HallBuilder.BuildReliefAnchors` authors the anchors into the hall (Phase 1 U3); the legacy `PlantEquipment` asset is a separate whole plant and is never placed (see `docs/design/reactor-core-assets.md`). Positions come from `ReliefAnchors` (UnityEngine-free, tested): the PORV on the containment head at the pressurizer end, opposite the steam lines; two SG relief valves and the bypass tee on the steam line that runs from the head to the pool wall at `HallDimensions.PipeRunHeight`. `PlantEquipmentBinder` binds them by name prefix (`VFX_PORV_SteamJet`, `VFX_SGRelief`, `VFX_Bypass_SteamJet`) and `ReactorSoundscape` puts the matching sounds at the same points. The anchors sit about 21.9 m above the pool floor, under the surface; whether the jets show through the observation window is recorded with the U3 renders, not assumed.
 
 ## Verification
 

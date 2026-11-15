@@ -139,6 +139,9 @@ are used; when only some exist, the run fails naming the missing one.
 "<Unity.exe>" -batchmode -projectPath ReactorSim.Unity -executeMethod RoomRender.Run -logFile out/unity-RoomRender.log
 #   or as a CI step: ROOM_RENDER=1 UNITY_EXE=... bash scripts/ci.sh
 
+# Relief and bypass jets in four states (idle, PORV only, SG relief only, tripped turbine with bypass) -> <REACTOR_ASSET_RENDER_DIR or out/reactor-assets>/relief/
+"<Unity.exe>" -batchmode -projectPath ReactorSim.Unity -executeMethod ReactorAssetRender.RunRelief -logFile out/unity-relief.log
+
 # Back on Linux: copy out/render/*.png from the host into out/render/<timestamp>/
 REACTOR_SIM_WIN_HOST=my-windows-box REACTOR_SIM_WIN_REPO='C:\path\to\reactor-sim' bash scripts/fetch-renders.sh [--dest DIR]
 ```

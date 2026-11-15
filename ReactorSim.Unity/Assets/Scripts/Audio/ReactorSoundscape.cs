@@ -29,6 +29,8 @@ public sealed class ReactorSoundscape : MonoBehaviour
         detector.volume = 0.35f;
     }
 
+    private static Vector3 HallPoint(double[] p) { return new Vector3((float)p[0], (float)p[1], (float)p[2]); }
+
     private AudioSource MakeSource(string name, AudioClip clip, bool spatial)
     {
         var go = new GameObject(name);
@@ -94,9 +96,10 @@ public sealed class ReactorSoundscape : MonoBehaviour
             {
                 core.transform.position = hall.transform.TransformPoint(new Vector3(0, HallDimensions.VesselBase + 5.2f, HallDimensions.ModuleZ));
                 water.transform.position = hall.transform.TransformPoint(new Vector3(-HallDimensions.VesselShiftX, HallDimensions.WaterDepth + HallDimensions.GalleryEyeAboveWater, -HallDimensions.PoolAxisFromWall + 1f));
-                primaryRelief.transform.position = hall.transform.TransformPoint(new Vector3(0, HallDimensions.WaterDepth - 1f, HallDimensions.ModuleZ));
-                secondaryRelief.transform.position = hall.transform.TransformPoint(new Vector3(-6f, HallDimensions.VesselBase + 6f, HallDimensions.ModuleZ));
-                bypass.transform.position = hall.transform.TransformPoint(new Vector3(7f, HallDimensions.VesselBase + 5f, HallDimensions.ModuleZ));
+                // Relief and bypass sound come from the same hall points as their steam jets (HallBuilder.BuildReliefAnchors).
+                primaryRelief.transform.position = hall.transform.TransformPoint(HallPoint(ReliefAnchors.Primary()));
+                secondaryRelief.transform.position = hall.transform.TransformPoint(HallPoint(ReliefAnchors.SecondarySound()));
+                bypass.transform.position = hall.transform.TransformPoint(HallPoint(ReliefAnchors.Bypass()));
                 cooling.transform.position = hall.transform.TransformPoint(new Vector3(4f, HallDimensions.VesselBase + 6f, HallDimensions.ModuleZ));
                 generator.transform.position = hall.transform.TransformPoint(new Vector3(-3f, HallDimensions.VesselBase + 4f, HallDimensions.ModuleZ));
                 positioned = true;

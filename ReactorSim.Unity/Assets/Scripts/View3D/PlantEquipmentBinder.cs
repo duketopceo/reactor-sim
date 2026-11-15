@@ -4,7 +4,7 @@ using ReactorSim.Instruments;
 
 // Phase 2 plant equipment binder (N4): drives hall and containment-side motion from PlantSnapshot.
 // Flywheel_PrimaryFlow spins with PrimaryFlowFrac, the spent-fuel racks glow with power (RackGlow_* objects: cells, haze cones
-// and one shared point light, all through GlowMapping from the power FRACTION), PORV steam anchor activates when ReliefOpen,
+// and one shared point light, all through GlowMapping from the power FRACTION), PORV and SG relief steam anchors activate on ReliefOpen / SecondaryReliefOpen, the bypass anchor on DumpSteamKW (see HallSteamModel),
 // RPV CRDM rods track BankInsertion. The rack glow is a labelled visual cue, not a physics claim (see GlowMapping).
 public class PlantEquipmentBinder : MonoBehaviour
 {
@@ -35,6 +35,7 @@ public class PlantEquipmentBinder : MonoBehaviour
 
     private readonly System.Collections.Generic.List<ParticleSystem> primaryReliefJets = new System.Collections.Generic.List<ParticleSystem>();
     private readonly System.Collections.Generic.List<ParticleSystem> secondaryReliefJets = new System.Collections.Generic.List<ParticleSystem>();
+    private readonly System.Collections.Generic.List<ParticleSystem> bypassJets = new System.Collections.Generic.List<ParticleSystem>();
 
     private void Awake()
     {
@@ -103,6 +104,8 @@ public class PlantEquipmentBinder : MonoBehaviour
                 primaryReliefJets.Add(MakeSteamJet(t.gameObject));
             else if (t.name.StartsWith("VFX_SGRelief"))
                 secondaryReliefJets.Add(MakeSteamJet(t.gameObject));
+            else if (t.name.StartsWith("VFX_Bypass_SteamJet"))
+                bypassJets.Add(MakeSteamJet(t.gameObject));
         }
     }
 
@@ -131,7 +134,23 @@ public class PlantEquipmentBinder : MonoBehaviour
         float lightScale = (float)GlowMapping.LightScale(power) * shimmer;
         for (int i = 0; i < rackLights.Count; i++)
             if (rackLights[i] != null) rackLights[i].intensity = rackLightBase[i] * lightScale;
-        ApplyReliefState(s.ReliefOpen, s.SecondaryReliefOpen);
+        HallSteamModel steam = HallSteamModel.From(s);
+        ApplyReliefState(steam.PrimaryRelief, steam.SecondaryRelief);
+        ApplyBypass(steam.Bypass);
+    }
+
+    /// <summary>Bypass (steam dump) jet at 0..1 intensity from DumpSteamKW; independent of the turbine and of both reliefs.</summary>
+    public void ApplyBypass(float intensity)
+    {
+        foreach (var jet in bypassJets)
+        {
+            if (jet == null) continue;
+            bool on = intensity > 0f;
+            var emission = jet.emission;
+            emission.rateOverTime = on ? 60f * Mathf.Clamp01(intensity) : 0f;
+            if (on && !jet.isPlaying) jet.Play();
+            else if (!on && jet.isPlaying) jet.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        }
     }
 
     // Kept separate so each authored relief path can be checked independently in play mode.

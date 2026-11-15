@@ -66,7 +66,7 @@ public static class PlantFeedbackPlayCapture
             var soundscape = UnityEngine.Object.FindAnyObjectByType<ReactorSoundscape>();
             if (soundscape == null || soundscape.GetComponentsInChildren<AudioSource>().Length < 6)
                 throw new InvalidOperationException("Reactor sound layers are missing");
-            CheckReliefBindings();
+            CheckReliefBindings(hall);
             string dir = Path.GetFullPath(Path.Combine(Application.dataPath, "../../out/plant-feedback-play"));
             Directory.CreateDirectory(dir);
             Capture(cam, Path.Combine(dir, "reactor.png"));
@@ -155,27 +155,40 @@ public static class PlantFeedbackPlayCapture
         Debug.Log("[PlantFeedbackPlayCapture] OK live detail follows the snapshot: A=" + seen[0].Split('\n')[0] + " B=" + seen[1].Split('\n')[0]);
     }
 
-    private static void CheckReliefBindings()
+    // The real hall's own anchors (HallBuilder.BuildReliefAnchors), through the real binder: each jet answers only its own signal.
+    private static void CheckReliefBindings(GameObject hall)
     {
-        // The currently placed hall has no relief anchors, so exercise both authored anchor types in a temporary fixture.
-        var fixture = new GameObject("ReliefBindingFixture");
-        fixture.SetActive(false);
-        var primary = new GameObject("VFX_PORV_SteamJet_Anchor");
-        primary.transform.SetParent(fixture.transform, false);
-        var secondary = new GameObject("VFX_SGRelief_SteamJet_Anchor_1");
-        secondary.transform.SetParent(fixture.transform, false);
-        var binder = fixture.AddComponent<PlantEquipmentBinder>();
-        fixture.SetActive(true);
-        var priJet = primary.GetComponentInChildren<ParticleSystem>();
-        var secJet = secondary.GetComponentInChildren<ParticleSystem>();
-        if (priJet == null || secJet == null) throw new InvalidOperationException("Relief fixture jets not bound");
-        binder.ApplyReliefState(true, false);
-        if (priJet.emission.rateOverTime.constant <= 0 || secJet.emission.rateOverTime.constant != 0)
-            throw new InvalidOperationException("Primary relief incorrectly drives secondary relief");
+        var binder = hall.GetComponent<PlantEquipmentBinder>();
+        if (binder == null) throw new InvalidOperationException("Hall has no equipment binder");
+        var pri = JetAt(hall, ReliefAnchors.PrimaryName);
+        var sec = new System.Collections.Generic.List<ParticleSystem>();
+        for (int i = 0; i < ReliefAnchors.SecondaryCount; i++) sec.Add(JetAt(hall, ReliefAnchors.SecondaryName(i)));
+        var byp = JetAt(hall, ReliefAnchors.BypassName);
+        binder.ApplyReliefState(true, false); binder.ApplyBypass(0f);
+        Expect(Rate(pri) > 0 && Rate(sec[0]) == 0 && Rate(sec[1]) == 0 && Rate(byp) == 0, "primary relief alone drives only the PORV jet");
         binder.ApplyReliefState(false, true);
-        if (priJet.emission.rateOverTime.constant != 0 || secJet.emission.rateOverTime.constant <= 0)
-            throw new InvalidOperationException("Secondary relief incorrectly drives primary relief");
-        UnityEngine.Object.Destroy(fixture);
+        Expect(Rate(pri) == 0 && Rate(sec[0]) > 0 && Rate(sec[1]) > 0 && Rate(byp) == 0, "secondary relief alone drives only the SG relief jets");
+        var trip = HallSteamModel.From(new PlantSnapshot { TurbineTripped = true, TurbineSteamKW = 0, DumpSteamKW = Physics.RatedThermalKW * .3 });
+        binder.ApplyReliefState(trip.PrimaryRelief, trip.SecondaryRelief); binder.ApplyBypass(trip.Bypass);
+        Expect(Rate(pri) == 0 && Rate(sec[0]) == 0 && Rate(byp) > 0, "bypass steam alone (turbine tripped) drives only the bypass jet");
+        binder.ApplyReliefState(false, false); binder.ApplyBypass(0f);
+        Expect(Rate(pri) == 0 && Rate(sec[0]) == 0 && Rate(byp) == 0, "all jets stop when nothing is open");
+    }
+
+    private static ParticleSystem JetAt(GameObject hall, string anchor)
+    {
+        var t = ControlRoomSceneBuilder.FindDeep(hall.transform, anchor);
+        var ps = t != null ? t.GetComponentInChildren<ParticleSystem>(true) : null;
+        if (ps == null) throw new InvalidOperationException("Relief anchor or its bound jet missing: " + anchor);
+        return ps;
+    }
+
+    private static float Rate(ParticleSystem ps) { return ps.emission.rateOverTime.constant; }
+
+    private static void Expect(bool ok, string what)
+    {
+        if (!ok) throw new InvalidOperationException("Relief binding: " + what);
+        Debug.Log("[PlantFeedbackPlayCapture] OK " + what);
     }
 
     private static void Capture(Camera cam, string path)
