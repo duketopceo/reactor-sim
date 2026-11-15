@@ -17,9 +17,7 @@ public class ProceduralPlantAudio : MonoBehaviour
     /// <summary>The scene's audio, for control sounds (ControlRoom3DBinder plays them through PlayControl).</summary>
     public static ProceduralPlantAudio Instance { get; private set; }
 
-    // The horn sounds while any of these conditions is raised and not yet acknowledged. Tracked per condition, so after
-    // an acknowledge a NEW condition (a turbine trip during a scram) sounds the horn again.
-    private static readonly string[] HornAlarms = { "scram", "bop-trip", "high-pressure", "high-fuel-temp" };
+    // The horn sounds while any AudioPriority.HornAlarms condition is raised and not yet acknowledged (tracked per condition).
     private readonly ReactorSim.Instruments.AlarmTracker hornTracker = new ReactorSim.Instruments.AlarmTracker();
     private PlantSnapshot hornSnap;
     private System.Func<string, bool> hornRaised;
@@ -29,16 +27,7 @@ public class ProceduralPlantAudio : MonoBehaviour
 
     private bool HornConditionRaised(string name)
     {
-        var s = hornSnap;
-        if (s == null) return false;
-        switch (name)
-        {
-            case "scram": return s.Scrammed;
-            case "bop-trip": return s.BopTripMask != 0;
-            case "high-pressure": return s.PrimaryPressureBar > 165.0;
-            case "high-fuel-temp": return s.FuelTempC > 1200.0;
-            default: return false;
-        }
+        return AudioPriority.HornConditionRaised(name, hornSnap);
     }
 
     private void Awake()
@@ -317,7 +306,7 @@ public class ProceduralPlantAudio : MonoBehaviour
             // Acknowledge / silence (AcknowledgeAlarms) quiets the conditions raised so far; a new one sounds again.
             hornSnap = s;
             if (hornRaised == null) hornRaised = HornConditionRaised;
-            hornTracker.Update(HornAlarms, hornRaised, s.AlarmAckSeq);
+            hornTracker.Update(AudioPriority.HornAlarms, hornRaised, s.AlarmAckSeq);
             bool sound = hornTracker.AnyUnacked;
             scramKlaxon.volume = cats.AlarmGain;
             if (sound && !scramKlaxon.isPlaying) scramKlaxon.Play();

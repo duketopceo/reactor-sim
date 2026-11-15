@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using ReactorSim;
+using ReactorSim.Instruments;
 
 // Pure alarm and voice priority (no UnityEngine; linked into ReactorSim.Core.Tests). One rank table covers the horn
-// alarm names (ProceduralPlantAudio.HornAlarms) and the voice line keys (VoiceAnnouncer), so simultaneous cues stay
+// alarm names (AudioPriority.HornAlarms) and the voice line keys (VoiceAnnouncer), so simultaneous cues stay
 // intelligible: a SCRAM outranks everything, then trips, then limit alarms, then state changes, then advisories and
 // procedure steps. Pick chooses the one voice line to play when several fire in the same tick.
 public static class AudioPriority
@@ -22,6 +24,29 @@ public static class AudioPriority
         { "step_shutdown_banks", 10 }, { "step_bank_a", 10 }, { "step_dilute", 10 }, { "heatup", 10 },
         { "turbine_roll", 10 }, { "power_ascension", 10 },
     };
+
+    /// <summary>
+    /// The conditions that sound the horn until acknowledged. Tracked one by one (AlarmTracker), so after an acknowledge a NEW
+    /// condition (a turbine trip during a scram) sounds the horn again.
+    /// </summary>
+    public static readonly string[] HornAlarms = { "scram", "bop-trip", "high-pressure", "high-fuel-temp" };
+
+    /// <summary>
+    /// True while a horn condition is raised in the snapshot. The limits come from LampPredicates so the horn and the annunciator
+    /// lamps cannot disagree; any balance-of-plant trip bit counts as bop-trip.
+    /// </summary>
+    public static bool HornConditionRaised(string name, PlantSnapshot s)
+    {
+        if (s == null || name == null) return false;
+        switch (name)
+        {
+            case "scram": return s.Scrammed;
+            case "bop-trip": return s.BopTripMask != 0;
+            case "high-pressure": return s.PrimaryPressureBar > LampPredicates.PriPressHiBar;
+            case "high-fuel-temp": return s.FuelTempC > LampPredicates.FuelTempHiC;
+            default: return false;
+        }
+    }
 
     /// <summary>Priority of a horn alarm name or voice key; unknown or null is 0.</summary>
     public static int Rank(string key)

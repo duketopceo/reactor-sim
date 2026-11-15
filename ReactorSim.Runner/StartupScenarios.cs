@@ -165,7 +165,7 @@ namespace ReactorSim
         }
 
         // Runs the procedure from the sandbox start with the step policies.
-        internal static StartupRun Run(Procedure proc, Action<string> log = null, Func<Simulation, ProcedureState, bool> stopWhen = null)
+        internal static StartupRun Run(Procedure proc, Action<string> log = null, Func<Simulation, ProcedureState, bool> stopWhen = null, Action<PlantSnapshot> observe = null)
         {
             var sim = new Simulation();
             SandboxStart.Apply(sim);
@@ -196,6 +196,7 @@ namespace ReactorSim
                 if ((ticks - 1) % PolicyEveryTicks == 0) Policy(proc.Steps[cur].Id, op, snap);
                 sim.Tick();
                 sim.Plant.AssertFinite("startup:" + proc.Steps[cur].Id + ":t=" + sim.GameMinutes.ToString("F1", CultureInfo.InvariantCulture));
+                observe?.Invoke(sim.CaptureSnapshot());
                 if (Verbose && ticks % 10 == 0) log?.Invoke("    " + F(sim.GameMinutes) + " [" + proc.Steps[cur].Id + "] " + Live(sim.CaptureSnapshot()));
             }
             var fin = sim.CaptureSnapshot();
