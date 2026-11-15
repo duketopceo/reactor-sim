@@ -25,6 +25,7 @@ public static class InstrumentCheck
     public static void Run()
     {
         pendingRows = null;
+        kitByCtl = null;
         int failures = 0;
         try
         {
@@ -73,7 +74,7 @@ public static class InstrumentCheck
             failures++;
         }
 
-        int crts = 0, gauges = 0;
+        int crts = 0, gauges = 0, labelled = 0;
         var roots = new List<GameObject> { room };
         if (equip != null) roots.Add(equip);
         foreach (var root in roots)
@@ -105,14 +106,78 @@ public static class InstrumentCheck
                         failures++;
                         Debug.LogError("[InstrumentCheck] FAIL " + t.name + ": no value source");
                     }
-                    else Debug.Log("[InstrumentCheck] OK   " + t.name + " <- " + src.Name);
+                    else
+                    {
+                        Debug.Log("[InstrumentCheck] OK   " + t.name + " <- " + src.Name);
+                        failures += CheckScaleLabels(t, src, ref labelled);
+                    }
                 }
             }
         }
-        Debug.Log("[InstrumentCheck] " + crts + " CRT screens, " + gauges + " gauge/bar pivots inspected");
+        Debug.Log("[InstrumentCheck] " + crts + " CRT screens, " + gauges + " gauge/bar pivots inspected, " + labelled + " scale-label sets measured");
+        if (labelled == 0)
+        {
+            failures++;
+            Debug.LogError("[InstrumentCheck] FAIL no gauge scale labels were measured against the bezel frame");
+        }
         int roomTris, roomRenderers, roomLights;
         HallBuilder.Stats(room, out roomTris, out roomRenderers, out roomLights);
         Debug.Log($"[InstrumentCheck] control-room totals: {roomTris} tris, {roomRenderers} renderers, {roomLights} lights");
+        return failures;
+    }
+
+    // Label-vs-bezel (the readability regression behind the square frame): every numeral and unit a circular dial prints, and
+    // the min/max numerals of an edgewise bar, must lie inside the kit's bezel frame (GaugeScale.BezelInnerHalfFrac,
+    // kits.json circular_bezel_inner_frac) or between the bar's rails and end caps, with clearance. The boxes are the exact
+    // ones GaugeNumerals places.
+    private static int CheckScaleLabels(Transform pivot, GaugeSource src, ref int labelled)
+    {
+        var ctl = ControlRoomSceneBuilder.FindCtlRoot(pivot);
+        if (ctl == null) return 0;
+        if (kitByCtl == null)
+        {
+            kitByCtl = new Dictionary<string, string>();
+            foreach (var row in DesignData.LoadInventory()) kitByCtl["CTL_" + row.Id] = row["kit"];
+        }
+        string kit;
+        kitByCtl.TryGetValue(ctl.name, out kit);
+        int failures = 0;
+        var marks = GaugeScale.Marks(src.Min, src.Max, src.Units);
+        string unit = GaugeScale.UnitLabel(src.Units);
+        if (kit == "K01" || kit == "K01L")
+        {
+            labelled++;
+            var boxes = new List<KeyValuePair<string, GaugeScale.FaceBox>>
+            {
+                new KeyValuePair<string, GaugeScale.FaceBox>("min " + marks[0].Text, GaugeScale.EndNumeralBox(marks[0].Text, false)),
+                new KeyValuePair<string, GaugeScale.FaceBox>("mid " + marks[1].Text, GaugeScale.MidNumeralBox(marks[1].Text)),
+                new KeyValuePair<string, GaugeScale.FaceBox>("max " + marks[2].Text, GaugeScale.EndNumeralBox(marks[2].Text, true)),
+            };
+            if (unit.Length > 0) boxes.Add(new KeyValuePair<string, GaugeScale.FaceBox>("unit " + unit, GaugeScale.UnitBox(unit)));
+            foreach (var b in boxes)
+                if (!GaugeScale.InsideBezel(b.Value))
+                {
+                    failures++;
+                    Debug.LogError("[InstrumentCheck] FAIL " + ctl.name + ": " + b.Key + " reaches the bezel frame");
+                }
+        }
+        else if (kit == "K02")
+        {
+            labelled++;
+            var layout = GaugeScale.BarLabels(GaugeGeometry.TravelM(src.Name));
+            string maxText = marks[2].Text + (unit.Length == 0 || unit == "%" ? unit : " " + unit);
+            if (maxText.Length > GaugeScale.BarMaxChars(layout)) maxText = marks[2].Text;
+            foreach (var pair in new[] { new KeyValuePair<string, float>(marks[0].Text, layout.Lo), new KeyValuePair<string, float>(maxText, layout.Hi) })
+            {
+                var b = GaugeScale.BarNumeralBox(pair.Key, pair.Value, layout);
+                if (Mathf.Abs(b.X) + b.W / 2f > GaugeScale.BarStripInnerHalfWidthM - 0.003f
+                    || Mathf.Abs(b.Y) + b.H / 2f > GaugeScale.BarStripInnerHalfHeightM - 0.003f)
+                {
+                    failures++;
+                    Debug.LogError("[InstrumentCheck] FAIL " + ctl.name + ": bar numeral '" + pair.Key + "' reaches the rails or end caps");
+                }
+            }
+        }
         return failures;
     }
 
@@ -131,6 +196,7 @@ public static class InstrumentCheck
     }
 
     private static HashSet<string> pendingRows;
+    private static Dictionary<string, string> kitByCtl;
 
     // Every page must render non-empty text containing the live power and reactivity of a fresh plant.
     private static int CheckPages()

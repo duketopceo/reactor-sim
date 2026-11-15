@@ -214,6 +214,8 @@ public static class ControlRoomSceneBuilder
         PlaceClipboard(crRoot.transform, "SEAT_A1", "CLIPBOARD_A1", "Startup checklist", new[] { "cold-start-to-grid" });
         PlaceClipboard(crRoot.transform, "SEAT_A2", "CLIPBOARD_A2", "Startup checklist", new[] { "cold-start-to-grid" });
 
+        MarkStaticBatching(crRoot);
+
         // RoomCam: reuse imported camera if present, else create one.
         Camera cam = Camera.main;
         if (cam == null)
@@ -693,6 +695,44 @@ public static class ControlRoomSceneBuilder
             }
         }
         return has;
+    }
+
+    // Draw-call budget: every renderer of the room that never moves is flagged for static batching, so the many small kit
+    // meshes (shared materials) combine at build/enter-play instead of costing a draw each. Not flagged: anything under a
+    // moving or bound pivot (INT_, BIND_, CRT_, PART_ covers, out-of-service parts), the reactor hall (HallBuilder flags its
+    // own), procedure clipboards, the plant-overview wall (its view drives it), screens and counter windows (their materials
+    // are swapped at runtime), anything with its own behaviour, and disabled renderers (collision proxies).
+    public static int MarkStaticBatching(GameObject crRoot)
+    {
+        int flagged = 0;
+        foreach (var r in crRoot.GetComponentsInChildren<MeshRenderer>(true))
+        {
+            var go = r.gameObject;
+            if (!r.enabled || go.layer == HallLayer || go.GetComponent<MonoBehaviour>() != null) continue;
+            if (StaticExcluded(go.transform, crRoot.transform)) continue;
+            bool screenMaterial = false;
+            foreach (var m in r.sharedMaterials)
+                if (m != null && m.name.IndexOf("CrtScreen", System.StringComparison.OrdinalIgnoreCase) >= 0) { screenMaterial = true; break; }
+            if (screenMaterial) continue;
+            GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
+            flagged++;
+        }
+        Debug.Log("[Phase2SceneBuilder] " + flagged + " room renderers flagged for static batching.");
+        return flagged;
+    }
+
+    private static bool StaticExcluded(Transform t, Transform stop)
+    {
+        for (; t != null && t != stop; t = t.parent)
+        {
+            string n = t.name;
+            if (n.StartsWith("INT_") || n.StartsWith("BIND_") || n.StartsWith("CRT_") || n.StartsWith("OOS_Part_")
+                || n.IndexOf("_PART_", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || n.StartsWith("CLIPBOARD_") || n == "WholePlantOverview" || n.StartsWith("TaskLight_")
+                || n.StartsWith("Window_") || n.StartsWith("Door_"))
+                return true;
+        }
+        return false;
     }
 
     // The kit's auxiliary cover pivots (PART_Guard / PART_ScramCover) are siblings of the INT_ pivot, so the fitted

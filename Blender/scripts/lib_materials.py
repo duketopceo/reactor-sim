@@ -29,7 +29,7 @@ def build_materials():
     materials["M_AmberGlow"] = make_mat("M_AmberGlow", (0.10, 0.08, 0.02), emission_color=(0.95, 0.68, 0.12), emission_strength=1.0)
     materials["M_GreenGlow"] = make_mat("M_GreenGlow", (0.02, 0.08, 0.03), emission_color=(0.16, 0.78, 0.42), emission_strength=1.0)
     materials["M_CherenkovGlow"] = make_mat("M_CherenkovGlow", (0.01, 0.03, 0.08), emission_color=(0.18, 0.55, 1.00), emission_strength=2.0)
-    materials["M_ScramRed"] = make_mat("M_ScramRed", (0.45, 0.05, 0.05), metallic=0.20, roughness=0.35)
+    materials["M_ScramRed"] = make_mat("M_ScramRed", (0.85, 0.03, 0.03), metallic=0.10, roughness=0.30)
     materials["M_FloorDark"] = make_mat("M_FloorDark", (0.10, 0.11, 0.13), metallic=0.05, roughness=0.55)
     materials["M_GaugeNeedle"] = make_mat("M_GaugeNeedle", (0.75, 0.10, 0.10), metallic=0.0, roughness=0.40)
     # 9. Painted bezel / instrument trim (dials, CRT bezels, switch collars)
