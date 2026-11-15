@@ -155,7 +155,12 @@ On the Windows machine (graphics session):
 bash scripts/capture-playtest.sh --sizes 1920x1080 --poses gallery,away,hall,glowoff,glowidle,glowmid,glowfull
 bash scripts/check-captures.sh <dir> --only glowoff,glowidle,glowmid,glowfull --allow-skip gallery,away,hall   # rack glow rises with power
 bash scripts/check-captures.sh <dir> --baseline <baseline dir> --budget-only                                   # runtime budget
+bash scripts/check-captures.sh <dir> --baseline <baseline dir> --budget-only --room-budget                     # + seat/stand room budget
 ```
+
+`--room-budget` grades the `seat` and `stand` poses as a rise over the baseline (p95 at most 4 ms, p99 at most 6 ms, draw calls at
+most 120), so detail added to the control room is measured; the gallery poses alone never see the room. Both runs need the
+`seat`, `stand` and gallery poses at the same size.
 
 The baseline is a run of the same poses on a build with the old hall: the commit before the hall build, with the capture poses
 (`gallery`, `away`) added to it, because those poses do not exist in older builds. Frame time on a shared machine is noisy (the
