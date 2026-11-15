@@ -168,7 +168,7 @@ public static class PlantFeedbackPlayCapture
         Expect(Rate(pri) > 0 && Rate(sec[0]) == 0 && Rate(sec[1]) == 0 && Rate(byp) == 0, "primary relief alone drives only the PORV jet");
         binder.ApplyReliefState(false, true);
         Expect(Rate(pri) == 0 && Rate(sec[0]) > 0 && Rate(sec[1]) > 0 && Rate(byp) == 0, "secondary relief alone drives only the SG relief jets");
-        var trip = HallSteamModel.From(new PlantSnapshot { TurbineTripped = true, TurbineSteamKW = 0, DumpSteamKW = Physics.RatedThermalKW * .3 });
+        var trip = HallSteamModel.From(new PlantSnapshot { TurbineTripped = true, TurbineSteamKW = 0, DumpSteamKW = ReactorSim.Physics.RatedThermalKW * .3 });
         binder.ApplyReliefState(trip.PrimaryRelief, trip.SecondaryRelief); binder.ApplyBypass(trip.Bypass);
         Expect(Rate(pri) == 0 && Rate(sec[0]) == 0 && Rate(byp) > 0, "bypass steam alone (turbine tripped) drives only the bypass jet");
         binder.ApplyReliefState(false, false); binder.ApplyBypass(0f);

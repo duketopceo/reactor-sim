@@ -85,7 +85,7 @@ public static class ReactorAssetRender
                 new { name = "idle", snap = new PlantSnapshot() },
                 new { name = "primary-only", snap = new PlantSnapshot { ReliefOpen = true } },
                 new { name = "secondary-only", snap = new PlantSnapshot { SecondaryReliefOpen = true } },
-                new { name = "trip-bypass", snap = new PlantSnapshot { TurbineTripped = true, TurbineSteamKW = 0, DumpSteamKW = Physics.RatedThermalKW * .3 } },
+                new { name = "trip-bypass", snap = new PlantSnapshot { TurbineTripped = true, TurbineSteamKW = 0, DumpSteamKW = ReactorSim.Physics.RatedThermalKW * .3 } },
             };
             foreach (var state in states)
             {
