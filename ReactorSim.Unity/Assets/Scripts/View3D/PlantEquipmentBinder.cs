@@ -111,14 +111,14 @@ public class PlantEquipmentBinder : MonoBehaviour
         go.transform.localPosition = new Vector3(0f, 0f, 0.12f);          // anchor +z is up: leave from the top of the sparger pipe
         var ps = go.AddComponent<ParticleSystem>();
         ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-        float lo = kind == Plume.Primary ? 0.12f : kind == Plume.Secondary ? 0.09f : 0.06f;
-        float hi = kind == Plume.Primary ? 0.26f : kind == Plume.Secondary ? 0.19f : 0.13f;
+        float lo = kind == Plume.Primary ? 0.10f : kind == Plume.Secondary ? 0.09f : 0.06f;
+        float hi = kind == Plume.Primary ? 0.22f : kind == Plume.Secondary ? 0.19f : 0.13f;
         var main = ps.main;
         main.loop = true;
         main.startLifetime = new ParticleSystem.MinMaxCurve(3.0f, 4.0f);
         main.startSpeed = new ParticleSystem.MinMaxCurve(1.0f, 1.5f);
         main.startSize = new ParticleSystem.MinMaxCurve(lo, hi);
-        main.startColor = new Color(0.82f, 0.95f, 1f, 1f);
+        main.startColor = new Color(0.82f, 0.95f, 1f, 0.8f);
         main.simulationSpace = ParticleSystemSimulationSpace.Local;
         main.maxParticles = 400;
         var emission = ps.emission;
@@ -237,7 +237,7 @@ public class PlantEquipmentBinder : MonoBehaviour
     {
         SetReliefJets(primaryReliefJets, primaryOpen);
         SetReliefJets(secondaryReliefJets, secondaryOpen);
-        SetPlumes(primaryPlumes, primaryOpen, 110f);
+        SetPlumes(primaryPlumes, primaryOpen, 90f);
         SetPlumes(secondaryPlumes, secondaryOpen, 80f);
     }
 
