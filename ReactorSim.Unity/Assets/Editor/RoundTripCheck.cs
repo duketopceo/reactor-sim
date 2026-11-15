@@ -269,6 +269,21 @@ public static class RoundTripCheck
             }
         }
 
+        if (!negative)
+        {
+            // R5 (U2): a rejected press gives its feedback and changes nothing; a wall click is a read-only selection.
+            var feedback = new RoundTripPlan.Verdict();
+            yield return RunRejectedAndWallClicks(feedback);
+            if (feedback.Ok) Debug.Log("[RoundTripCheck] OK rejected-press " + feedback.Detail);
+            else
+            {
+                rowsFailed++;
+                failedRows.Add("rejected-press");
+                failedWhy.Add(string.Join("; ", feedback.Failures.ToArray()));
+                Debug.LogError("[RoundTripCheck] FAIL rejected-press " + string.Join("; ", feedback.Failures.ToArray()));
+            }
+        }
+
         Debug.Log("[RoundTripCheck] " + rowsRun + " bound control rows round-tripped, " + rowsFailed + " failing");
         int code;
         if (negative)
@@ -285,6 +300,80 @@ public static class RoundTripCheck
             code = rowsFailed == 0 && rowsRun > 0 ? 0 : 1;
         }
         SessionState.SetInt(CodeKey, code);
+    }
+
+    // A press that is rejected (an indicator clicked, a control out of range) must show its feedback (the one-line note, and the plunger
+    // dip on a button) and must not touch the plant: same snapshot JSON, same intent log. A click on a status-wall component selects it
+    // on the detail plate and must not touch the plant either.
+    private static IEnumerator RunRejectedAndWallClicks(RoundTripPlan.Verdict v)
+    {
+        yield return Settle();
+        DiegeticInteractable indicator = null, button = null, wallNode = null;
+        foreach (var d in UnityEngine.Object.FindObjectsByType<DiegeticInteractable>(FindObjectsSortMode.None))
+        {
+            if (indicator == null && d.pinnable) indicator = d;
+            if (button == null && d.Operable && d.Spec.Style == ControlStyle.Button) button = d;
+            if (wallNode == null && d.IsWallNode) wallNode = d;
+        }
+        if (indicator == null) v.Fail("no indicator interactable to reject a press on");
+        if (button == null) v.Fail("no operable button to reject a press on");
+        if (wallNode == null) v.Fail("no status-wall component node");
+        if (!v.Ok) yield break;
+
+        var cases = new[]
+        {
+            new KeyValuePair<DiegeticInteractable, string>(indicator, ControlTooltipModel.RejectIndicator),
+            new KeyValuePair<DiegeticInteractable, string>(button, ControlTooltipModel.RejectOutOfRange),
+        };
+        int checkedPresses = 0;
+        foreach (var pair in cases)
+        {
+            var inter = pair.Key;
+            string reason = pair.Value;
+            string jsonBefore = Capture().ToJson();
+            int logBefore;
+            lock (bridge.SimLock) { logBefore = bridge.Sim.GetIntentLogSnapshot().Count; }
+            // The button is rejected for being out of range: put the eye far away for this one press, as the real path would see it.
+            var cam = Camera.main;
+            Vector3 eye = cam != null ? cam.transform.position : Vector3.zero;
+            if (inter == button && cam != null)
+            {
+                cam.transform.position = button.transform.position + Vector3.up * 50f;
+                if (button.RejectReason() != ControlTooltipModel.RejectOutOfRange) v.Fail(button.RowName + ": a press from far away is not rejected as out of range");
+            }
+            string want = inter.RejectNote(reason);
+            if (string.IsNullOrWhiteSpace(want)) { v.Fail(inter.RowName + " (" + reason + "): the rejection note is empty"); if (cam != null) cam.transform.position = eye; continue; }
+            inter.Reject(reason);
+            if (cam != null) cam.transform.position = eye;
+            string shown = binder.ActiveNotice;
+            if (shown != want) v.Fail(inter.RowName + " (" + reason + "): the on-screen note was \"" + (shown ?? "nothing") + "\", wanted \"" + want + "\"");
+            if (inter.Spec != null && inter.Spec.Style == ControlStyle.Button && !binder.RejectDipActive(inter))
+                v.Fail(inter.RowName + ": a rejected button press shows no plunger dip");
+            yield return WaitFrames(SettleFrames);
+            string jsonAfter = Capture().ToJson();
+            int logAfter;
+            lock (bridge.SimLock) { logAfter = bridge.Sim.GetIntentLogSnapshot().Count; }
+            if (jsonAfter != jsonBefore) v.Fail(inter.RowName + " (" + reason + "): a rejected press changed the snapshot");
+            if (logAfter != logBefore) v.Fail(inter.RowName + " (" + reason + "): a rejected press submitted " + (logAfter - logBefore) + " intent(s)");
+            checkedPresses++;
+        }
+
+        // The wall node: click it through the real OnMouseDown, then click again to clear.
+        var view = wallNode.GetComponentInParent<PlantWallMapView>();
+        if (view == null) { v.Fail("wall node " + wallNode.name + " has no PlantWallMapView above it"); yield break; }
+        string wallJsonBefore = Capture().ToJson();
+        int wallLogBefore;
+        lock (bridge.SimLock) { wallLogBefore = bridge.Sim.GetIntentLogSnapshot().Count; }
+        wallNode.SendMessage("OnMouseDown");
+        if (view.SelectedComponent != wallNode.wallComponent) v.Fail("a wall click did not select " + wallNode.wallComponent);
+        wallNode.SendMessage("OnMouseDown");
+        if (view.SelectedComponent != null) v.Fail("a second wall click did not clear the selection");
+        yield return WaitFrames(SettleFrames);
+        int wallLogAfter;
+        lock (bridge.SimLock) { wallLogAfter = bridge.Sim.GetIntentLogSnapshot().Count; }
+        if (Capture().ToJson() != wallJsonBefore) v.Fail("wall clicks changed the snapshot");
+        if (wallLogAfter != wallLogBefore) v.Fail("wall clicks submitted " + (wallLogAfter - wallLogBefore) + " intent(s)");
+        v.Detail = checkedPresses + " rejected presses and a wall select/clear left the snapshot and intent log unchanged";
     }
 
     // Longer than ControlRoom3DBinder's MODE latch (6 s of unscaled time).

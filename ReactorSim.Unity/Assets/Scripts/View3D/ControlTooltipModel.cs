@@ -134,6 +134,24 @@ namespace ReactorSim.Controls
             return null;
         }
 
+        /// <summary>
+        /// The one-line on-screen note for a rejected press. hoverNote is the control's own reason text (out of service, too far);
+        /// relatedControl is the control row that operates a clicked indicator (null when none).
+        /// </summary>
+        public static string RejectNoteFor(string reason, string label, string hoverNote, RuntimeRow relatedControl)
+        {
+            switch (reason)
+            {
+                case RejectIndicator:
+                    return IndicatorNote(relatedControl);
+                case RejectOutOfService:
+                case RejectOutOfRange:
+                    return hoverNote ?? "";
+                default:
+                    return (label ?? "") + " is not wired to anything";
+            }
+        }
+
         /// <summary>One line shown when a gauge or lamp is clicked: it is read, not operated.</summary>
         public static string IndicatorNote(RuntimeRow relatedControl)
         {

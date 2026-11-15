@@ -622,6 +622,20 @@ public class ControlRoom3DBinder : MonoBehaviour
         if (!string.IsNullOrEmpty(text)) Flash(text);
     }
 
+    /// <summary>The on-screen note currently shown (an action result or a rejected press's reason), or null when none is.</summary>
+    public string ActiveNotice { get { return Time.unscaledTime < actionUntil ? actionText : null; } }
+
+    /// <summary>The drag readout currently shown by a capture override, or null.</summary>
+    public string ActiveReadout { get { return Time.unscaledTime < readoutOverrideUntil ? readoutOverride : null; } }
+
+    /// <summary>True while a rejected press's plunger dip is still travelling on this control (transient, nothing submitted).</summary>
+    public bool RejectDipActive(DiegeticInteractable inter)
+    {
+        for (int i = 0; i < controls.Count; i++)
+            if (controls[i].Interactable == inter) return Time.time < controls[i].PressedUntil;
+        return false;
+    }
+
     /// <summary>Capture runs only: shows a drag readout without a real drag.</summary>
     public void ShowReadout(string text, float seconds)
     {

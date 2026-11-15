@@ -45,7 +45,7 @@ public class CaptureMode : MonoBehaviour
             string poseArg = ArgValue(args, "-poses");
             List<string> list = poseArg != null
                 ? CaptureMath.ParsePoses(poseArg)
-                : CaptureMath.ParsePoses("menu,seat,stand,crt,tooltip,rejected,drag,checklist,pause,tablet,clipboard,gallery,away,hall,glowoff,glowidle,glowmid,glowfull");
+                : CaptureMath.ParsePoses("menu,seat,stand,crt,tooltip,rejected,drag,checklist,pause,tablet,clipboard,wall,wallidle,gallery,away,hall,glowoff,glowidle,glowmid,glowfull");
             AudioListener.pause = true; // automated runs are silent: the sources keep running (volumes still update), nothing is output
             var go = new GameObject("CaptureMode");
             DontDestroyOnLoad(go);
@@ -72,6 +72,7 @@ public class CaptureMode : MonoBehaviour
     private IEnumerator Start()
     {
         int exitCode = 0;
+        AudioListener.pause = true;   // capture runs are silent: nothing reads the audio, and the box may be in a room
         sizeDir = Path.Combine(outDir, width + "x" + height);
         string problem = null;
         try { Directory.CreateDirectory(sizeDir); }
@@ -180,7 +181,9 @@ public class CaptureMode : MonoBehaviour
                 op.CaptureLookAt(gauge.FocusPoint, 45f);
                 yield return Frames(20);
                 gauge.Reject(ControlTooltipModel.RejectIndicator);   // draws the note for about 1.6 s
-                yield return Shot("rejected", "rejected-press", 3, 0f, null);
+                // The 400 measured frames outlast that note on a healthy box, so the press is rejected again just before the screenshot and
+                // the JSON records the note that was actually on screen (graded by check-captures.sh).
+                yield return Shot("rejected", "rejected-press", 3, 0f, null, beforeShot: () => gauge.Reject(ControlTooltipModel.RejectIndicator));
                 break;
             case "drag":
                 var knob = FirstInteractable(true);
@@ -188,9 +191,10 @@ public class CaptureMode : MonoBehaviour
                 op.CaptureLookAt(knob.FocusPoint, 45f);
                 yield return Frames(20);
                 var row = RuntimeInventoryStore.Inventory.Find(knob.rowId);
-                binder.ShowReadout(ControlTooltipModel.DragReadout(string.IsNullOrEmpty(knob.rowLabel) ? knob.RowName : knob.rowLabel,
-                    0.62, 0.5, row != null ? row.units : "", false), 3f);
-                yield return Shot("drag", "drag-readout", 3, 0f, null);
+                string dragText = ControlTooltipModel.DragReadout(string.IsNullOrEmpty(knob.rowLabel) ? knob.RowName : knob.rowLabel,
+                    0.62, 0.5, row != null ? row.units : "", false);
+                binder.ShowReadout(dragText, 3f);
+                yield return Shot("drag", "drag-readout", 3, 0f, null, beforeShot: () => binder.ShowReadout(dragText, 3f));
                 break;
             case "checklist":
                 yield return Panel("checklist", FindAnyObjectByType<StartupChecklistHud>(), "Expand", "Collapse");
@@ -203,6 +207,23 @@ public class CaptureMode : MonoBehaviour
                 break;
             case "clipboard":
                 yield return Panel("clipboard", FindAnyObjectByType<ProcedureClipboard>(), "Open", "Close");
+                break;
+            case "wall":
+            case "wallidle":
+                // The status wall's detail plate read from the nearest stand: "wall" with the reactor selected through the real click
+                // path (the longest readout), "wallidle" with nothing selected (the prompt). The JSON carries the text's projected
+                // glyph height and contrast and whether it fits its plate, graded by check-captures.sh.
+                var wallView = FindAnyObjectByType<PlantWallMapView>();
+                Transform plateTr = wallView != null ? wallView.transform.Find("LiveDetailPlate") : null;
+                Transform textTr = wallView != null ? wallView.transform.Find("LiveDetail") : null;
+                var wallText = textTr != null ? textTr.GetComponent<TMPro.TextMeshPro>() : null;
+                if (wallView == null || plateTr == null || wallText == null) { Skip(pose, "no status wall detail plate in the scene"); break; }
+                wallView.ClearSelection();
+                if (pose == "wall") wallView.ClickComponent("Reactor");
+                op.CaptureLookAt(plateTr.position, WallFov);
+                yield return Frames(20);
+                yield return Shot(pose, pose, 30, 0.5f, null, null, wallText, pose == "wall" ? "Reactor" : "");
+                wallView.ClearSelection();
                 break;
             case "bar":
             case "dial":
@@ -337,12 +358,17 @@ public class CaptureMode : MonoBehaviour
         for (int i = 0; i < n; i++) yield return null;
     }
 
-    private IEnumerator Shot(string pose, string label, int settleFrames, float settleSeconds, CrtScreenRenderer crt, List<Renderer> measure = null)
+    // Field of view of the wall poses: the same close read as the CRT poses (CaptureLookAt stands at the nearest quick-travel stop).
+    private const float WallFov = 28f;
+
+    private IEnumerator Shot(string pose, string label, int settleFrames, float settleSeconds, CrtScreenRenderer crt, List<Renderer> measure = null,
+        TMPro.TextMeshPro wallText = null, string wallSelected = null, Action beforeShot = null)
     {
         yield return Frames(settleFrames);
         if (settleSeconds > 0f) yield return new WaitForSecondsRealtime(settleSeconds);
         FrameMetrics.Reset();
         yield return Frames(400);   // frames the percentiles are taken over (a short window is dominated by one slow frame)
+        if (beforeShot != null) { beforeShot(); yield return null; }   // transient feedback (a note, a readout) must be live in the frame that is saved
         yield return new WaitForEndOfFrame();
 
         var tex = ScreenCapture.CaptureScreenshotAsTexture();
@@ -359,6 +385,9 @@ public class CaptureMode : MonoBehaviour
         sb.Append(",\"drawCalls\":").Append(FrameMetrics.DrawCalls);
         if (crt != null) AppendScreenMeasure(sb, crt, tex);
         if (measure != null && measure.Count > 0) AppendCropLuma(sb, measure, tex);
+        if (wallText != null) AppendWallMeasure(sb, wallText, wallSelected, tex);
+        if (pose == "rejected") sb.Append(",\"notice\":\"").Append(Esc(binder != null ? binder.ActiveNotice : null)).Append('"');
+        if (pose == "drag") sb.Append(",\"readout\":\"").Append(Esc(binder != null ? binder.ActiveReadout : null)).Append('"');
         sb.Append('}');
         records.Add(sb.ToString());
         Destroy(tex);
@@ -396,6 +425,54 @@ public class CaptureMode : MonoBehaviour
             }
         sb.Append(",\"cropMean\":").Append(InputLogFormat.Num(CaptureMath.CropMeanLuminance(crop, w, 0, 0, w, h)));
         sb.Append(",\"cropW\":").Append(w).Append(",\"cropH\":").Append(h);
+    }
+
+    // The wall detail text as it appears in the captured image: whether it fits its plate, the projected glyph height (cap height
+    // estimated from the first visible character's line box) and the contrast of the rendered pixels over the text's own bounds.
+    private static void AppendWallMeasure(StringBuilder sb, TMPro.TextMeshPro text, string selected, Texture2D tex)
+    {
+        text.ForceMeshUpdate();
+        bool fits = text.textBounds.size.x <= text.rectTransform.rect.width + 0.001f && text.textBounds.size.y <= text.rectTransform.rect.height + 0.001f;
+        sb.Append(",\"wallSelected\":\"").Append(Esc(selected)).Append('"');
+        sb.Append(",\"detailFits\":").Append(fits ? "true" : "false");
+        var cam = Camera.main;
+        var mr = text.GetComponent<Renderer>();
+        if (cam == null || mr == null) return;
+        var info = text.textInfo;
+        for (int i = 0; i < info.characterCount; i++)
+        {
+            var ci = info.characterInfo[i];
+            if (!ci.isVisible) continue;
+            Vector3 top = cam.WorldToScreenPoint(text.transform.TransformPoint(ci.topLeft));
+            Vector3 bottom = cam.WorldToScreenPoint(text.transform.TransformPoint(ci.bottomLeft));
+            if (top.z <= 0f || bottom.z <= 0f) return;
+            sb.Append(",\"lineBoxPx\":").Append(InputLogFormat.Num(Mathf.Abs(top.y - bottom.y)));
+            sb.Append(",\"glyphHeightPx\":").Append(InputLogFormat.Num(CaptureMath.GlyphHeightFromLineBoxPx(Mathf.Abs(top.y - bottom.y))));
+            break;
+        }
+        Bounds b = mr.bounds;
+        float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
+        for (int i = 0; i < 8; i++)
+        {
+            Vector3 corner = b.center + Vector3.Scale(b.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+            Vector3 p = cam.WorldToScreenPoint(corner);
+            if (p.z <= 0f) return;
+            minX = Mathf.Min(minX, p.x); maxX = Mathf.Max(maxX, p.x);
+            minY = Mathf.Min(minY, p.y); maxY = Mathf.Max(maxY, p.y);
+        }
+        int x0 = Mathf.Clamp(Mathf.RoundToInt(minX), 0, tex.width - 1), y0 = Mathf.Clamp(Mathf.RoundToInt(minY), 0, tex.height - 1);
+        int w = Mathf.Clamp(Mathf.RoundToInt(maxX) - x0, 1, tex.width - x0), h = Mathf.Clamp(Mathf.RoundToInt(maxY) - y0, 1, tex.height - y0);
+        Color32[] px = tex.GetPixels32();
+        var crop = new byte[w * h * 4];
+        for (int j = 0; j < h; j++)
+            for (int i = 0; i < w; i++)
+            {
+                Color32 c = px[(y0 + j) * tex.width + x0 + i];
+                int o = (j * w + i) * 4;
+                crop[o] = c.r; crop[o + 1] = c.g; crop[o + 2] = c.b; crop[o + 3] = 255;
+            }
+        sb.Append(",\"contrast\":").Append(InputLogFormat.Num(CaptureMath.CropContrast(crop, w, 0, 0, w, h)));
+        sb.Append(",\"textWidthPx\":").Append(w).Append(",\"textHeightPx\":").Append(h);
     }
 
     // Measurements of a CRT as it appears in the captured image: its on-screen width, the characters per line of its text, the

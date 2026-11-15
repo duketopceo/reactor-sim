@@ -204,4 +204,114 @@ public class PlantWallMapModelTests
         }
         Assert.DoesNotContain("kg/s", PlantWallMapModel.GroupedReadout(s));
     }
+
+    // U2 (R3): each component's readout carries its audited fields with units, and any NaN source reads N/M with no unit.
+    static readonly (string Name, string[] Fields)[] ReadoutFields =
+    {
+        ("Reactor", new[] { "PWR 80.0 %", "FUEL 600.0 C", "RHO 0 pcm", "PERIOD 900.0 s", "RODS A " }),
+        ("Safety", new[] { "SCRAM CLEAR", "SAFETY FLOW N/M" }),
+        ("PrimaryPump", new[] { "FLOW 90.0 %", "TEMP 300.0 C", "LEVEL 50.0 %" }),
+        ("Pressurizer", new[] { "PRESS 155.0 bar", "MARGIN 20.0 C", "HEAT 30.0 %", "SPRAY 10.0 %", "RELIEF CLOSED" }),
+        ("SteamGenerator", new[] { "PRESS 60.0 bar", "TEMP 270.0 C", "LEVEL 50.0 %", "RELIEF CLOSED", "THROTTLE 80.0 % command", "DUMP 500 kW heat" }),
+        ("Turbine", new[] { "SPEED 1800 rpm", "STEAM 90000 kW heat", "NOT TRIPPED" }),
+        ("Generator", new[] { "OUTPUT 30000 kW", "SYNCED" }),
+        ("Grid", new[] { "FREQ 60.00 Hz", "OUTPUT 80.0 % rated" }),
+        ("Condenser", new[] { "PRESS 0.08 bar", "HOTWELL 60.0 %", "VACUUM PUMP 100.0 % command" }),
+        ("Cooling", new[] { "COOLING 100.0 %" }),
+        ("FeedPump", new[] { "DELIVERED 80.0 % rated", "PUMP 90.0 % command", "SUPPLY 100.0 %" }),
+        ("Chemistry", new[] { "BORON 800 ppm", "PH 7.20", "CHEMISTRY FLOW N/M" }),
+    };
+
+    [Fact]
+    public void EveryComponentReadoutReturnsItsAuditedFieldsWithUnits()
+    {
+        var s = FullyPopulated();
+        s.BankInsertion = new[] { .1, .2, .3, .4 };
+        Assert.Equal(Components.Length, ReadoutFields.Length);
+        foreach (var (name, fields) in ReadoutFields)
+        {
+            string text = PlantWallMapModel.ComponentReadout(name, s);
+            foreach (string field in fields) Assert.Contains(field, text);
+        }
+    }
+
+    [Fact]
+    public void ANaNSourceReadsNotMeasuredWithNoUnit()
+    {
+        var nan = double.NaN;
+        var s = new PlantSnapshot { Power = nan, FuelTempC = nan, TotalReactivityPcm = nan, PeriodSeconds = nan, PrimaryFlowFrac = nan,
+            PrimaryTempC = nan, PrimaryLevelFrac = nan, PrimaryPressureBar = nan, PrimarySatMarginC = nan, HeaterPowerFrac = nan,
+            SprayFrac = nan, SecondaryPressureBar = nan, SecondaryTempC = nan, SecondaryLevelFrac = nan, SteamDemandFrac = nan,
+            DumpSteamKW = nan, TurbineRpm = nan, TurbineSteamKW = nan, GeneratorKw = nan, GridFrequencyHz = nan, GridOutputFrac = nan,
+            CondenserPressureBar = nan, HotwellInventoryFrac = nan, VacuumPumpFrac = nan, CoolingWaterFrac = nan,
+            FeedwaterDeliveredFrac = nan, FeedwaterFlowFrac = nan, FeedwaterAvailabilityFrac = nan, BoronPpm = nan, Ph = nan,
+            BankInsertion = new[] { nan, nan, nan, nan } };
+        foreach (string name in Components)
+        {
+            string text = PlantWallMapModel.ComponentReadout(name, s);
+            Assert.DoesNotMatch(@"NaN|Infinity", text);
+            // N/M is bare: never followed by a unit.
+            Assert.DoesNotMatch(@"N/M (%|bar|pcm|ppm|rpm|kW|Hz|heat|command|rated)", text);
+        }
+        Assert.Contains("PWR N/M", PlantWallMapModel.ComponentReadout("Reactor", s));
+        Assert.Contains("SPEED N/M", PlantWallMapModel.ComponentReadout("Turbine", s));
+    }
+
+    // U2 (R4): a direction exists only where the model knows the flow sign, and never at zero activity.
+    [Fact]
+    public void ARouteWithZeroActivityHasNoDirection()
+    {
+        var s = new PlantSnapshot { PrimaryFlowFrac = 0, FeedwaterDeliveredFrac = 0, GridOutputFrac = 0 };
+        Assert.Equal(0, PlantWallMapModel.RouteDirection("PrimaryHot", s));
+        Assert.Equal(0, PlantWallMapModel.RouteDirection("Feedwater", s));
+        Assert.Equal(0, PlantWallMapModel.RouteDirection("Grid", s));
+        Assert.Equal(0, PlantWallMapModel.RouteDirection("Steam", s));
+    }
+
+    [Fact]
+    public void ARouteWithKnownPositiveFlowHasForwardDirection()
+    {
+        var s = new PlantSnapshot { PrimaryFlowFrac = .4, FeedwaterDeliveredFrac = .2, GridOutputFrac = .5,
+            TurbineSteamKW = Physics.RatedThermalKW * .6, DumpSteamKW = Physics.RatedThermalKW * .25 };
+        foreach (string name in new[] { "PrimaryHot", "PrimaryCold", "Feedwater", "Grid", "Steam", "SteamHeader", "TurbineExhaust", "SteamDump" })
+            Assert.Equal(1, PlantWallMapModel.RouteDirection(name, s));
+    }
+
+    [Fact]
+    public void NoDirectionWhereTheModelDoesNotKnowTheFlowSignOrTheReadingIsMissing()
+    {
+        var s = new PlantSnapshot { PrimaryFlowFrac = 1, CoolingWaterFrac = 1, TurbineRpm = Physics.TurbineRatedRpm,
+            FeedwaterDeliveredFrac = 1, GridOutputFrac = 1 };
+        // Shaft is rotation, the cooling circuit's drawn order is not a modeled flow sign, the rest have no flow source.
+        foreach (string name in new[] { "Shaft", "CoolingSupply", "CoolingReturn", "Surge", "Chemistry", "Safety", "Unknown" })
+            Assert.Equal(0, PlantWallMapModel.RouteDirection(name, s));
+        s.PrimaryFlowFrac = double.NaN;
+        Assert.Equal(0, PlantWallMapModel.RouteDirection("PrimaryHot", s));
+        Assert.Equal(0, PlantWallMapModel.RouteDirection("PrimaryHot", null));
+    }
+
+    [Fact]
+    public void ForwardDirectionFollowsThePathOrderOfTheAuthoredAsset()
+    {
+        // The model's forward heading must match the polyline the Blender generator draws, point for point, so a change to the
+        // asset cannot silently reverse an arrow.
+        string py = System.IO.File.ReadAllText(TestRepo.Find("Blender", "scripts", "make_plant_overview.py"));
+        int checkedRoutes = 0;
+        foreach (string name in PlantWallMapModel.DirectedRoutes)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(py, "pipe\\(\"" + name + "\", \\[(.*?)\\], ");
+            Assert.True(m.Success, "no pipe() call for " + name);
+            var points = System.Text.RegularExpressions.Regex.Matches(m.Groups[1].Value, @"\((-?[\d.]+),\s*(-?[\d.]+)\)");
+            var path = PlantWallMapModel.RoutePath(name);
+            Assert.Equal(points.Count, path.Length);
+            for (int i = 0; i < path.Length; i++)
+            {
+                Assert.Equal(double.Parse(points[i].Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture), path[i][0], 9);
+                Assert.Equal(double.Parse(points[i].Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture), path[i][1], 9);
+            }
+            checkedRoutes++;
+        }
+        Assert.Equal(8, checkedRoutes);
+        Assert.Null(PlantWallMapModel.RoutePath("Shaft"));
+    }
 }

@@ -125,5 +125,30 @@ namespace ReactorSim.Core.Tests
             Assert.DoesNotContain("tier", frac.Split('\n')[1]);
             Assert.Contains("Supervised", ControlTooltipModel.DragReadout("Assistant tier", 2.2, 0.0, "tier", false));
         }
+
+        // U2 (R5): a rejected press says why in one line (nothing was submitted, so the note never names a plant value).
+        [Theory]
+        [InlineData(ControlTooltipModel.RejectOutOfService)]
+        [InlineData(ControlTooltipModel.RejectOutOfRange)]
+        [InlineData(ControlTooltipModel.RejectIndicator)]
+        [InlineData(ControlTooltipModel.RejectNoBinder)]
+        [InlineData(ControlTooltipModel.RejectNoSpec)]
+        public void EveryRejectReasonGivesAOneLineNote(string reason)
+        {
+            string note = ControlTooltipModel.RejectNoteFor(reason, "Boron dilute", "Too far - walk closer (within 2 m)", null);
+            Assert.False(string.IsNullOrWhiteSpace(note));
+            Assert.DoesNotContain("\n", note);
+        }
+
+        [Fact]
+        public void RejectNotesNameTheLabelOrTheHoverNote()
+        {
+            Assert.Equal("Too far - walk closer (within 2 m)",
+                ControlTooltipModel.RejectNoteFor(ControlTooltipModel.RejectOutOfRange, "Boron dilute", "Too far - walk closer (within 2 m)", null));
+            Assert.Equal("Boron dilute is not wired to anything",
+                ControlTooltipModel.RejectNoteFor(ControlTooltipModel.RejectNoSpec, "Boron dilute", "", null));
+            Assert.Equal(ControlTooltipModel.IndicatorNote(null),
+                ControlTooltipModel.RejectNoteFor(ControlTooltipModel.RejectIndicator, "Gauge", "", null));
+        }
     }
 }

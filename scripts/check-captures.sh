@@ -29,7 +29,7 @@ ROOM_POSES="seat stand"
 # rack glow (U7): mean rendered brightness over the racks, measured against a glowoff frame (no glow at all)
 GLOW_FULL_OVER_FLOOR_MIN=4    # (full - off) must be at least this multiple of (idle - off): "a set multiple of the floor"
 GLOW_FULL_DELTA_MIN=0.01      # and at least this much absolute mean luminance (0..1), so a flat render cannot pass
-REQUIRED_POSES="seat stand crt tooltip rejected drag checklist pause tablet clipboard menu"
+REQUIRED_POSES="seat stand crt tooltip rejected drag checklist pause tablet clipboard wall wallidle menu"
 
 DIR=""
 BASELINE=""
@@ -99,6 +99,23 @@ for c in data.get("captures", []):
             problems.append("%s: glyph %.1f px < %g px" % (label, c["glyphHeightPx"], glyph_min))
         if c.get("contrast", 99.0) < contrast_min:
             problems.append("%s: contrast %.2f < %g" % (label, c["contrast"], contrast_min))
+    # Transient control feedback must be on screen in the saved frame: the capture records the note / readout it drew.
+    if pose == "rejected" and not str(c.get("notice", "")).strip():
+        problems.append("%s: no rejection note on screen" % label)
+    if pose == "drag" and not str(c.get("readout", "")).strip():
+        problems.append("%s: no drag readout on screen" % label)
+    if pose in ("wall", "wallidle"):
+        # The status wall's detail plate (U2): same absolute glyph and contrast limits as the CRTs, measured on the rendered text,
+        # and the text must fit its plate. A missing measurement is a failure, never a pass.
+        if "glyphHeightPx" not in c or "contrast" not in c:
+            problems.append("%s: no glyph or contrast measurement (text behind the camera or capture tool did not measure it)" % label)
+        else:
+            if c["glyphHeightPx"] < glyph_min:
+                problems.append("%s: glyph %.1f px < %g px" % (label, c["glyphHeightPx"], glyph_min))
+            if c["contrast"] < contrast_min:
+                problems.append("%s: contrast %.2f < %g" % (label, c["contrast"], contrast_min))
+        if c.get("detailFits") is not True:
+            problems.append("%s: detail text does not fit its plate" % label)
     line = "  %-28s p95 %6.2f ms  p99 %6.2f ms  draws %s" % (label, c.get("frameMsP95", 0), c.get("frameMsP99", 0), c.get("drawCalls", "?"))
     if "glyphHeightPx" in c:
         line += "  glyph %.1f px  contrast %.2f" % (c["glyphHeightPx"], c.get("contrast", 0))
