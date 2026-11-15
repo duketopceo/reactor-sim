@@ -122,6 +122,13 @@ namespace ReactorSim.Core.Tests
         }
 
         [Fact]
+        public void ParsePoses_KnowsTheUnderwaterWindowPoses()
+        {
+            Assert.Equal(new[] { "winstandidle", "winstandfull", "winseatidle", "winseatfull" },
+                CaptureMath.ParsePoses("winstandidle,winstandfull,winseatidle,winseatfull").ToArray());
+        }
+
+        [Fact]
         public void GlyphHeightFromLineBox_UsesTheCapHeightRatioAndNeverInvents()
         {
             Assert.Equal(13.0, CaptureMath.GlyphHeightFromLineBoxPx(20.0), 9);

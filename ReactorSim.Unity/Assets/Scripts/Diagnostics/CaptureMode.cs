@@ -45,7 +45,7 @@ public class CaptureMode : MonoBehaviour
             string poseArg = ArgValue(args, "-poses");
             List<string> list = poseArg != null
                 ? CaptureMath.ParsePoses(poseArg)
-                : CaptureMath.ParsePoses("menu,seat,stand,crt,tooltip,rejected,drag,checklist,pause,tablet,clipboard,wall,wallidle,gallery,away,hall,glowoff,glowidle,glowmid,glowfull");
+                : CaptureMath.ParsePoses("menu,seat,stand,crt,tooltip,rejected,drag,checklist,pause,tablet,clipboard,wall,wallidle,gallery,away,hall,glowoff,glowidle,glowmid,glowfull,winstandidle,winstandfull,winseatidle,winseatfull");
             AudioListener.pause = true; // automated runs are silent: the sources keep running (volumes still update), nothing is output
             var go = new GameObject("CaptureMode");
             DontDestroyOnLoad(go);
@@ -259,6 +259,13 @@ public class CaptureMode : MonoBehaviour
             case "glowfull":
                 yield return GlowShot(pose, 1.0);
                 break;
+            case "winstandidle":
+            case "winstandfull":
+            case "winseatidle":
+            case "winseatfull":
+                // R9: the fuel array through the underwater window from the stand and from the chair, at shutdown (idle) and at full power.
+                yield return WindowShot(pose);
+                break;
             case "away":
                 // Same stand as the gallery pose but looking the other way, so the window is out of the frustum: the frame time
                 // here against the same pose on a baseline run is what the hall costs while it cannot be seen.
@@ -306,6 +313,25 @@ public class CaptureMode : MonoBehaviour
         toRoom.y = 0f;
         op.CaptureAt(centre + toRoom.normalized * 0.9f, focus.position, 45f);
         PlantEquipmentBinder.PowerOverride = power;
+        yield return Shot(pose, pose, 40, 0.8f, null, cells);
+        PlantEquipmentBinder.PowerOverride = null;
+    }
+
+    // The spent-fuel racks as the window shows them from the stand (the quick-travel stop nearest the glass) or from the first chair
+    // (at the real seated eye height, aimed at the racks; the window is behind the chair so this is a capture-only view), with the
+    // plant power forced to shutdown (idle glow) or full power. cropMean is the mean brightness over the racks; a rack that is not
+    // fully in frame records none, which check-captures.sh grades as a failure.
+    private IEnumerator WindowShot(string pose)
+    {
+        var glass = WindowGlass();
+        var hallRoot = HallVisibility.FindHall();
+        Transform focus = hallRoot != null ? hallRoot.transform.Find("RackFocus") : null;
+        if (glass == null || focus == null) { Skip(pose, "no window or no rack focus in the scene"); yield break; }
+        var cells = new List<Renderer>();
+        foreach (var r in hallRoot.GetComponentsInChildren<Renderer>(true)) if (r.name.StartsWith("RackGlow_Cells_")) cells.Add(r);
+        if (pose.StartsWith("winseat", System.StringComparison.Ordinal)) op.CaptureSeatLookAt(focus.position, 50f);
+        else op.CaptureLookAt(focus.position, 50f);
+        PlantEquipmentBinder.PowerOverride = pose.EndsWith("full", System.StringComparison.Ordinal) ? 1.0 : 0.0;
         yield return Shot(pose, pose, 40, 0.8f, null, cells);
         PlantEquipmentBinder.PowerOverride = null;
     }

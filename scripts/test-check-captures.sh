@@ -260,13 +260,44 @@ mkfull() {   # mkfull <dir> <with wall: yes|no>
   if [ "$2" = yes ]; then
     body="$body,{\"pose\":\"wall\",\"label\":\"wall\",\"file\":\"f.png\",\"glyphHeightPx\":12,\"contrast\":7,\"detailFits\":true}"
     body="$body,{\"pose\":\"wallidle\",\"label\":\"wallidle\",\"file\":\"f.png\",\"glyphHeightPx\":12,\"contrast\":7,\"detailFits\":true}"
+    for wz in winstandidle winseatidle; do body="$body,{\"pose\":\"$wz\",\"label\":\"$wz\",\"file\":\"f.png\",\"cropMean\":0.10}"; done
+    for wz in winstandfull winseatfull; do body="$body,{\"pose\":\"$wz\",\"label\":\"$wz\",\"file\":\"f.png\",\"cropMean\":0.20}"; done
   fi
   echo "{\"captures\":[$body]}" > "$d/captures.json"
 }
 mkfull "$tmp/fullwith" yes
 mkfull "$tmp/fullwithout" no
-expect 0 "a full default run with the wall poses passes" "$tmp/fullwith"
-expect 1 "a full default run without the wall poses fails" "$tmp/fullwithout"
+expect 0 "a full default run with the wall and window poses passes" "$tmp/fullwith"
+expect 1 "a full default run without the wall and window poses fails" "$tmp/fullwithout"
+
+# underwater window cases (R9): mkwin <dir> <stand idle> <stand full> <seat idle> <seat full> [nomeasure]; nomeasure drops the seat full cropMean
+mkwin() {
+  local d="$1/1600x900"
+  mkdir -p "$d"
+  head -c 30000 /dev/zero > "$d/w.png"
+  local seatfull="\"cropMean\":$5,"
+  [ "${6:-}" = nomeasure ] && seatfull=""
+  cat > "$d/captures.json" <<EOF
+{"captures":[
+ {"pose":"winstandidle","label":"winstandidle","file":"w.png","cropMean":$2},
+ {"pose":"winstandfull","label":"winstandfull","file":"w.png","cropMean":$3},
+ {"pose":"winseatidle","label":"winseatidle","file":"w.png","cropMean":$4},
+ {"pose":"winseatfull","label":"winseatfull","file":"w.png",${seatfull}"x":1}
+]}
+EOF
+}
+WINPOSES=winstandidle,winstandfull,winseatidle,winseatfull
+mkwin "$tmp/winok" 0.10 0.20 0.10 0.20
+mkwin "$tmp/winflat" 0.10 0.20 0.10 0.105          # seat rise only 0.005
+mkwin "$tmp/winedge" 0.5 0.51 0.5 0.51              # rise exactly 0.01
+mkwin "$tmp/winedgex" 0.5 0.509 0.5 0.51            # stand rise 0.009
+mkwin "$tmp/winnone" 0.10 0.20 0.10 0.20 nomeasure
+expect 0 "window fuel array that brightens with power passes" "$tmp/winok" --only $WINPOSES
+expect 1 "a window view whose fuel array stays flat fails" "$tmp/winflat" --only $WINPOSES
+expect 0 "window rise exactly on the floor passes" "$tmp/winedge" --only $WINPOSES
+expect 1 "window rise just under the floor fails" "$tmp/winedgex" --only $WINPOSES
+expect 1 "a window capture with no rack measurement fails instead of passing" "$tmp/winnone" --only $WINPOSES
+expect 0 "a waived window view is reported, not graded" "$tmp/winnone" --only $WINPOSES --allow-skip winseatfull
 
 [ "$failures" -eq 0 ] && echo "check-captures budget self-test: PASS" || echo "check-captures budget self-test: FAILED ($failures)"
 exit "$failures"

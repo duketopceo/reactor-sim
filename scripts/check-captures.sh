@@ -29,7 +29,7 @@ ROOM_POSES="seat stand"
 # rack glow (U7): mean rendered brightness over the racks, measured against a glowoff frame (no glow at all)
 GLOW_FULL_OVER_FLOOR_MIN=4    # (full - off) must be at least this multiple of (idle - off): "a set multiple of the floor"
 GLOW_FULL_DELTA_MIN=0.01      # and at least this much absolute mean luminance (0..1), so a flat render cannot pass
-REQUIRED_POSES="seat stand crt tooltip rejected drag checklist pause tablet clipboard wall wallidle menu"
+REQUIRED_POSES="seat stand crt tooltip rejected drag checklist pause tablet clipboard wall wallidle winstandidle winstandfull winseatidle winseatfull menu"
 
 DIR=""
 BASELINE=""
@@ -149,6 +149,27 @@ if glow or glow_wanted:
             print("  NOTE rack glow: glowmid skipped by --allow-skip, the monotonic check is NOT graded")
         else:
             problems.append("rack glow: glowmid is missing or has no cropMean, the monotonic check cannot be graded (waive it with --allow-skip glowmid)")
+
+# Underwater window (R9): the fuel array as seen from the stand and from the chair, at shutdown (idle) and at full power. The
+# rendered rack brightness must rise from idle to full power by the same absolute floor as the rack glow check
+# (GLOW_DELTA), so a window that shows the racks as a dark or flat block fails. A rack that was not measured (not fully in
+# frame) is a failure, never a pass; there is no waiver other than --allow-skip on the pose itself, which is reported as ungraded.
+win_views = [v for v in ("winstand", "winseat") if any(p in (v + "idle", v + "full") for p in required) or (v + "idle") in seen or (v + "full") in seen]
+if win_views:
+    delta_min = float(os.environ["GLOW_DELTA"])
+    by_pose = {c.get("pose"): c for c in data.get("captures", []) if "skipped" not in c}
+    for v in win_views:
+        idle_c, full_c = by_pose.get(v + "idle", {}), by_pose.get(v + "full", {})
+        idle_m, full_m = idle_c.get("cropMean"), full_c.get("cropMean")
+        if idle_m is None or full_m is None:
+            if (v + "idle") in allow_skip or (v + "full") in allow_skip:
+                print("  NOTE window %s: skipped by --allow-skip, the fuel-array check is NOT graded" % v)
+            else:
+                problems.append("window %s: needs %sidle and %sfull captures with a cropMean (racks fully in frame), so the fuel-array check is ungraded" % (v, v, v))
+            continue
+        print("  window %-9s fuel array mean brightness: shutdown %.4f  full power %.4f  (rise %+.4f, need >= %g)" % (v, idle_m, full_m, full_m - idle_m, delta_min))
+        if full_m - idle_m < delta_min:
+            problems.append("window %s: full-power fuel-array brightness is only %+.4f over shutdown (need %g)" % (v, full_m - idle_m, delta_min))
 
 for pose in required:
     if pose not in seen and pose not in allow_skip and not any(p.startswith(pose + " skipped") for p in problems):
