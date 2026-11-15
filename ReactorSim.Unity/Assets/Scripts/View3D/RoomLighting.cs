@@ -10,7 +10,7 @@ namespace ReactorSim.View3D
     {
         // Ceiling fixtures (key): cool blue-teal white, low. Intensity is a unitless built-in-pipeline value, not Blender watts.
         public static readonly Rgba KeyColor = new Rgba(0.66, 0.84, 1.00);
-        public const float KeyIntensity = 0.55f;
+        public const float KeyIntensity = 0.45f;
         public const float KeyRange = 7f;
 
         // Ambient (fill): cool and dim, sky brighter than equator brighter than ground.
@@ -29,13 +29,13 @@ namespace ReactorSim.View3D
 
         // Ceiling fixture panels (self-lit): cooler and dimmer than the exported warm white, so the panels match the key.
         public static readonly Rgba FixtureEmissionTint = new Rgba(0.62, 0.82, 1.00);
-        public const float FixtureEmissionScale = 0.55f;
+        public const float FixtureEmissionScale = 0.30f;
 
         // Surface value steps (albedo multipliers) that separate the room: the consoles and bench tops keep full value, the
         // walls step down and cool, the ceiling and the floor go darker still.
-        public static readonly Rgba WallTint = new Rgba(0.40, 0.52, 0.66);
-        public static readonly Rgba CeilingTint = new Rgba(0.22, 0.28, 0.38);
-        public static readonly Rgba FloorTint = new Rgba(0.22, 0.25, 0.30);
+        public static readonly Rgba WallTint = new Rgba(0.34, 0.46, 0.60);
+        public static readonly Rgba CeilingTint = new Rgba(0.18, 0.24, 0.34);
+        public static readonly Rgba FloorTint = new Rgba(0.18, 0.21, 0.27);
 
         // Emission ladder for self-lit surfaces: panel surfaces take no emission, screens carry a dark glow, lamps a bright one.
         public const double ScreenEmission = 1.0;
