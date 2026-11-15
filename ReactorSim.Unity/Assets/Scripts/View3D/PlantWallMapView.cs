@@ -264,7 +264,7 @@ public sealed class PlantWallMapView : MonoBehaviour
         var go2 = new GameObject("LiveDetail");
         go2.layer = gameObject.layer;
         go2.transform.SetParent(transform, false);
-        go2.transform.localPosition = plate2.transform.localPosition + new Vector3(0f, 0.40f, face * 0.075f);
+        go2.transform.localPosition = plate2.transform.localPosition + new Vector3(0f, 0.44f, face * 0.075f);
         go2.transform.localRotation = go.transform.localRotation;
         detail = go2.AddComponent<TextMeshPro>();
         detail.enableAutoSizing = true;
@@ -273,10 +273,11 @@ public sealed class PlantWallMapView : MonoBehaviour
         // 6.7 px tall at the 28 degree wall pose, under the 10 px floor, with most of the plate empty).
         detail.fontSizeMax = 2.4f;
         detail.alignment = TextAlignmentOptions.Top;
+        detail.lineSpacing = -15f;   // a 4-line readout is height-limited; tighter lines raise the glyph size (upper-case text, no descender clash)
         detail.textWrappingMode = TextWrappingModes.Normal;
         detail.color = ThemeColors.TextBody;
         detail.rectTransform.pivot = new Vector2(0.5f, 1f);
-        detail.rectTransform.sizeDelta = new Vector2(width - 0.24f, 0.8f);
+        detail.rectTransform.sizeDelta = new Vector2(width - 0.24f, 0.86f);
     }
 
     private void OnDestroy()
