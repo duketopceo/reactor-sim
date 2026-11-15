@@ -23,7 +23,7 @@ public static class PlantFeedbackPlayCapture
         SessionState.SetFloat(Started, (float)EditorApplication.timeSinceStartup);
         Arm();
         PlayModeGuard.Prepare();
-        EditorApplication.isEmitting = true;
+        EditorApplication.isPlaying = true;
     }
 
     private static void Arm() { EditorApplication.update -= Poll; EditorApplication.update += Poll; }
@@ -33,8 +33,8 @@ public static class PlantFeedbackPlayCapture
         if (stage == 0) return;
         if (EditorApplication.timeSinceStartup - SessionState.GetFloat(Started, 0) > 120)
         { Debug.LogError("[PlantFeedbackPlayCapture] Timeout"); Finish(1); return; }
-        if (stage == 3) { if (!EditorApplication.isEmittingOrWillChangePlaymode) Finish(0); return; }
-        if (!EditorApplication.isEmitting) return;
+        if (stage == 3) { if (!EditorApplication.isPlayingOrWillChangePlaymode) Finish(0); return; }
+        if (!EditorApplication.isPlaying) return;
         try
         {
             var hall = HallVisibility.FindHall();
@@ -120,7 +120,7 @@ public static class PlantFeedbackPlayCapture
             Capture(cam, Path.Combine(dir, "wall-metrics-close.png"));
             Debug.Log("[PlantFeedbackPlayCapture] PASS bubbles=" + ps.particleCount + " " + dir);
             SessionState.SetInt(Stage, 3);
-            EditorApplication.isEmitting = false;
+            EditorApplication.isPlaying = false;
         }
         catch (Exception ex) { Debug.LogError("[PlantFeedbackPlayCapture] FAIL " + ex); Finish(1); }
     }
