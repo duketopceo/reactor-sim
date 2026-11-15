@@ -95,9 +95,9 @@ function of state and `dt`, and recorded in the journal ([observability](../deve
 | NUM-06 | numerical | Rod integral worth: endpoints, monotone, symmetric | PASS |
 | NUM-07 | reference | `SaturationPressureBar` vs 6 IF97 points (0.5 %) + inverse round trip | PASS |
 | NUM-08 | accounting | Decay heat equilibrium ≈ 6.3 % of fission power; `TotalHeatPower = PromptHeatFraction (0.937) · Power + DecayHeatPower` | PASS |
-| DOM-01 | domain | Saturation call outside the valid domain should fault, not clamp | **XFAIL KD-02** |
+| DOM-01 | domain | Saturation call outside the IF97 domain (or NaN/Inf) is rejected (`ArgumentOutOfRangeException`) or returns non-finite; domain endpoints still answer | PASS (KD-02 fixed) |
 | SCR-01 | scenario | From 70 % power: fission collapses to ≤1e-4, rods fully in within one tick, ρ<0, decay heat >0, bounded by ~6.3 % of prior power, monotone decline for 10 game-min, SCRAM stays latched, decay heat > fission at 10 min | PASS |
-| SCR-02 | latch | `Scrammed` should block rod withdrawal until `ResetScram()` | **XFAIL KD-03** |
+| SCR-02 | latch | `Scrammed` blocks `SetAllRods` withdrawal until `ResetScram()` | PASS (KD-03 fixed) |
 | EDGE-01 | edge | `Plant.Step(0)` advances no integrated state | PASS (see O-1) |
 | EDGE-02 | edge | NaN/±Inf `dt` is detected by `AssertFinite` | PASS |
 | EDGE-03 | edge | Negative/NaN/Inf `dt` rejected at `Step` | PASS (KD-04 fixed) |
@@ -105,7 +105,7 @@ function of state and `dt`, and recorded in the journal ([observability](../deve
 | EDGE-05 | edge | A NaN command is rejected, or if accepted at least detected by `AssertFinite` | PASS |
 | EDGE-06 | edge | Out-of-range bounded commands saturate (rods to [0,1]; `SteamDemandFrac` 5.0 ≡ 1.0) | PASS |
 | EDGE-07 | edge | Zero primary flow finite; less flow never gives a lower primary temperature | PASS |
-| EDGE-08 | edge | Loss of heat sink at power: finite, but should not sit on a model clamp | **XFAIL KD-06** |
+| EDGE-08 | edge | Loss of heat sink at power: finite, plant is not already tripped beforehand, the reactor protection SCRAMs with a recorded protective cause, and no state variable sits on a model clamp | PASS (KD-06 fixed) |
 
 Fixture provenance: NUM-07 values are IAPWS-IF97 saturation points (`Physics` now implements the
 IF97 Region 4 closed form exactly; it was an Antoine fit, 0.76 % low at 300 K), cross-checked on 2026-11-07
@@ -117,17 +117,22 @@ NUM-02/-03 reference values are derived analytically in the check, not hard-code
 | ID | Observation (field paths) | Contract / impact | Disposition |
 |---|---|---|---|
 | **KD-01** | `ReactorCore.StepKinetics`: `_precursors[g] += (src − λ_g C)·dt`, explicit Euler. At `dt = 6 s`, λ₆·dt = 18; stability needs λ·dt < 2. Subcritical-multiplication benchmark gives `Core.Power` 1.696e-4 vs analytic 1.0e-4 (+70 %), `_precursors[5]` pinned at 0 by the `<0` clamp. Dt ≤ 0.5 s is correct to 1 %. | Delayed-neutron dynamics are wrong at the production tick; all scenarios were tuned on it | **Fixed**: `StepKinetics` now substeps at 0.02 s, so the 5 s tick is converged (NUM-03/04). |
-| **KD-02** | `Physics.SaturationPressureBar(700 K)` returns 220.64 bar; `SaturationTempK(500 bar)` returns 647 K, no fault | Invalid domain silently clamped | Deferred; needs a model-limit fault type |
-| **KD-03** | After `Plant.Scram()`, `SetAllRods(0)` withdraws all banks in one tick at the 50 %/s scram speed; only the Runner's `TrimPower` guards `Scrammed` | Trip is not latched in Core | Deferred; belongs with protection/intents |
+| **KD-02** | `Physics.SaturationPressureBar(700 K)` returned 220.64 bar; `SaturationTempK(500 bar)` returned 647 K, no fault | Invalid domain silently clamped | **Fixed 2026-11-15**: root cause was `Clamp(Sanitize(x))` inside the IF97 functions. They now throw `ArgumentOutOfRangeException` outside 273.15-647.096 K / 0.00611657-220.64 bar (NaN/Inf included); `TrySaturationPressureBar` / `TrySaturationTempK` return false instead. The plant never leaves the domain (hard bounds 20-365 C, 1-200 bar primary, 1-90 bar secondary), so `Thermal` is unchanged. DOM-01 now also accepts a thrown domain error as "reported"; it previously accepted only a non-finite return, which would have leaked NaN into the plant. |
+| **KD-03** | After `Plant.Scram()`, `SetAllRods(0)` withdrew all banks in one tick at the 50 %/s scram speed; only the Runner's `TrimPower` guarded `Scrammed` | Trip not latched in Core | **Fixed 2026-11-15**: the latch was enforced only in `Plant.Apply`, not at the rod-target entry point. `Plant.SetAllRods` now ignores requests while `Scrammed` (input validation still runs first); `Scram()` sets targets directly. Snapshot format unchanged (`scrammed` was already saved). |
 | **KD-04** | `Plant.Step(dt)`: `-6` runs time backwards (`Banks[3].Insertion` can exceed 1, precursors change); NaN/Inf make rods jump to target (`Physics.Clamp` passes NaN) and trigger `SanitizeHits`; no rejection | Should be rejected, not applied | **Fixed 2026-11-07**: `Plant.Step` throws `ArgumentOutOfRangeException` for NaN, negative or > `Plant.MaxStepSeconds` (3600 s) dt before mutating state. Also fixes a hang: `(int)Ceiling(+Inf)` saturates to `int.MaxValue` substeps on .NET 9+/ARM64 |
 | **KD-05** | `Plant.SetAllRods(NaN)`: `Physics.Clamp` maps NaN to the lower bound, so a NaN rod target meant **fully withdrawn** (silently) | Reject at the boundary | **Fixed 2026-11-07**: `SetAllRods` throws `ArgumentOutOfRangeException`; `Simulation.EnqueueIntent` throws `ArgumentException` for non-finite intent values (HTTP API → 400, co-op host drops and logs) |
-| **KD-06** | Loss of sink from 50 % power: `Thermal.PrimaryTempC` reaches the hard clamp 360 °C (FuelTempC ≈ 684 °C, `PrimaryPressureBar` ≈ 188 bar in the observed run); `Thermal.Step` clamps silently | No controlled model-limit fault; this is where meltdown/damage logic will have to live | Deferred (README: damage model not implemented) |
+| **KD-06** | Loss of sink from 50 % power: `Thermal.PrimaryTempC` reached the hard clamp (FuelTempC ≈ 684 C, `PrimaryPressureBar` ≈ 188 bar); `Thermal.Step` clamped silently and Core had no automatic protection (DEF-TRIP) | No controlled limit response | **Fixed 2026-11-15**: root cause was the missing reactor protection, not the clamp. `Plant.Step` now latches a SCRAM (`LastScramCause`, not serialized) on high primary temperature (345 C) or high fuel temperature (1204 C); setpoints and rationale are in `Physics.cs`. The clamps stay as a last-resort numerical bound. **Residual:** primary pressure is `saturation + heater bias (0..80 bar)`; the scripted startup pegs the heaters and sits on the 200 bar clamp for several minutes, so a pressure trip was deliberately not added (it would nuisance-trip the standard startup). Damage/meltdown logic is still not implemented. |
 | O-1 | `Plant.Step(0)` still refreshes derived ledger terms (`Core.DopplerPcm`, …) from current temperatures: the ledger lags the thermal state by one tick (operator splitting) | Documented, excluded from EDGE-01 | Design note |
 | O-2 | At `P = 1`, `DecayHeatPower/Power ≈ 0.063` and `TotalHeatPower = 1.063` → thermal model receives 106.3 % of `RatedThermalKW` at "rated" fission power | Unit-convention question: is "rated" fission-only or total? | Calibration question; no coefficient changed |
 | O-3 | Poison equations use normalised power as flux (no flux-per-power conversion) and a static `PoisonTimeWarp` = 200 | Documented gameplay compression; must be explicit in tuning data | Design note |
 
-No physical coefficient was changed to make a check pass. Core changes were limited to
-four read-only accessors (`GetPrecursor`, `GetDecayStore`, group counts) so hidden state can be hashed.
+No physical coefficient was changed to make a check pass. Core changes for KD-01..KD-05 were limited to
+the numerical and boundary fixes described above and four read-only accessors (`GetPrecursor`,
+`GetDecayStore`, group counts) so hidden state can be hashed. The 2026-11-15 defect fixes (KD-02, KD-03,
+KD-06) change behavior only at an out-of-domain call, a SCRAM-latched rod request, and a primary temperature
+above 345 C / fuel above 1204 C; no coefficient or correlation changed, and the scripted startup (peak 337 C)
+and the full-power preset never reach a setpoint. Regression tests: `ReactorSim.Core.Tests/SimulationDefectTests.cs`.
+There are currently no XFAIL checks; the mechanism remains for future defects.
 
 ## 5. Test taxonomy (what to add, in priority order)
 
@@ -180,8 +185,8 @@ Invalid numbers are never silently clamped to make a run look healthy.
 | Shutdown with decay heat | physical | tested SCR-01 ✔ |
 | Cold start / low-power log instrumentation | physical; log-scale instrument with floor | partially: startup scenario; source floor `SourcePower` = 1e-6 |
 | I/Xe buildup after power change | physical | existing `xenon_pit` scenario; no analytic fixed-power test (needs a test hook) |
-| Loss of cooling | physical → fault at model limit | **KD-06** |
-| Invalid thermodynamic domain / phase boundary | fault | **KD-02**; liquid-only primary assumption not enforced |
+| Loss of cooling | physical → fault at model limit | protective SCRAM (KD-06 fixed); damage model absent |
+| Invalid thermodynamic domain / phase boundary | fault | KD-02 fixed; liquid-only primary assumption not enforced |
 | Simultaneous commands | defined order | deferred: no queue |
 | Pause / time acceleration | pause = no ticks; acceleration = more ticks, never a different `dt` | deferred; DET-03 covers chunking |
 | Long-run drift | bounded drift/residual | existing `soak` (finite only); residual-based drift check deferred |

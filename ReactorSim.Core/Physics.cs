@@ -77,7 +77,9 @@ namespace ReactorSim
 
         // ---- Water saturation curve: IAPWS-IF97 Region 4 (exact closed form) ----
         // Valid from the triple point (273.15 K, 0.00611657 bar) to the critical point
-        // (647.096 K, 220.64 bar); inputs outside are clamped (verification KD-02).
+        // (647.096 K, 220.64 bar). Inputs outside that range (or non-finite) are a domain error: the Try* forms
+// return false and the plain forms throw ArgumentOutOfRangeException, the same boundary-rejection
+// semantics as Plant.Step / Plant.SetAllRods. They are never silently clamped (verification DOM-01).
         public const double CriticalTempK = 647.096;
         public const double CriticalPressureBar = 220.64;
         private const double TriplePressureBar = 0.00611657;
@@ -90,9 +92,42 @@ namespace ReactorSim
             0.65017534844798e3,
         };
 
+        public const double TripleTempK = 273.15;
+
+        public static bool TrySaturationPressureBar(double tempK, out double pressureBar)
+        {
+            if (!(tempK >= TripleTempK && tempK <= CriticalTempK)) { pressureBar = double.NaN; return false; }
+            pressureBar = SaturationPressureInDomain(tempK);
+            return true;
+        }
+
+        public static bool TrySaturationTempK(double pressureBar, out double tempK)
+        {
+            if (!(pressureBar >= TriplePressureBar && pressureBar <= CriticalPressureBar)) { tempK = double.NaN; return false; }
+            tempK = SaturationTempInDomain(pressureBar);
+            return true;
+        }
+
         public static double SaturationPressureBar(double tempK)
         {
-            double t = Clamp(Sanitize(tempK, 333.15), 273.15, CriticalTempK);
+            double p;
+            if (!TrySaturationPressureBar(tempK, out p))
+                throw new ArgumentOutOfRangeException(nameof(tempK), tempK,
+                    "saturation pressure is only defined from " + TripleTempK + " K to " + CriticalTempK + " K (IAPWS-IF97 Region 4)");
+            return p;
+        }
+
+        public static double SaturationTempK(double pressureBar)
+        {
+            double t;
+            if (!TrySaturationTempK(pressureBar, out t))
+                throw new ArgumentOutOfRangeException(nameof(pressureBar), pressureBar,
+                    "saturation temperature is only defined from " + TriplePressureBar + " bar to " + CriticalPressureBar + " bar (IAPWS-IF97 Region 4)");
+            return t;
+        }
+
+        private static double SaturationPressureInDomain(double t)
+        {
             var n = If97N;
             double th = t + n[9] / (t - n[10]);
             double a = th * th + n[1] * th + n[2];
@@ -102,9 +137,9 @@ namespace ReactorSim
             return x * x * x * x * 10.0; // MPa -> bar
         }
 
-        public static double SaturationTempK(double pressureBar)
+        private static double SaturationTempInDomain(double pressureBar)
         {
-            double p = Clamp(Sanitize(pressureBar, 1.0), TriplePressureBar, CriticalPressureBar) / 10.0; // bar -> MPa
+            double p = pressureBar / 10.0; // bar -> MPa
             var n = If97N;
             double be = Math.Sqrt(Math.Sqrt(p));
             double e = be * be + n[3] * be + n[6];
@@ -121,6 +156,16 @@ namespace ReactorSim
         {
             SanitizeHits = 0;
         }
+
+        // ---- Reactor protection system (automatic SCRAM) ----
+        // Original gameplay design choices, scaled to this plant's operating point (full-power primary ~305 C, ~155 bar);
+        // the real overtemperature-dT trip function is reduced to simple setpoints. Each sits below
+        // the model's hard bound so the plant trips before Thermal.Step has to clamp anything.
+        // High primary temperature: 40 K above the 305 C full-power value, 8 K above the worst overshoot of the scripted
+        // cold startup (337 C, so normal operation never nuisance-trips) and 15 K under the 360 C bound (PrimaryTempMaxC).
+        public const double TripHighPrimaryTempC = 345.0;
+        // High fuel temperature: the 1204 C (2200 F) peak-cladding-temperature limit, 10 CFR 50.46(b)(1); bound 1600 C.
+        public const double TripHighFuelTempC = 1204.0;
 
         public const double PowerMaxAssert = 5.0;
         public const double FuelTempMaxC = 1600.0;
