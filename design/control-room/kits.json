@@ -24,6 +24,7 @@
     "K22":  {"name": "Panel_Title_Plate",        "face_w": 0.40, "face_h": 0.05, "depth": 0.01, "mount": ["vertical", "bench"], "role": "sign",      "pivot": "none"},
     "K23":  {"name": "Out_Of_Service_Tag",       "face_w": 0.08, "face_h": 0.05, "depth": 0.005,"mount": ["vertical", "bench"], "role": "tag",       "pivot": "none", "note": "hangs over a needs_core_model row's kit (KTD6)"}
   },
+  "circular_bezel_inner_frac": 0.4545,
   "label_plate": {"height": 0.025, "gap": 0.01, "note": "every placed kit gets a label plate below it (above it on the bench); text height per KTD8 for its viewpoint distance"},
   "spacing": {"min_gap": 0.03, "note": "minimum clear gap between neighbouring kit footprints including label plates"}
 }

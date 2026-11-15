@@ -36,6 +36,51 @@ namespace ReactorSim.Core.Tests
         }
 
         [Fact]
+        public void EveryNumeral_StaysInsideTheBezelFrame_WithClearance()
+        {
+            // The bezel frame's clear inner half-width is the Blender contract (kits.json circular_bezel_inner_frac): no end
+            // numeral, middle numeral or unit may reach the rails (a round ring used to cut through the corner numerals).
+            foreach (var t in Samples)
+            {
+                Assert.True(GaugeScale.InsideBezel(GaugeScale.EndNumeralBox(t, false)), "min " + t);
+                Assert.True(GaugeScale.InsideBezel(GaugeScale.EndNumeralBox(t, true)), "max " + t);
+                Assert.True(GaugeScale.InsideBezel(GaugeScale.MidNumeralBox(t)), "mid " + t);
+            }
+            foreach (var u in Units) Assert.True(GaugeScale.InsideBezel(GaugeScale.UnitBox(u)), "unit " + u);
+            // the same rule must reject a box that touches the frame
+            Assert.False(GaugeScale.InsideBezel(new GaugeScale.FaceBox(0.40f, -0.40f, 0.20f, 0.09f)));
+        }
+
+        [Fact]
+        public void BezelFraction_MatchesTheKitCatalogue()
+        {
+            string json = System.IO.File.ReadAllText(TestRepo.Find("design", "control-room", "kits.json"));
+            double frac = System.Text.Json.JsonDocument.Parse(json).RootElement.GetProperty("circular_bezel_inner_frac").GetDouble();
+            Assert.Equal(GaugeScale.BezelInnerHalfFrac, (float)frac, 4);
+        }
+
+        [Fact]
+        public void BarNumerals_StayBetweenTheRailsAndTheEndCaps()
+        {
+            foreach (float travel in new[] { 0.18f, 0.30f })
+            {
+                var layout = GaugeScale.BarLabels(travel);
+                foreach (var t in Samples)
+                {
+                    foreach (float y in new[] { layout.Lo, layout.Hi })
+                    {
+                        if (t.Length > GaugeScale.BarMaxChars(layout)) continue;   // AttachBar drops the unit/over-long text
+                        var b = GaugeScale.BarNumeralBox(t, y, layout);
+                        Assert.True(System.Math.Abs(b.X) + b.W / 2f <= GaugeScale.BarStripInnerHalfWidthM - 0.003f, t + " clears the side rails at travel " + travel);
+                        Assert.True(System.Math.Abs(b.Y) + b.H / 2f <= GaugeScale.BarStripInnerHalfHeightM - 0.003f, t + " clears the end caps at travel " + travel);
+                    }
+                }
+                // the typical numerals always fit (a "100%" / "0.10" / "120%" is 4 characters)
+                Assert.True(GaugeScale.BarMaxChars(layout) >= 4);
+            }
+        }
+
+        [Fact]
         public void EndNumeralsOnTheSmallDialAreAtLeastTwoCentimetresHigh()
         {
             const float smallFaceM = 0.22f;   // K01 face width (GaugeNumerals.SmallFaceM)

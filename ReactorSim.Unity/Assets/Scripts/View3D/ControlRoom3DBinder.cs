@@ -67,6 +67,10 @@ public class ControlRoom3DBinder : MonoBehaviour
         public Quaternion BaseRot;
         public float ShownFrac = -1f;
         public float PressedUntil;
+        // Kit auxiliary cover pivot (PART_Guard / PART_ScramCover), a sibling of the INT_ pivot; null when absent.
+        public Transform AuxPivot;
+        public Quaternion AuxRest;
+        public float AuxFrac = -1f;
     }
 
     private sealed class Pending
@@ -203,13 +207,35 @@ public class ControlRoom3DBinder : MonoBehaviour
     public void Register(DiegeticInteractable inter)
     {
         if (inter == null || inter.Spec == null) return;
-        controls.Add(new ControlState
+        var state = new ControlState
         {
             Interactable = inter,
             Spec = inter.Spec,
             BasePos = inter.transform.localPosition,
             BaseRot = inter.transform.localRotation
-        });
+        };
+        state.AuxPivot = FindAuxPivot(inter.transform);
+        if (state.AuxPivot != null) state.AuxRest = state.AuxPivot.localRotation;
+        controls.Add(state);
+    }
+
+    // The kit's auxiliary cover pivot (PART_Guard on guarded buttons, PART_ScramCover on the SCRAM button),
+    // authored as a sibling of the INT_ pivot under the CTL_ root so it never inherits press motion.
+    private static Transform FindAuxPivot(Transform pivot)
+    {
+        Transform root = pivot;
+        while (root != null && !root.name.StartsWith("CTL_")) root = root.parent;
+        if (root == null) root = pivot.parent;
+        if (root == null) return null;
+        foreach (Transform c in root.GetComponentsInChildren<Transform>(true))
+        {
+            if (c == pivot || c.IsChildOf(pivot)) continue;
+            string n = c.name;
+            if (n.EndsWith("_PART_Guard", System.StringComparison.OrdinalIgnoreCase)
+                || n.EndsWith("_PART_ScramCover", System.StringComparison.OrdinalIgnoreCase))
+                return c;
+        }
+        return null;
     }
 
     // ---- per frame -----------------------------------------------------------------------------------------
@@ -431,10 +457,33 @@ public class ControlRoom3DBinder : MonoBehaviour
                 // Plunger: 0 .. 0.025 m into the face.
                 t.localPosition = c.BasePos - KitFaceNormal * (0.025f * c.ShownFrac);
             }
+            if (c.AuxPivot != null)
+            {
+                // Blender pose_aux_deg -100 about the across-face axis swings the cover toward the operator
+                // (verified against the imported FBX: AngleAxis(-100, local X) moves the cover's free edge +face-normal).
+                bool scramCover = c.AuxPivot.name.EndsWith("_PART_ScramCover", System.StringComparison.OrdinalIgnoreCase);
+                bool open = scramCover
+                    ? c.Spec.Kind == IntentKind.Scram && Time.time < scramArmedUntil
+                    : c.Interactable != null && c.Interactable.GuardOpen;
+                float at = open ? 1f : 0f;
+                c.AuxFrac = c.AuxFrac < 0f ? at : Mathf.Lerp(c.AuxFrac, at, 1f - Mathf.Exp(-10f * dt));
+                c.AuxPivot.localRotation = c.AuxRest * Quaternion.AngleAxis(-100f * c.AuxFrac, KitAcross);
+            }
         }
     }
 
     // ---- control state -------------------------------------------------------------------------------------
+
+    /// <summary>Transient plunger travel for a rejected press: the control dips and returns, nothing is submitted.</summary>
+    public void RejectPress(DiegeticInteractable inter)
+    {
+        for (int i = 0; i < controls.Count; i++)
+            if (controls[i].Interactable == inter)
+            {
+                controls[i].PressedUntil = Time.time + 0.12f;
+                return;
+            }
+    }
 
     private bool ButtonOn(ControlSpec spec, PlantSnapshot s)
     {

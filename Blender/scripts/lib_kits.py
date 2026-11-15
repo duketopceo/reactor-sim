@@ -36,6 +36,9 @@ FOOTPRINTS = {
 }
 _PIVOT_GRAMMAR = {kid: k["pivot"] for kid, k in _CATALOGUE["kits"].items()}
 LABEL_PLATE = _CATALOGUE["label_plate"]  # {"height", "gap"}
+# Clear inner half-width of the circular gauges' bezel frame as a share of face_w. The dial's scale numerals must fit
+# inside it (GaugeScaleTests and InstrumentCheck read the same number from kits.json).
+BEZEL_INNER_FRAC = float(_CATALOGUE["circular_bezel_inner_frac"])
 
 
 # layout.json grid.min_plate_width: a label plate is as wide as its kit, but never narrower than this.
@@ -51,6 +54,48 @@ FOOTPRINT_TOL = 0.002
 SELF_LABELED = ("K21", "K22", "K23")   # the kit IS the text/tag: no extra plate
 FURNITURE = ("K14", "K15", "K18")      # room furniture: no footprint contract, no plate, no tag
 NO_PLATE = ("K05",)                    # annunciator tile: the text is on the lens, no plate (layout.json no_label_plate_kits)
+
+# ---------------------------------------------------------------------------------------------------------------
+# Pose contract (KTD3): Blender authors every kit at its REST pose and records the motion envelope as root custom
+# props so the Unity binder and the Blender checks read one documented contract. Fractions 0..1 map rest->active in
+# ControlRoom3DBinder / the U3 pure pose helper; nothing here animates. Axes are kit-frame (see header): +Y is the
+# face normal toward the operator, +Z is up the face, X is across the face.
+#   pose_kind      needle      circular gauge: pivot rotates about +Y, sweep pose_sweep_lo..hi degrees
+#                  bar         edgewise gauge: pivot slides along +Z by pose_travel_m centred on rest
+#                  rotary_face knob/selector/wheel: pivot rotates about +Y by pose_sweep_lo..hi degrees
+#                  rotary_across rod-bank lever: pivot pitches about X by pose_sweep_lo..hi degrees
+#                  press        pushbutton/plunger/toggle bat: pivot travels -Y by pose_press_m on press
+#                  guarded      like press, plus an auxiliary PART_Guard cover that arms before the press
+#                  scram_cover  like press, plus an auxiliary PART_ScramCover that lifts before the press
+#                  counter     K04 digits: runtime text, pivot carries no moving mesh
+#                  lamp/beacon emissive material driven at runtime, no transform motion
+#                  screen      CRT: runtime RenderTexture face, no transform motion
+#                  static      no live mover
+# Auxiliary covers (PART_Guard / PART_ScramCover) are empties parented to the kit root at the cover's hinge edge;
+# U3 rotates them open on arm. Their rest pose is identity, same as every other authored pose.
+POSE_CONTRACT = {
+    "K01":  {"pose_kind": "needle",       "pose_sweep_lo": -135.0, "pose_sweep_hi": 135.0},
+    "K01L": {"pose_kind": "needle",       "pose_sweep_lo": -135.0, "pose_sweep_hi": 135.0},
+    "K02":  {"pose_kind": "bar"},                                                     # travel_m set per row
+    "K03":  {"pose_kind": "needle",       "pose_sweep_lo": -135.0, "pose_sweep_hi": 135.0},
+    "K04":  {"pose_kind": "counter"},
+    "K05":  {"pose_kind": "lamp"},
+    "K06":  {"pose_kind": "scram_cover", "pose_press_m": 0.025, "pose_aux_deg": -100.0},
+    "K07":  {"pose_kind": "rotary_across", "pose_sweep_lo": -40.0, "pose_sweep_hi": 40.0},
+    "K08":  {"pose_kind": "rotary_face",  "pose_sweep_lo": -150.0, "pose_sweep_hi": 150.0},
+    "K09":  {"pose_kind": "rotary_face",  "pose_sweep_lo": -150.0, "pose_sweep_hi": 150.0},
+    "K10":  {"pose_kind": "rotary_face",  "pose_sweep_lo": -150.0, "pose_sweep_hi": 150.0},
+    "K11":  {"pose_kind": "guarded",      "pose_press_m": 0.025, "pose_aux_deg": -100.0},
+    "K12":  {"pose_kind": "rotary_face",  "pose_sweep_lo": -150.0, "pose_sweep_hi": 150.0},
+    "K13":  {"pose_kind": "screen"},
+    "K16":  {"pose_kind": "static"},
+    "K17":  {"pose_kind": "beacon"},
+    "K19":  {"pose_kind": "press",        "pose_press_m": 0.025},
+    "K20":  {"pose_kind": "lamp"},
+    "K21":  {"pose_kind": "static"},
+    "K22":  {"pose_kind": "static"},
+    "K23":  {"pose_kind": "static"},
+}
 
 BUILDERS = {}
 
@@ -104,6 +149,10 @@ class Ctx:
         p = add_empty(self.mover, center, self.col, self.root)
         self.root["mover_obj"] = p.name
         return p
+
+    def aux_pivot(self, n, center):
+        """A named auxiliary hinge pivot (PART_Guard / PART_ScramCover): identity rotation, not a binder name."""
+        return add_empty(self.nm(n), center, self.col, self.root)
 
     def set_mover(self, obj):
         """For kits whose NAMED part is the mesh itself (lamp tile, CRT screen, klaxon dome)."""
@@ -177,10 +226,40 @@ def _label_plate(ctx, text, mount):
 
 def _oos_tag(ctx):
     y = ctx.depth + 0.004
-    tag = ctx.box("OosTag", (0, y, 0), (0.08, 0.005, 0.05), ctx.m["M_ScramRed"])
+    # A pale tag with near-black lettering (the old light-on-dark-red tag was unreadable from the seat); the text fills
+    # the tag: 2 lines of up to 7 characters at ~12 mm cap height.
+    tag = ctx.box("OosTag", (0, y, 0), (0.084, 0.005, 0.052), ctx.m["M_GaugeFace"])
     tag["aux"] = 1
-    make_text(ctx.col, ctx.nm("OosText"), "OUT OF\nSERVICE", 0.012, ctx.m["M_GaugeFace"], ctx.root,
-              (0, y + 0.0025 + 0.0005, 0), max_width=0.07, extrude=0.0005)
+    make_text(ctx.col, ctx.nm("OosText"), "OUT OF\nSERVICE", 0.018, ctx.m["M_DarkRubber"], ctx.root,
+              (0, y + 0.0025 + 0.0005, 0), max_width=0.076, max_height=0.044, extrude=0.001)
+
+
+def _merge_static(ctx):
+    """Join the kit's decorative meshes that share a parent and a material into one mesh (one Unity renderer, one draw
+    call per material instead of one per tick/rail/screw). Left alone: text and plates (aux, other checks measure them),
+    the bound mover mesh (lamp lens, screen face, beacon dome; the binder finds it by name), and anything with modifiers
+    or several material slots. Pivot children merge only with siblings under the same pivot, so motion is unchanged."""
+    mover = ctx.root.get("mover_obj", "")
+    groups = {}
+    for o in ctx.root.children_recursive:
+        if o.type != "MESH" or o.get("aux") or o.name == mover or o.modifiers:
+            continue
+        mats = o.data.materials
+        if len(mats) != 1 or mats[0] is None or o.parent is None:
+            continue
+        groups.setdefault((o.parent.name, mats[0].name), []).append(o)
+    for (pname, mname), objs in sorted(groups.items()):
+        if len(objs) < 2:
+            continue
+        parent = bpy.data.objects[pname]
+        tgt = bpy.data.objects.new("%s_%s" % (ctx.ctl_id, mname[2:] if mname.startswith("M_") else mname),
+                                   bpy.data.meshes.new("%s_%s_mesh" % (ctx.ctl_id, mname)))
+        ctx.col.objects.link(tgt)
+        tgt.parent = parent
+        bpy.context.view_layer.update()
+        sel = [tgt] + objs
+        with bpy.context.temp_override(active_object=tgt, selected_objects=sel, selected_editable_objects=sel):
+            bpy.ops.object.join()
 
 
 def _register(kid):
@@ -208,6 +287,11 @@ def _register(kid):
                 root["label"] = label
             ctx = Ctx(kid, ctl_id, root, mover, col, label, label_size)
             body(ctx)
+            _merge_static(ctx)
+            pose =POSE_CONTRACT.get(kid)
+            if pose:
+                for k, v in pose.items():
+                    root[k] = v
             if kid not in SELF_LABELED and kid not in FURNITURE:
                 if label and kid not in NO_PLATE:
                     _label_plate(ctx, label, mount)
@@ -234,14 +318,32 @@ def _gauge_circular(ctx, s):
     m = ctx.m
     sy = ctx.depth / 0.08
     ctx.base(m["M_PanelSlate"], 0.03 * sy)
-    ctx.box("Faceplate", (0, 0.032 * sy, 0), (0.19 * s, 0.004, 0.19 * s), m["M_GaugeFace"])
-    ctx.ticks(ctx.root, (0, 0), 0.082 * s, [i / 10.0 for i in range(11)], 0.035 * sy, 0.014 * s, m["M_DarkRubber"])
-    ctx.ticks(ctx.root, (0, 0), 0.068 * s, [0.8], 0.036 * sy, 0.016 * s, m["M_AmberGlow"], width=0.008 * s)
-    ctx.ticks(ctx.root, (0, 0), 0.068 * s, [0.92], 0.036 * sy, 0.016 * s, m["M_ScramRed"], width=0.008 * s)
+    # Square bezel frame (four rails) around a square dial plate. The scale numerals (GaugeNumerals) stand in the plate's
+    # bottom corners, outside any circle the needle fits in, so a round ring always cut through them. The frame's clear
+    # inner half-width (kits.json circular_bezel_inner_frac * face_w) is the contract: GaugeScaleTests and
+    # InstrumentCheck keep every numeral inside it. No glass overlay: the exported glass material is opaque in Unity
+    # and hid the ticks and tinted the face.
+    inner = BEZEL_INNER_FRAC * ctx.fw             # clear half-width inside the rails
+    outer = 0.106 * s                             # the rails reach to just inside the footprint
+    rail = outer - inner
+    ctx.box("Faceplate", (0, 0.032 * sy, 0), (2.0 * inner, 0.004, 2.0 * inner), m["M_GaugeFace"])
+    for sx in (-1, 1):
+        ctx.box("Rail%d" % sx, (sx * (inner + rail / 2.0), 0.0335 * sy, 0), (rail, 0.005 * sy, 2.0 * outer), m["M_BezelBlack"])
+    for sz in (-1, 1):
+        ctx.box("Cap%d" % sz, (0, 0.0335 * sy, sz * (inner + rail / 2.0)), (2.0 * inner, 0.005 * sy, rail), m["M_BezelBlack"])
+    ctx.ticks(ctx.root, (0, 0), 0.082 * s, [i / 10.0 for i in range(11)], 0.0355 * sy, 0.014 * s, m["M_DarkRubber"])
+    ctx.ticks(ctx.root, (0, 0), 0.068 * s, [0.8], 0.0365 * sy, 0.016 * s, m["M_AmberGlow"], width=0.008 * s)
+    ctx.ticks(ctx.root, (0, 0), 0.068 * s, [0.92], 0.0365 * sy, 0.016 * s, m["M_ScramRed"], width=0.008 * s)
+    c = outer - rail / 2.0
+    for sx in (-1, 1):  # bezel screws on the frame corners
+        for sz in (-1, 1):
+            ctx.cyl("Screw%d_%d" % (sx, sz), (sx * c, 0.037 * sy, sz * c), 0.0035, 0.003, m["M_BrushedSteel"], verts=10)
     piv = ctx.pivot((0, 0.045 * sy, 0))
     # long along Z: the binder turns the pivot about local Z (Blender Y), so the needle visibly sweeps
     ctx.box("Needle", (0, 0, 0.035 * s), (0.010 * s, 0.008, 0.100 * s), m["M_GaugeNeedle"], piv)
+    ctx.box("NeedleTail", (0, 0, -0.028 * s), (0.008 * s, 0.006, 0.030 * s), m["M_GaugeNeedle"], piv)
     ctx.cyl("Hub", (0, 0.048 * sy, 0), 0.014 * s, 0.014, m["M_BrushedSteel"], verts=20)
+    ctx.cyl("HubCap", (0, 0.0555 * sy, 0), 0.006 * s, 0.003, m["M_BezelBlack"], verts=16)
 
 
 @_register("K01")
@@ -258,12 +360,18 @@ def _k01l(ctx):
 def _k02(ctx):
     m = ctx.m
     ctx.base(m["M_PanelSlate"], 0.03)
+    # bezel channel around the strip: side rails and end caps in bezel black
+    for sx in (-1, 1):
+        ctx.box("Rail%d" % sx, (sx * 0.055, 0.032, 0), (0.010, 0.004, 0.30), m["M_BezelBlack"])
+    for sz in (-1, 1):
+        ctx.box("EndCap%d" % sz, (0, 0.032, sz * 0.153), (0.12, 0.004, 0.010), m["M_BezelBlack"])
     ctx.box("Strip", (0, 0.032, 0), (0.10, 0.004, 0.30), m["M_GaugeFace"])
     for i in range(11):
-        ctx.box("Tick%d" % i, (-0.04, 0.035, -0.14 + i * 0.028), (0.03, 0.003, 0.003), m["M_DarkRubber"])
-    ctx.box("TargetBug", (0, 0.036, 0.06), (0.10, 0.004, 0.012), m["M_AmberGlow"])
+        ctx.box("Tick%d" % i, (-0.04, 0.037, -0.14 + i * 0.028), (0.03, 0.003, 0.003), m["M_DarkRubber"])
+    ctx.box("TargetBug", (0, 0.037, 0.06), (0.10, 0.004, 0.012), m["M_AmberGlow"])
     piv = ctx.pivot((0, 0.045, 0))  # rest = mid travel: the binder slides local Y by Travel*frac around RestY-Travel/2
     ctx.box("PointerBar", (0, 0, 0), (0.09, 0.008, 0.014), m["M_GaugeNeedle"], piv)
+    ctx.box("PointerTip", (0.048, 0, 0), (0.014, 0.006, 0.010), m["M_GaugeNeedle"], piv)
     bank = "BankInsertion" in ctx.mover
     ctx.root["travel_m"] = 0.30 if bank else 0.18  # mirrors the binder (ControlRoom3DBinder.BindGauges)
 
@@ -272,19 +380,27 @@ def _k02(ctx):
 def _k03(ctx):
     m = ctx.m
     ctx.base(m["M_PanelSlate"], 0.03)
+    # bezel frame around the dual dial face
+    for sx in (-1, 1):
+        ctx.box("Rail%d" % sx, (sx * 0.120, 0.032, 0), (0.008, 0.004, 0.17), m["M_BezelBlack"])
+    for sz in (-1, 1):
+        ctx.box("Cap%d" % sz, (0, 0.032, sz * 0.093), (0.24, 0.004, 0.008), m["M_BezelBlack"])
     ctx.box("Faceplate", (0, 0.032, 0), (0.23, 0.004, 0.17), m["M_GaugeFace"])
-    ctx.ticks(ctx.root, (0, -0.025), 0.062, [i / 8.0 for i in range(9)], 0.035, 0.012, m["M_DarkRubber"])
-    ctx.box("Chip_Doppler", (-0.10, 0.036, 0.07), (0.03, 0.004, 0.012), m["M_GreenGlow"])
-    ctx.box("Chip_Xe", (0.10, 0.036, 0.07), (0.03, 0.004, 0.012), m["M_AmberGlow"])
+    ctx.ticks(ctx.root, (0, -0.025), 0.062, [i / 8.0 for i in range(9)], 0.0355, 0.012, m["M_DarkRubber"])
+    ctx.box("Chip_Doppler", (-0.10, 0.0365, 0.07), (0.03, 0.004, 0.012), m["M_GreenGlow"])
+    ctx.box("Chip_Xe", (0.10, 0.0365, 0.07), (0.03, 0.004, 0.012), m["M_AmberGlow"])
     piv = ctx.pivot((0, 0.045, -0.025))
     ctx.box("Needle", (0, 0, 0.035), (0.010, 0.008, 0.085), m["M_GaugeNeedle"], piv)
+    ctx.box("NeedleTail", (0, 0, -0.022), (0.008, 0.006, 0.026), m["M_GaugeNeedle"], piv)
     ctx.cyl("Hub", (0, 0.048, -0.025), 0.012, 0.014, m["M_BrushedSteel"], verts=20)
+    ctx.cyl("HubCap", (0, 0.0555, -0.025), 0.005, 0.003, m["M_BezelBlack"], verts=16)
 
 
 @_register("K04")
 def _k04(ctx):
     m = ctx.m
     ctx.base(m["M_PanelSlate"], 0.03)
+    ctx.box("Bezel", (0, 0.031, 0), (0.28, 0.004, 0.10), m["M_BezelBlack"])
     for i in range(5):
         ctx.box("Digit%d" % i, (-0.10 + i * 0.05, 0.034, 0), (0.04, 0.004, 0.07), m["M_CrtScreen"])
     ctx.pivot((0, 0.045, 0))  # BIND_GAUGE pivot with no child: the binder's rotation has nothing to move
@@ -294,20 +410,22 @@ def _k04(ctx):
 def _k05(ctx):
     m = ctx.m
     ctx.base(m["M_PanelSlate"], 0.02)
-    lens = ctx.box("Lens", (0, 0.024, 0), (0.07, 0.008, 0.05), m["M_AnnunciatorEmissive"], raw=False)
+    ctx.box("Bezel", (0, 0.023, 0), (0.076, 0.006, 0.056), m["M_BezelBlack"])
+    lens = ctx.box("Lens", (0, 0.026, 0), (0.07, 0.008, 0.05), m["M_AnnunciatorEmissive"], raw=False)
     lens.name = ctx.mover  # the binder reads the Renderer on the BIND_LAMP_* object itself
     ctx.set_mover(lens)
     if ctx.label:  # a tile carries its own text on the lens (no label plate), scaled to fit the lens
         make_text(ctx.col, ctx.nm("TileText"), RL.wrap_tile_label(ctx.label, 5 if ctx.label_size else 9), ctx.label_size or 0.012, m["M_GaugeFace"], ctx.root,
-                  (0, 0.028 + 0.0005, 0), max_width=0.064, max_height=0.044, extrude=0.0005)
+                  (0, 0.031, 0), max_width=0.064, max_height=0.044, extrude=0.0005)
 
 
 @_register("K20")
 def _k20(ctx):
     m = ctx.m
     ctx.base(m["M_PanelSlate"], 0.008)
-    ctx.cyl("Housing", (0, 0.014, 0), 0.019, 0.012, m["M_BrushedSteel"], verts=24)
-    lens = ctx.cyl("Lens", (0, 0.023, 0), 0.015, 0.008, m["M_AnnunciatorEmissive"], verts=24)
+    ctx.cyl("Bezel", (0, 0.019, 0), 0.0195, 0.003, m["M_BezelBlack"], verts=24)
+    ctx.cyl("Housing", (0, 0.016, 0), 0.019, 0.012, m["M_BrushedSteel"], verts=24)
+    lens = ctx.cyl("Lens", (0, 0.025, 0), 0.015, 0.008, m["M_AnnunciatorEmissive"], verts=24)
     lens.name = ctx.mover
     ctx.set_mover(lens)
 
@@ -319,42 +437,75 @@ def _k20(ctx):
 def _k06(ctx):
     m = ctx.m
     ctx.base(m["M_PanelSlate"], 0.025)
-    ctx.cyl("Collar", (0, 0.031, 0), 0.040, 0.012, m["M_BrushedSteel"])
-    piv = ctx.pivot((0, 0.037, 0))
-    ctx.cyl("Plunger", (0, 0.015, 0), 0.028, 0.030, m["M_ScramRed"], piv)
+    # Low steel collar with a dark well; the red mushroom stands tall out of it (rest: cap top at y 0.060, the full depth
+    # contract) and the binder presses it 0.025 m in, so it sinks until only the dome crowns the well (pressed).
+    ctx.cyl("Collar", (0, 0.029, 0), 0.040, 0.008, m["M_BrushedSteel"])
+    ctx.cyl("CollarTrim", (0, 0.0335, 0), 0.036, 0.001, m["M_BezelBlack"], verts=24)
+    piv = ctx.pivot((0, 0.033, 0))   # children are pivot-local: world y = 0.033 + local y
+    ctx.cyl("Stem", (0, 0.0085, 0), 0.016, 0.017, m["M_BrushedSteel"], piv, verts=20)
+    ctx.cyl("Plunger", (0, 0.0195, 0), 0.031, 0.009, m["M_ScramRed"], piv, verts=32)   # the mushroom cap
+    ctx.cyl("PlungerDome", (0, 0.0255, 0), 0.022, 0.003, m["M_ScramRed"], piv, verts=24)
+    # SCRAM guard: a steel hoop around the cap on a bottom hinge (the cap stays visible through it); U3 flips it open
+    # when armed. Hinge-local: the hoop is centred 0.038 up the face from the hinge, 12 tangent segments at r 0.038.
+    cover = ctx.aux_pivot("PART_ScramCover", (0, 0.0505, -0.038))
+    ctx.box("Hinge", (0, 0, 0), (0.070, 0.010, 0.010), m["M_BrushedSteel"], cover)
+    for k in range(12):
+        a = 2.0 * math.pi * k / 12.0
+        seg = ctx.box("Cover%d" % k, (0.038 * math.sin(a), 0.0045, 0.038 + 0.038 * math.cos(a)), (0.022, 0.008, 0.008),
+                      m["M_BrushedSteel"], cover)
+        seg.rotation_euler = (0, a, 0)
 
 
 @_register("K07")
 def _k07(ctx):
     m = ctx.m
     ctx.base(m["M_ConsoleBeige"], 0.03)
+    # lever slot: dark channel with steel side rails and detent notches
     ctx.box("Slot", (0, 0.032, 0), (0.016, 0.004, 0.14), m["M_DarkRubber"])
+    for sx in (-1, 1):
+        ctx.box("Rail%d" % sx, (sx * 0.0135, 0.033, 0), (0.003, 0.002, 0.14), m["M_BrushedSteel"])
+    for i, z in enumerate((-0.05, -0.025, 0.0, 0.025, 0.05)):
+        ctx.box("Detent%d" % i, (0, 0.0345, z), (0.010, 0.002, 0.006), m["M_BezelBlack"])
+    ctx.cyl("PivotBoss", (0, 0.034, 0), 0.011, 0.012, m["M_BrushedSteel"], axis="Y", verts=16)
     piv = ctx.pivot((0, 0.02, 0))  # rod-bank dials rotate about local X (the T-handle pitches)
     ctx.box("Shaft", (0, 0.017, 0), (0.016, 0.034, 0.016), m["M_BrushedSteel"], piv)
     ctx.box("Handle", (0, 0.034, 0), (0.07, 0.012, 0.016), m["M_ScramRed"], piv)
+    for i, x in enumerate((-0.022, 0.0, 0.022)):  # grip ridges across the T-handle
+        ctx.box("Grip%d" % i, (x, 0.034, 0), (0.006, 0.012, 0.018), m["M_DarkRubber"], piv)
 
 
 @_register("K08")
 def _k08(ctx):
     m = ctx.m
     ctx.base(m["M_PanelSlate"], 0.02)
-    ctx.ticks(ctx.root, (0, 0), 0.047, [i / 8.0 for i in range(9)], 0.022, 0.008, m["M_GaugeFace"],
+    ctx.cyl("Bezel", (0, 0.021, 0), 0.050, 0.004, m["M_BezelBlack"], verts=32)
+    ctx.ticks(ctx.root, (0, 0), 0.047, [i / 8.0 for i in range(9)], 0.0235, 0.008, m["M_GaugeFace"],
               sweep=ANIM["knob_sweep_z"], width=0.004)
+    ctx.box("Index", (0, 0.024, 0.050), (0.006, 0.004, 0.008), m["M_GaugeNeedle"])  # fixed pointer at 12 o'clock
     piv = ctx.pivot((0, 0.02, 0))
-    ctx.cyl("Skirt", (0, 0.006, 0), 0.034, 0.012, m["M_BrushedSteel"], piv)
-    ctx.cyl("Knob", (0, 0.026, 0), 0.026, 0.040, m["M_BrushedSteel"], piv)
-    ctx.box("Pointer", (0, 0.047, 0.016), (0.008, 0.004, 0.024), m["M_GaugeNeedle"], piv)
+    ctx.cyl("Skirt", (0, 0.006, 0), 0.034, 0.012, m["M_BrushedSteel"], piv, verts=32)
+    ctx.cyl("Knob", (0, 0.026, 0), 0.026, 0.040, m["M_BezelBlack"], piv, verts=32)
+    ctx.cyl("KnobCap", (0, 0.0475, 0), 0.020, 0.005, m["M_BrushedSteel"], piv, verts=24)
+    ctx.box("Pointer", (0, 0.0505, 0.016), (0.008, 0.004, 0.024), m["M_GaugeNeedle"], piv)
 
 
 @_register("K09")
 def _k09(ctx):
     m = ctx.m
     ctx.base(m["M_PanelSlate"], 0.02)
-    ctx.ticks(ctx.root, (0, 0), 0.05, [i / 3.0 for i in range(4)], 0.022, 0.010, m["M_GaugeFace"],
+    ctx.cyl("Bezel", (0, 0.021, 0), 0.055, 0.004, m["M_BezelBlack"], verts=32)
+    ctx.ticks(ctx.root, (0, 0), 0.05, [i / 3.0 for i in range(4)], 0.0235, 0.010, m["M_GaugeFace"],
               sweep=ANIM["knob_sweep_z"], width=0.005)
+    for i, f in enumerate((0.0, 1.0 / 3.0, 2.0 / 3.0, 1.0)):  # detent marks at each selector stop
+        th = math.radians(lerp(ANIM["knob_sweep_z"][0], ANIM["knob_sweep_z"][1], f))
+        mk = ctx.box("Detent%d" % i, (-0.052 * math.sin(th), 0.0235, 0.052 * math.cos(th)),
+                     (0.006, 0.003, 0.010), m["M_AmberGlow"])
+        mk.rotation_euler = (0, -th, 0)
     piv = ctx.pivot((0, 0.02, 0))
     ctx.box("Grip", (0, 0.022, 0.022), (0.024, 0.040, 0.050), m["M_ScramRed"], piv)
+    ctx.box("GripIndex", (0, 0.043, 0.040), (0.008, 0.004, 0.014), m["M_GaugeFace"], piv)
     ctx.cyl("Hub", (0, 0.030, 0), 0.020, 0.020, m["M_BrushedSteel"], piv, verts=16)
+    ctx.cyl("HubCap", (0, 0.041, 0), 0.012, 0.004, m["M_BezelBlack"], piv, verts=16)
 
 
 @_register("K10")
@@ -362,6 +513,10 @@ def _k10(ctx):
     m = ctx.m
     ctx.base(m["M_PanelSlate"], 0.01, "Flange")
     ctx.box("Pedestal", (0, 0.035, 0), (0.06, 0.05, 0.06), m["M_PanelSlate"])
+    ctx.cyl("BackPlate", (0, 0.048, 0), 0.118, 0.004, m["M_BezelBlack"], verts=40)
+    ctx.ticks(ctx.root, (0, 0), 0.105, [i / 8.0 for i in range(9)], 0.0505, 0.010, m["M_GaugeFace"],
+              sweep=ANIM["knob_sweep_z"], width=0.004)
+    ctx.box("Index", (0, 0.0515, 0.110), (0.008, 0.003, 0.012), m["M_GaugeNeedle"])
     piv = ctx.pivot((0, 0.07, 0))
     bpy.ops.mesh.primitive_torus_add(major_radius=0.10, minor_radius=0.012, major_segments=48, minor_segments=12,
                                      location=(0, 0, 0), rotation=(math.pi / 2, 0, 0))
@@ -373,6 +528,10 @@ def _k10(ctx):
     ctx.box("SpokeH", (0, 0, 0), (0.20, 0.010, 0.012), m["M_BrushedSteel"], piv)
     ctx.box("SpokeV", (0, 0, 0), (0.012, 0.010, 0.20), m["M_BrushedSteel"], piv)
     ctx.cyl("Hub", (0, 0.005, 0), 0.025, 0.030, m["M_BrushedSteel"], piv)
+    ctx.cyl("HubCap", (0, 0.021, 0), 0.016, 0.004, m["M_BezelBlack"], piv, verts=20)
+    for sx, sz in ((0.10, 0.0), (-0.10, 0.0), (0.0, -0.10)):  # grips on the three free spoke ends
+        ctx.cyl("Grip%d_%d" % (int(sx * 100), int(sz * 100)), (sx, 0.020, sz), 0.012, 0.040,
+                m["M_ScramRed"], piv, verts=16)
     ctx.cyl("Grip", (0, 0.020, 0.10), 0.012, 0.040, m["M_ScramRed"], piv, verts=16)
 
 
@@ -384,9 +543,15 @@ def _k11(ctx):
     ctx.box("Lamp_Green", (0.017, 0.034, 0.04), (0.02, 0.008, 0.02), m["M_GreenGlow"])
     piv = ctx.pivot((0, 0.03, -0.015))
     ctx.box("Bat", (0, 0.015, 0), (0.012, 0.030, 0.012), m["M_BrushedSteel"], piv)
+    ctx.box("BatTip", (0, 0.031, 0), (0.016, 0.008, 0.016), m["M_ScramRed"], piv)
+    # guarded toggle: a flip-up red cover over the bat on a bottom hinge; U3 flips it open when armed.
+    # Children are hinge-local: the hood sits above the hinge line, its free edge toward +Z (up-face).
+    guard = ctx.aux_pivot("PART_Guard", (0, 0.036, -0.045))
+    ctx.box("GuardHinge", (0, 0, 0), (0.064, 0.006, 0.006), m["M_BrushedSteel"], guard)
+    ctx.box("GuardTop", (0, 0.032, 0.040), (0.062, 0.005, 0.080), m["M_ScramRed"], guard)
     for sx in (-1, 1):
-        ctx.box("GuardPost%d" % sx, (sx * 0.026, 0.05, -0.015), (0.006, 0.04, 0.04), m["M_ScramRed"])
-    ctx.box("GuardBar", (0, 0.068, -0.015), (0.058, 0.008, 0.008), m["M_ScramRed"])
+        ctx.box("GuardCheek%d" % sx, (sx * 0.029, 0.008, 0.040), (0.005, 0.030, 0.080), m["M_ScramRed"], guard)
+    ctx.box("GuardLip", (0, 0.018, 0.076), (0.062, 0.016, 0.005), m["M_ScramRed"], guard)
 
 
 @_register("K12")
@@ -396,19 +561,27 @@ def _k12(ctx):
     ctx.box("Slot", (0, 0.032, 0), (0.014, 0.004, 0.20), m["M_DarkRubber"])
     ctx.box("Bar_Actual", (0.037, 0.032, 0), (0.012, 0.004, 0.18), m["M_GreenGlow"])
     ctx.box("Bar_Demand", (-0.037, 0.032, 0), (0.012, 0.004, 0.18), m["M_AmberGlow"])
+    # scale ticks beside the slot and end stops
+    for i in range(5):
+        ctx.box("Tick%d" % i, (0.026, 0.034, -0.08 + i * 0.04), (0.008, 0.002, 0.003), m["M_DarkRubber"])
+    for sz in (-1, 1):
+        ctx.box("Stop%d" % sz, (0, 0.034, sz * 0.102), (0.014, 0.006, 0.008), m["M_BezelBlack"])
     # NOTE: the binder rotates INT_DIAL pivots, so the round thumb turns in place; the pivot sits at track mid.
     piv = ctx.pivot((0, 0.04, 0))
-    ctx.cyl("Thumb", (0, 0.010, 0), 0.030, 0.020, m["M_BrushedSteel"], piv)
-    ctx.box("ThumbMark", (0, 0.021, 0.016), (0.006, 0.004, 0.024), m["M_GaugeNeedle"], piv)
+    ctx.cyl("Thumb", (0, 0.010, 0), 0.030, 0.020, m["M_BrushedSteel"], piv, verts=24)
+    ctx.cyl("ThumbGrip", (0, 0.021, 0), 0.020, 0.006, m["M_BezelBlack"], piv, verts=20)
+    ctx.box("ThumbMark", (0, 0.025, 0.016), (0.006, 0.004, 0.024), m["M_GaugeNeedle"], piv)
 
 
 @_register("K19")
 def _k19(ctx):
     m = ctx.m
     ctx.base(m["M_PanelSlate"], 0.02)
-    ctx.cyl("Ring", (0, 0.025, 0), 0.026, 0.010, m["M_BrushedSteel"])
+    ctx.cyl("Bezel", (0, 0.024, 0), 0.029, 0.004, m["M_BezelBlack"], verts=24)
+    ctx.cyl("Ring", (0, 0.027, 0), 0.026, 0.010, m["M_BrushedSteel"], verts=24)
     piv = ctx.pivot((0, 0.02, 0))
-    ctx.cyl("Cap", (0, 0.010, 0), 0.020, 0.020, m["M_GaugeFace"], piv)
+    ctx.cyl("Cap", (0, 0.010, 0), 0.020, 0.020, m["M_GaugeFace"], piv, verts=24)
+    ctx.cyl("CapDome", (0, 0.021, 0), 0.012, 0.004, m["M_BezelBlack"], piv, verts=20)
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -417,13 +590,32 @@ def _k19(ctx):
 @_register("K13")
 def _k13(ctx):
     m = ctx.m
-    ctx.box("Housing", (0, 0.12, 0), (0.34, 0.24, 0.26), m["M_PanelSlate"])
-    ctx.box("Bezel", (0, 0.265, 0), (0.40, 0.05, 0.30), m["M_PanelSlate"])
-    # CrtScreenRenderer lays text on the thinnest bounds axis (Y here) of the CRT_* mesh
-    scr = ctx.box("Screen", (0, 0.292, 0), (0.32, 0.006, 0.24), m["M_CrtScreen"])
+    # Deep console CRT: housing, picture-frame bezel, recessed emissive face, vents, corner screws.
+    # The Screen mesh keeps its ~0.32 x 0.24 active face; CrtScreenRenderer targets it by name + thinnest axis,
+    # so nothing else here may carry the CRT_ name or the M_CrtScreen material, and no glass may cover the face
+    # (the text plane sits 3 mm proud of it).
+    ctx.box("Housing", (0, 0.10, 0), (0.36, 0.20, 0.28), m["M_PanelSlate"])
+    ctx.box("HousingLip", (0, 0.205, 0), (0.37, 0.01, 0.29), m["M_BezelBlack"])  # shadow gap under the bezel
+    # Bezel frame: four rails out to the 0.40 x 0.30 face edges around the screen opening, front face at y = 0.29.
+    for sz, nm in ((1, "BezelTop"), (-1, "BezelBottom")):
+        ctx.box(nm, (0, 0.26, sz * 0.14), (0.40, 0.06, 0.02), m["M_BezelBlack"])
+    for sx, nm in ((1, "BezelLeft"), (-1, "BezelRight")):
+        ctx.box(nm, (sx * 0.19, 0.26, 0), (0.02, 0.06, 0.26), m["M_BezelBlack"])
+    # Screen recessed ~20 mm behind the bezel face.
+    scr = ctx.box("Screen", (0, 0.266, 0), (0.32, 0.008, 0.234), m["M_CrtScreen"])
     scr.name = ctx.mover
     ctx.set_mover(scr)
-    ctx.box("PowerLED", (0.17, 0.293, -0.135), (0.012, 0.006, 0.012), m["M_GreenGlow"])
+    # Vent slots on both housing side faces (the front is fully occupied by lip + bezel).
+    for sx in (-1, 1):
+        for i in range(3):
+            ctx.box("Vent%d_%d" % (sx, i), (sx * 0.181, 0.10, -0.06 + i * 0.06),
+                    (0.004, 0.06, 0.010), m["M_DarkRubber"])
+    # Corner screws on the bezel face.
+    for sx in (-1, 1):
+        for sz in (-1, 1):
+            ctx.cyl("Screw%d_%d" % (sx, sz), (sx * 0.185, 0.291, sz * 0.14), 0.006, 0.004,
+                    m["M_BrushedSteel"], axis="Y", verts=12)
+    ctx.box("PowerLED", (0.16, 0.291, -0.14), (0.012, 0.004, 0.012), m["M_GreenGlow"])
 
 
 @_register("K16")
@@ -437,15 +629,27 @@ def _k16(ctx):
 def _k17(ctx):
     m = ctx.m
     ctx.box("MountPlate", (0, 0.02, -0.085), (0.15, 0.04, 0.03), m["M_BrushedSteel"])
+    ctx.cyl("BaseFlange", (0, 0.075, -0.068), 0.072, 0.008, m["M_BezelBlack"], axis="Z", verts=24)
     dome = ctx.cyl("Dome", (0, 0.075, 0.015), 0.06, 0.17, m["M_ScramRed"], axis="Z", verts=24)
     dome.name = ctx.mover  # AlarmFeedback matches the Renderer named BIND_KLAXON_Beacon_*
     ctx.set_mover(dome)
+    for k in range(4):  # beacon cage ribs: vertical strips on the dome's XY cross-section, long along Z
+        a = math.radians(45.0 + 90.0 * k)
+        rib = ctx.box("Rib%d" % k, (0.062 * math.sin(a), 0.075 + 0.062 * math.cos(a), 0.015),
+                      (0.005, 0.012, 0.160), m["M_BezelBlack"])
+        rib.rotation_euler = (0, 0, -a)
+    ctx.cyl("EndCap", (0, 0.075, -0.066), 0.030, 0.008, m["M_BezelBlack"], axis="Z", verts=20)
 
 
 @_register("K21")
 def _k21(ctx):
     m = ctx.m
     ctx.base(m["M_PanelSlate"], 0.03)
+    # sign housing: bezel rails around the lit face, end caps at both extremes
+    for sx in (-1, 1):
+        ctx.box("Rail%d" % sx, (sx * (ctx.fw / 2.0 - 0.012), 0.032, 0), (0.024, 0.004, ctx.fh - 0.02), m["M_BezelBlack"])
+    for sz in (-1, 1):
+        ctx.box("Cap%d" % sz, (0, 0.032, sz * (ctx.fh / 2.0 - 0.012)), (ctx.fw - 0.024, 0.004, 0.024), m["M_BezelBlack"])
     make_text(ctx.col, ctx.nm("SignText"), ctx.label or "SECTION", 0.12, m["M_AmberGlow"], ctx.root,
               (0, 0.03 + LABEL_EXTRUDE, 0), max_width=ctx.fw - 0.06, max_height=ctx.fh - 0.05)
 
@@ -461,9 +665,9 @@ def _k22(ctx):
 @_register("K23")
 def _k23(ctx):
     m = ctx.m
-    ctx.base(m["M_ScramRed"], 0.005)
-    make_text(ctx.col, ctx.nm("TagText"), "OUT OF\nSERVICE", 0.012, m["M_GaugeFace"], ctx.root,
-              (0, 0.005 + 0.0005, 0), max_width=0.07, extrude=0.0005)
+    ctx.base(m["M_GaugeFace"], 0.005)   # same pale tag + near-black lettering as _oos_tag
+    make_text(ctx.col, ctx.nm("TagText"), "OUT OF\nSERVICE", 0.018, m["M_DarkRubber"], ctx.root,
+              (0, 0.005 + 0.0005, 0), max_width=0.072, max_height=0.042, extrude=0.001)
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -531,10 +735,12 @@ def local_bbox(root, include_aux=False):
 
 
 def check_footprint(root):
-    """Returns (ok, w, h, d, expected_dict) measured on the kit itself (label plate and OOS tag excluded)."""
+    """Returns (ok, w, h, d, expected_dict) measured on the kit itself (label plate and OOS tag excluded).
+    ok requires the face_w x face_h window AND that the kit stays inside its declared depth (y 0..depth)."""
     kid = root["kit_id"]
     exp = FOOTPRINTS[kid]
     lo, hi = local_bbox(root)
-    w, h, d = hi.x - lo.x, hi.z - lo.z, hi.y
-    ok = abs(w - exp["face_w"]) <= FOOTPRINT_TOL and abs(h - exp["face_h"]) <= FOOTPRINT_TOL
+    w, h, d = hi.x - lo.x, hi.z - lo.z, hi.y - min(lo.y, 0.0)
+    ok = (abs(w - exp["face_w"]) <= FOOTPRINT_TOL and abs(h - exp["face_h"]) <= FOOTPRINT_TOL
+          and hi.y <= exp["depth"] + FOOTPRINT_TOL and lo.y >= -FOOTPRINT_TOL)
     return ok, w, h, d, exp

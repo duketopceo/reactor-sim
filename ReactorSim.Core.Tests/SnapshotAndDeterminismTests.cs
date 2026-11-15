@@ -30,6 +30,43 @@ namespace ReactorSim.Tests
         }
 
         [Fact]
+        public void MeasuredFlowsAreCapturedAndRestoredWithoutConfusingCommandsForOutput()
+        {
+            var plant = new Plant();
+            plant.LoadPreset("full-power");
+            plant.Apply(PlantIntent.SetSteamDump(0.3));
+            for (int i = 0; i < 5; i++) plant.Step(1.0);
+            var captured = plant.CaptureState();
+            Assert.Equal(plant.Thermal.FeedwaterDeliveredFrac, captured.FeedwaterDeliveredFrac);
+            Assert.Equal(plant.Thermal.DumpSteamKW, captured.DumpSteamKW);
+            var restored = new Plant();
+            restored.RestoreState(PlantSnapshot.FromJson(captured.ToJson()));
+            var roundTrip = restored.CaptureState();
+            Assert.Equal(captured.FeedwaterDeliveredFrac, roundTrip.FeedwaterDeliveredFrac);
+            Assert.Equal(captured.DumpSteamKW, roundTrip.DumpSteamKW);
+            Assert.Equal(captured.TurbineSteamKW, roundTrip.TurbineSteamKW);
+        }
+
+        [Fact]
+        public void LegacySnapshotWithoutMeasuredFlowKeysRestoresAndStepsFinite()
+        {
+            var plant = new Plant();
+            plant.LoadPreset("full-power");
+            for (int i = 0; i < 5; i++) plant.Step(1.0);
+            string json = plant.CaptureState().ToJson();
+            json = System.Text.RegularExpressions.Regex.Replace(json, "\"(dumpSteamKW|feedwaterDeliveredFrac)\":[^,}]*,?", "");
+            Assert.DoesNotContain("dumpSteamKW", json);
+            Assert.DoesNotContain("feedwaterDeliveredFrac", json);
+            var restored = new Plant();
+            restored.RestoreState(PlantSnapshot.FromJson(json));
+            restored.Step(1.0);
+            var s = restored.CaptureState();
+            Assert.True(double.IsFinite(s.DumpSteamKW) && s.DumpSteamKW >= 0);
+            Assert.True(double.IsFinite(s.FeedwaterDeliveredFrac) && s.FeedwaterDeliveredFrac >= 0 && s.FeedwaterDeliveredFrac <= 1.5);
+            Assert.True(double.IsFinite(s.TurbineSteamKW));
+        }
+
+        [Fact]
         public void SnapshotJson_RoundTripsFreshPlant()
         {
             var p = new Plant();

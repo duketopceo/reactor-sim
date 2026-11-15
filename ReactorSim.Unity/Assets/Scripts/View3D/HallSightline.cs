@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
 
-// Pure sight-line maths (no UnityEngine) for the reactor window: how far down an eye standing or sitting in the control room can
-// look through the observation opening, how far down the pool and the module are, and whether a sight line crosses a box (the
-// parked crane). Linked into ReactorSim.Core.Tests and read by HallCheck, so the "you can see the reactor from here" claim is a
-// number checked on any box, not a hope tested only in a render.
+// Pure sight-line maths (no UnityEngine) for the reactor window: how much of the vessel an eye standing or sitting in the
+// control room can see through the observation opening at eye level (the aquarium window: the eye is underwater and the
+// vessel mid-body sits in the pane), and whether a sight line crosses a box (the parked crane). Linked into
+// ReactorSim.Core.Tests and read by HallCheck, so the "you can see the reactor from here" claim is a number checked on any
+// box, not a hope tested only in a render.
 // Frames: heights are metres above the room floor unless a name says "AbovePoolFloor"; "back" is the distance from the window wall
 // into the room; "along" is the position along the wall from the window centre.
 namespace ReactorSim
@@ -65,11 +66,11 @@ namespace ReactorSim
         public static View Stand() { return new View { name = "stand", eyeHeight = HallDimensions.StandEyeHeight, back = HallDimensions.StandBackFromWall, along = HallDimensions.StandAlongWall }; }
         public static View Seat() { return new View { name = "seat", eyeHeight = HallDimensions.SeatEyeHeight, back = HallDimensions.SeatBackFromWall, along = HallDimensions.SeatAlongWall }; }
 
-        /// <summary>Downward angle (degrees) from the viewpoint to a target at the given height above the pool floor over the pool axis.</summary>
+        /// <summary>Downward angle (degrees) from the viewpoint to a target at the given height above the pool floor over the module axis.</summary>
         public static double AngleToAxisTargetDeg(View v, double targetAbovePoolFloor)
         {
             double drop = HallDimensions.EyeAbovePoolFloor((float)v.eyeHeight) - targetAbovePoolFloor;
-            return DownAngleDeg(drop, v.back + HallDimensions.PoolAxisFromWall);
+            return DownAngleDeg(drop, v.back + HallDimensions.ModuleFromWall);
         }
 
         /// <summary>Margin in degrees by which the sight line to the target sits inside the opening's downward reach (negative = cut off).</summary>
@@ -78,50 +79,52 @@ namespace ReactorSim
             return OpeningDownReachDeg(v.eyeHeight, HallDimensions.WindowSill, v.back) - AngleToAxisTargetDeg(v, targetAbovePoolFloor);
         }
 
-        /// <summary>Margin in metres by which the sight line to the pool axis crosses the wall inside the opening's side edges.</summary>
+        /// <summary>Margin in metres by which the sight line to the module axis crosses the wall inside the opening's side edges.</summary>
         public static double EdgeMargin(View v)
         {
-            double crossing = CrossingAlong(v.along, HallDimensions.VesselShiftX, v.back, HallDimensions.PoolAxisFromWall);
+            double crossing = CrossingAlong(v.along, HallDimensions.VesselShiftX, v.back, HallDimensions.ModuleFromWall);
             return HallDimensions.WindowWidth * 0.5 - Math.Abs(crossing);
         }
 
         /// <summary>
-        /// Height of the module (metres above the pool floor) at which the sight line from the viewpoint grazes the near pool rim and
-        /// meets the pool axis. Everything on the axis above this height is seen over the rim; below it the rim hides the module.
+        /// Height (metres above the pool floor) at which the sight line from the viewpoint through a point `edgeY` high on the
+        /// window wall crosses the module axis. Similar triangles: the wall is `back` from the eye, the axis `ModuleFromWall` beyond it.
         /// </summary>
-        public static double RimHiddenBelow(View v)
+        public static double AxisHeightThroughEdge(View v, double edgeY)
         {
             double eye = HallDimensions.EyeAbovePoolFloor((float)v.eyeHeight);
-            double rimTop = HallDimensions.WaterDepth + HallDimensions.DeckAboveWater;
-            double toAxis = v.back + HallDimensions.PoolAxisFromWall;
-            double toRim = toAxis - HallDimensions.PoolRadius;
-            return rimTop - (eye - rimTop) * HallDimensions.PoolRadius / Math.Max(1e-9, toRim);
+            return edgeY + (edgeY - eye) * HallDimensions.ModuleFromWall / Math.Max(1e-9, v.back);
         }
 
-        /// <summary>Metres of the module, measured down from its head, that show above the near pool rim (negative = the head is hidden).</summary>
-        public static double RimVisibleHeight(View v)
+        /// <summary>The lowest and highest vessel heights (above the pool floor) the opening frames on the module axis.</summary>
+        public static void VisibleBandOnAxis(View v, out double low, out double high)
         {
-            return HallDimensions.ContainmentTop - RimHiddenBelow(v);
+            double sillY = HallDimensions.RoomFloorAbovePoolFloor + HallDimensions.WindowSill;
+            low = AxisHeightThroughEdge(v, sillY);
+            high = AxisHeightThroughEdge(v, sillY + HallDimensions.WindowHeight);
         }
 
         /// <summary>
-        /// What the window has to show: the module head, from the stand and from the seat,
-        /// through the middle of the opening. Empty means the claim holds.
+        /// What the window has to show: a band of the vessel mid-body, from the stand and from the seat, through the middle of
+        /// the opening (the aquarium claim: the reactor is seen at eye level through the water, not looked down at from a gallery).
+        /// Empty means the claim holds.
         /// </summary>
         public static List<string> CheckWindowReach()
         {
             var bad = new List<string>();
-            double m = HallDimensions.SightMarginDeg;
-            View stand = Stand(), seat = Seat();
-            double standMargin = ReachMarginDeg(stand, HallDimensions.SightTargetHeight);
-            double seatMargin = ReachMarginDeg(seat, HallDimensions.SightTargetHeight);
-            if (standMargin < m) bad.Add("from the stand the window cannot look down to the module head (margin " + standMargin.ToString("0.0") + " deg)");
-            if (seatMargin < m) bad.Add("from the seat the window cannot look down to the module head (margin " + seatMargin.ToString("0.0") + " deg)");
-            double needVisible = HallDimensions.HeadDomeHeight + HallDimensions.HeadVisibleMargin;
-            foreach (View v in new[] { stand, seat })
-                if (RimVisibleHeight(v) < needVisible) bad.Add("from the " + v.name + " the pool rim hides the module head (" + RimVisibleHeight(v).ToString("0.00") + " m shows, " + needVisible.ToString("0.00") + " m needed)");
-            foreach (View v in new[] { stand, seat })
-                if (EdgeMargin(v) < HallDimensions.SightEdgeMargin) bad.Add("from the " + v.name + " the module sits too close to the window edge (" + EdgeMargin(v).ToString("0.00") + " m)");
+            foreach (View v in new[] { Stand(), Seat() })
+            {
+                double low, high;
+                VisibleBandOnAxis(v, out low, out high);
+                // The seat sits farther back, so its band rides higher; it gets a wider low-side allowance.
+                double lowLimit = HallDimensions.VesselBandLow + (v.back > HallDimensions.StandBackFromWall ? 1.5 : 0.0);
+                if (low > lowLimit)
+                    bad.Add("from the " + v.name + " the window cannot see down to the vessel mid-body (lowest visible " + low.ToString("0.0") + " m, need " + lowLimit.ToString("0.0") + " m)");
+                if (high < HallDimensions.VesselBandHigh)
+                    bad.Add("from the " + v.name + " the window cannot see up to the vessel mid-body (highest visible " + high.ToString("0.0") + " m, need " + HallDimensions.VesselBandHigh.ToString("0.0") + " m)");
+                if (EdgeMargin(v) < HallDimensions.SightEdgeMargin)
+                    bad.Add("from the " + v.name + " the module sits too close to the window edge (" + EdgeMargin(v).ToString("0.00") + " m)");
+            }
             return bad;
         }
 
@@ -186,9 +189,10 @@ namespace ReactorSim
             double[] eye = EyeInHallSpace(v);
             double r = HallDimensions.ContainmentDiameter * 0.5;
             double top = HallDimensions.SightTargetHeight;
+            double mz = HallDimensions.ModuleZ;
             double[][] targets =
             {
-                new[] { 0.0, top, 0.0 }, new[] { -r, top, 0.0 }, new[] { r, top, 0.0 },
+                new[] { 0.0, top, mz }, new[] { -r, top, mz }, new[] { r, top, mz },
                 new[] { 0.0, (double)HallDimensions.WaterDepth, 0.0 },
                 new[] { 0.0, (double)HallDimensions.WaterDepth, -HallDimensions.PoolRadius },
                 new[] { 0.0, (double)HallDimensions.WaterDepth, HallDimensions.PoolRadius },

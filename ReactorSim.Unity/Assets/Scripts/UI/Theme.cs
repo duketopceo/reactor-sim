@@ -53,6 +53,9 @@ namespace ReactorSim.Ui
         public static readonly Rgba TextPaperDone = new Rgba(0.15, 0.32, 0.15);
 
         // ---- status (always shown with a glyph or label where they carry meaning) ----
+        // Original scene-emission cues, not instrument alarm colours or blackbody radiation.
+        public static readonly Rgba CoreGlowCold = new Rgba(0.13, 0.35, 0.85);
+        public static readonly Rgba CoreGlowHot = new Rgba(0.24, 0.72, 1.00);
         public static readonly Rgba StatusNormal = new Rgba(0.55, 0.85, 1.00);
         public static readonly Rgba StatusOk = new Rgba(0.60, 1.00, 0.80);
         public static readonly Rgba StatusCaution = new Rgba(1.00, 0.75, 0.25);
