@@ -269,7 +269,9 @@ public sealed class PlantWallMapView : MonoBehaviour
         detail = go2.AddComponent<TextMeshPro>();
         detail.enableAutoSizing = true;
         detail.fontSizeMin = 0.6f;
-        detail.fontSizeMax = 1.2f;
+        // Auto-size still fits the text to the plate's own bounds; the cap only lets short readouts use the room (a 4-line readout was
+        // 6.7 px tall at the 28 degree wall pose, under the 10 px floor, with most of the plate empty).
+        detail.fontSizeMax = 2.4f;
         detail.alignment = TextAlignmentOptions.Top;
         detail.textWrappingMode = TextWrappingModes.Normal;
         detail.color = ThemeColors.TextBody;
