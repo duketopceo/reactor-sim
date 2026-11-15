@@ -71,6 +71,7 @@ public class CaptureMode : MonoBehaviour
     private IEnumerator Start()
     {
         int exitCode = 0;
+        AudioListener.pause = true;   // capture runs are silent: nothing reads the audio, and the box may be in a room
         sizeDir = Path.Combine(outDir, width + "x" + height);
         string problem = null;
         try { Directory.CreateDirectory(sizeDir); }

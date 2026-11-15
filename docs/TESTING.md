@@ -143,6 +143,13 @@ are used; when only some exist, the run fails naming the missing one.
 REACTOR_SIM_WIN_HOST=my-windows-box REACTOR_SIM_WIN_REPO='C:\path\to\reactor-sim' bash scripts/fetch-renders.sh [--dest DIR]
 ```
 
+Capture poses graded by `scripts/check-captures.sh` (`REQUIRED_POSES`) include `wall` (the status wall's detail plate with the reactor
+selected through the real click path) and `wallidle` (nothing selected, the prompt). Each is measured on the rendered image: projected
+glyph height at least 10 px, text contrast at least 4.5, and the text must fit its plate (`detailFits`); a missing measurement fails.
+`scripts/test-check-captures.sh` proves each limit can fail. `PlantFeedbackPlayCapture.Run -feedbackScene Assets/Scenes/Bootstrap.unity`
+(graphics session) clicks every wall node through `DiegeticInteractable`, asserts the plate text and highlight for normal, changed and
+all-NaN snapshots, the route cues (hidden at zero and NaN, shown while flowing, calibrated to their pipes) and saves close captures.
+
 `RoomRender` logs `[RoomRender] OK <path> <bytes>` per image or `[RoomRender] FAIL ...`, and fails on an empty,
 tiny (under 1 KB) or single-flat-colour image. `fetch-renders.sh` exits 0 fetched, 1 nothing found, 2 host
 unreachable or bad usage (same contract as `fetch-playtest-logs.sh`).

@@ -118,6 +118,14 @@ speed, and electrical output control the brightness of their respective routes. 
 route responds; a steam dump can carry heat to the condenser even when the turbine is tripped. The chemistry, surge, and safety
 connections remain static circuit markings because the snapshot does not expose a measured flow for those particular paths.
 
+Click a component on the wall (reactor, safety, primary pump, pressurizer, steam generator, turbine, generator, grid, condenser,
+cooling, feed pump, boron/makeup) to select it: it turns yellow and its readings (actual values with units, commands labeled as
+commands, `N/M` where no source exists) fill the lower plate. Click it again to clear; click another to move the selection; with
+nothing selected the plate asks you to select a component. The click only selects: it never changes the plant, and it works from
+any distance. Small arrowheads travel along the primary, steam, steam-dump, turbine-exhaust, feedwater and grid routes while they
+carry flow, and are absent when a route is idle or its reading is missing; the cooling circuit has none because the model does not
+define a flow direction for it.
+
 - **The module.** A small modular reactor of the pumped integral type: a 2.7 m wide, 18.8 m tall reactor vessel standing in
   a 4.5 m wide containment shell, in the pool with the containment head just under the water. The steam generators and the
   pressurizer are inside the vessel, so there is no external primary loop. What you see outside the vessel is what such a
