@@ -28,7 +28,7 @@ Plans may be designed in parallel, but a co-op or whole-plant claim is gated on 
 - Host-authoritative TCP networking can synchronize plant snapshots and player intents for LAN co-op. It is not yet a finished online lobby or a verified, full-body shared-world experience; the Fusion integration is a stub.
 - Procedural plant sounds and synthesized voice lines exist. Mixing, actual listening tests, source coverage, spatial accuracy and cross-state consistency still need work.
 - Walkable turbine and support buildings, radiation exposure/contamination gameplay, maintenance/repair loops and a finished player character are not present as complete gameplay systems.
-- CI records three known verification XFAILs (`DOM-01`, `SCR-02`, `EDGE-08`). Snapshot compatibility, scenario verification, deterministic saves and Unity scene checks remain ongoing gates.
+- CI records no known verification XFAILs: `DOM-01`, `SCR-02` and `EDGE-08` were fixed and promoted to required checks (see `docs/testing/simulation-verification.md`). Snapshot compatibility, scenario verification, deterministic saves and Unity scene checks remain ongoing gates.
 
 ## Phase 1 — Make the current plant readable and trustworthy
 
@@ -37,7 +37,7 @@ Plans may be designed in parallel, but a co-op or whole-plant claim is gated on 
 - Finish the live counterpart and wall work: clear status summary, readable system metrics and units, source inventory, directional cues only for modeled paths, and explicit unavailable states. Connect room/hall equipment, alarms and sounds to their authoritative snapshot values.
 - Finish control-room labels, physical interaction feedback, checklists, textures, lighting, water, accessibility and performance. Validate screen and reactor views from normal player positions.
 - Audit and mix core, pump, steam, turbine, generator, cooling, water, control, alarm and voice audio. Add category volume controls, spatial placement and event priorities; audition builds in quiet, startup, full-load and emergency states.
-- Address the three documented physics XFAILs with regression scenarios. Verify save/load, startup, transient and trip behavior without changing golden results silently.
+- The three documented physics XFAILs are fixed with regression tests (done). Still to verify: save/load, startup, transient and trip behavior without changing golden results silently.
 
 **Gate:** cold startup to grid, steady operation, SCRAM and turbine trip are playable; wall/desk/hall/audio agree, numeric values are legible, and tests plus a documented visual/listening pass succeed.
 
