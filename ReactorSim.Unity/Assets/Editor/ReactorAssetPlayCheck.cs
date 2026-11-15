@@ -75,7 +75,7 @@ public static class ReactorAssetPlayCheck
             var snapshot = bridge.GetSnapshot();
             var pivot = ReactorAssetCheck.Find(hall, "ROD_BANK_A_PIV");
             Vector3 expected = Vector3.Lerp(pivot.parent.Find("RS_ROD_BankA_Withdrawn_PIV").position,
-                pivot.parent.Find("RS_ROD_BankA_Inserted_PIV").position, (float)snapshot.BankInsertion[0]);
+                pivot.parent.Find("RS_ROD_BankA_Inserted_PIV").position, (float)PlantWallMapModel.BankInsertion("A", snapshot));   // snapshot order is D, C, B, A
             Require(Vector3.Distance(expected, pivot.position) < 0.02f, "live binder follows actual snapshot");
             string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../../out/reactor-assets"));
             Directory.CreateDirectory(directory);

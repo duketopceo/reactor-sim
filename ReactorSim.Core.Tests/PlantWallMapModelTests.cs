@@ -134,4 +134,18 @@ public class PlantWallMapModelTests
             BoronPpm = nan, Ph = nan };
         Assert.Equal(PlantWallMapModel.Status.Unavailable, PlantWallMapModel.Component(name, s));
     }
+    [Fact]
+    public void RotorSpeedIsBoundedAndNeverNaN()
+    {
+        Assert.Equal(0, PlantWallMapModel.RotorSpeed(false, null));
+        var s = new PlantSnapshot { PrimaryFlowFrac = .4, TurbineRpm = Physics.TurbineRatedRpm * .5 };
+        Assert.Equal(.4, PlantWallMapModel.RotorSpeed(false, s), 9);
+        Assert.Equal(.5, PlantWallMapModel.RotorSpeed(true, s), 9);
+        s.PrimaryFlowFrac = 7; s.TurbineRpm = -50;
+        Assert.Equal(1, PlantWallMapModel.RotorSpeed(false, s));
+        Assert.Equal(0, PlantWallMapModel.RotorSpeed(true, s));
+        s.PrimaryFlowFrac = double.NaN; s.TurbineRpm = double.PositiveInfinity;
+        Assert.Equal(0, PlantWallMapModel.RotorSpeed(false, s));
+        Assert.Equal(0, PlantWallMapModel.RotorSpeed(true, s));
+    }
 }

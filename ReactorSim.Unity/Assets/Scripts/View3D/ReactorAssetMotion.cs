@@ -80,6 +80,7 @@ public sealed class ReactorAssetMotion : MonoBehaviour
 
     public void Apply(PlantSnapshot snapshot, double power, bool glowOff, float deltaTime)
     {
+        if (snapshot == null) return;
         foreach (var bank in banks)
         {
             double input = PlantWallMapModel.BankInsertion(bank.name, snapshot);
@@ -89,8 +90,7 @@ public sealed class ReactorAssetMotion : MonoBehaviour
         foreach (var rotor in rotors)
         {
             // Readable visual mapping prevents a fast rotor aliasing as stationary; no simulation feedback.
-            float speed = rotor.turbine ? Mathf.Clamp01((float)snapshot.TurbineRpm / 3000f)
-                                        : Mathf.Clamp01((float)snapshot.PrimaryFlowFrac);
+            float speed = (float)PlantWallMapModel.RotorSpeed(rotor.turbine, snapshot);
             rotor.pivot.Rotate(rotor.axis, -speed * 240f * deltaTime, Space.Self);
         }
         Color tint = Color.Lerp(ThemeColors.ToColor(ReactorSim.Ui.Theme.CoreGlowCold),

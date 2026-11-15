@@ -59,6 +59,14 @@ public static class PlantWallMapModel
         return Math.Max(0, Math.Min(1, s.BankInsertion[index]));
     }
 
+    // Visual rotor speed 0..1 for the authored rotor assets; missing or non-finite readings stop the rotor, never poison its transform.
+    public static double RotorSpeed(bool turbine, PlantSnapshot s)
+    {
+        if (s == null) return 0;
+        double value = turbine ? s.TurbineRpm / Physics.TurbineRatedRpm : s.PrimaryFlowFrac;
+        return Finite(value) ? Math.Max(0, Math.Min(1, value)) : 0;
+    }
+
     // Compact component readouts use actual snapshot values; command values are labeled explicitly.
     // Returns N/M for missing sensors rather than filling in plausible-looking numbers.
     public static string ComponentReadout(string name, PlantSnapshot s)

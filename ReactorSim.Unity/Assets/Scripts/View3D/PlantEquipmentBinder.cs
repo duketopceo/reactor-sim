@@ -45,7 +45,15 @@ public class PlantEquipmentBinder : MonoBehaviour
         if (reactorMotion != null) reactorMotion.Bind();
     }
 
-    private static ParticleSystem MakeSteamJet(GameObject parent)
+    private readonly System.Collections.Generic.List<Material> jetMaterials = new System.Collections.Generic.List<Material>();
+
+    private void OnDestroy()
+    {
+        foreach (var material in jetMaterials) if (material != null) Destroy(material);
+        jetMaterials.Clear();
+    }
+
+    private ParticleSystem MakeSteamJet(GameObject parent)
     {
         // Runtime-built particle jet so no .prefab asset is needed for the VFX.
         var go = new GameObject(parent.name + "_Steam");
@@ -64,7 +72,9 @@ public class PlantEquipmentBinder : MonoBehaviour
         shape.shapeType = ParticleSystemShapeType.Cone;
         shape.angle = 18f;
         var renderer = go.GetComponent<ParticleSystemRenderer>();
-        renderer.sharedMaterial = new Material(Shader.Find("Unlit/Color")) { color = new Color(0.9f, 0.95f, 1f, 0.35f) };
+        var jetMaterial = new Material(Shader.Find("Unlit/Color")) { name = "SteamJetMaterial", color = new Color(0.9f, 0.95f, 1f, 0.35f) };
+        jetMaterials.Add(jetMaterial);
+        renderer.sharedMaterial = jetMaterial;
         return ps;
     }
 
@@ -103,7 +113,7 @@ public class PlantEquipmentBinder : MonoBehaviour
 
         if (flywheel != null)
         {
-            float speed = Mathf.Clamp01((float)s.PrimaryFlowFrac) * 360f;
+            float speed = (float)PlantWallMapModel.RotorSpeed(false, s) * 360f;   // Clamp01 passes NaN through, which would poison the transform
             flywheel.Rotate(0f, 0f, -speed * Time.deltaTime);
         }
         // Power is a fraction of rated (1.0 = rated); GlowMapping turns it into emission, haze and light, with a dim floor at 0.
