@@ -35,12 +35,14 @@ namespace ReactorSim
         /// crosses the pane at nearly the same place from both poses (parallax grows with depth), so it can sit off the fuel from both.
         /// </summary>
         public const float SpargerFromGlass = 0.6f;
+        /// <summary>Half the length of the sparger drum, along z (end-on to the window); the clearance test counts both ends.</summary>
+        public const float SpargerHalfLength = 0.12f;
         /// <summary>
         /// Hall-space x of the three spargers (PORV, SG relief, bypass). Chosen with the fuel footprint (ReliefAnchorsTests): the PORV in the open water
         /// left of the fuel, the SG relief in the gap between the stand's and the seat's footprints, the bypass towards the right edge of the pane.
         /// About a metre apart on the glass from both poses, so the three plumes read as three sources and none sits in front of the fuel array.
         /// </summary>
-        public static readonly float[] SpargerX = { -1.97f, -0.85f, 0.31f };
+        public static readonly float[] SpargerX = { -1.99f, -0.85f, 0.315f };
         /// <summary>Each horizontal run on the way to the sparger sits in its own z lane (offsets from the sparger z) so no two share a line.</summary>
         private static readonly double[] LaneOffsetZ = { 0.0, 0.25, 0.5 };
 

@@ -258,8 +258,10 @@ namespace ReactorSim.Core.Tests
             for (int i = 0; i < sp.Length; i++)
                 foreach (var v in new[] { HallSightline.Stand(), HallSightline.Seat() })
                 {
-                    double c = GlassCrossing(v, sp[i]);
-                    AssertClearOfFuel(names[i], v, c, c);
+                    // The drum runs along z, so both its ends count (the near end crosses the glass at a slightly different place).
+                    double near = GlassCrossing(v, new[] { sp[i][0], sp[i][1], sp[i][2] - ReliefAnchors.SpargerHalfLength });
+                    double far = GlassCrossing(v, new[] { sp[i][0], sp[i][1], sp[i][2] + ReliefAnchors.SpargerHalfLength });
+                    AssertClearOfFuel(names[i], v, Math.Min(near, far), Math.Max(near, far));
                 }
         }
 

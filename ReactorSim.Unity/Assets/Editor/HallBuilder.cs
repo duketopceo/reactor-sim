@@ -236,12 +236,12 @@ public static class HallBuilder
         foreach (double[] sp in new[] { ReliefAnchors.SpargerPrimary(), ReliefAnchors.SpargerSecondary(), ReliefAnchors.SpargerBypass() })
         {
             Vector3 c = HallVec(sp);
-            const float half = 0.24f, r = 0.07f;
+            float half = ReliefAnchors.SpargerHalfLength; const float r = 0.07f;
             body.AddTube(c + Vector3.back * half, c + Vector3.forward * half, r, 12, true);
-            for (int k = -1; k <= 1; k++) PipeSweep.Flange(body, c + Vector3.forward * (k * 0.18f), Vector3.forward, r, 12);
-            for (int k = -2; k <= 2; k++)
+            for (int k = -1; k <= 1; k++) PipeSweep.Flange(body, c + Vector3.forward * (k * 0.09f), Vector3.forward, r, 12);
+            for (int k = -1; k <= 1; k++)
             {
-                Vector3 h = c + new Vector3(0f, r, k * 0.09f);
+                Vector3 h = c + new Vector3(0f, r, k * 0.07f);
                 holes.AddBox(h - new Vector3(0.025f, 0.012f, 0.025f), h + new Vector3(0.025f, 0.02f, 0.025f));
             }
         }
