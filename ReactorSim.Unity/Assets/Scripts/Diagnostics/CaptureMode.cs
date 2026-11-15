@@ -180,7 +180,9 @@ public class CaptureMode : MonoBehaviour
                 op.CaptureLookAt(gauge.FocusPoint, 45f);
                 yield return Frames(20);
                 gauge.Reject(ControlTooltipModel.RejectIndicator);   // draws the note for about 1.6 s
-                yield return Shot("rejected", "rejected-press", 3, 0f, null);
+                // The 400 measured frames outlast that note on a healthy box, so the press is rejected again just before the screenshot and
+                // the JSON records the note that was actually on screen (graded by check-captures.sh).
+                yield return Shot("rejected", "rejected-press", 3, 0f, null, beforeShot: () => gauge.Reject(ControlTooltipModel.RejectIndicator));
                 break;
             case "drag":
                 var knob = FirstInteractable(true);
@@ -188,9 +190,10 @@ public class CaptureMode : MonoBehaviour
                 op.CaptureLookAt(knob.FocusPoint, 45f);
                 yield return Frames(20);
                 var row = RuntimeInventoryStore.Inventory.Find(knob.rowId);
-                binder.ShowReadout(ControlTooltipModel.DragReadout(string.IsNullOrEmpty(knob.rowLabel) ? knob.RowName : knob.rowLabel,
-                    0.62, 0.5, row != null ? row.units : "", false), 3f);
-                yield return Shot("drag", "drag-readout", 3, 0f, null);
+                string dragText = ControlTooltipModel.DragReadout(string.IsNullOrEmpty(knob.rowLabel) ? knob.RowName : knob.rowLabel,
+                    0.62, 0.5, row != null ? row.units : "", false);
+                binder.ShowReadout(dragText, 3f);
+                yield return Shot("drag", "drag-readout", 3, 0f, null, beforeShot: () => binder.ShowReadout(dragText, 3f));
                 break;
             case "checklist":
                 yield return Panel("checklist", FindAnyObjectByType<StartupChecklistHud>(), "Expand", "Collapse");
@@ -358,12 +361,13 @@ public class CaptureMode : MonoBehaviour
     private const float WallFov = 28f;
 
     private IEnumerator Shot(string pose, string label, int settleFrames, float settleSeconds, CrtScreenRenderer crt, List<Renderer> measure = null,
-        TMPro.TextMeshPro wallText = null, string wallSelected = null)
+        TMPro.TextMeshPro wallText = null, string wallSelected = null, Action beforeShot = null)
     {
         yield return Frames(settleFrames);
         if (settleSeconds > 0f) yield return new WaitForSecondsRealtime(settleSeconds);
         FrameMetrics.Reset();
         yield return Frames(400);   // frames the percentiles are taken over (a short window is dominated by one slow frame)
+        if (beforeShot != null) { beforeShot(); yield return null; }   // transient feedback (a note, a readout) must be live in the frame that is saved
         yield return new WaitForEndOfFrame();
 
         var tex = ScreenCapture.CaptureScreenshotAsTexture();
@@ -381,6 +385,8 @@ public class CaptureMode : MonoBehaviour
         if (crt != null) AppendScreenMeasure(sb, crt, tex);
         if (measure != null && measure.Count > 0) AppendCropLuma(sb, measure, tex);
         if (wallText != null) AppendWallMeasure(sb, wallText, wallSelected, tex);
+        if (pose == "rejected") sb.Append(",\"notice\":\"").Append(Esc(binder != null ? binder.ActiveNotice : null)).Append('"');
+        if (pose == "drag") sb.Append(",\"readout\":\"").Append(Esc(binder != null ? binder.ActiveReadout : null)).Append('"');
         sb.Append('}');
         records.Add(sb.ToString());
         Destroy(tex);

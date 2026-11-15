@@ -87,6 +87,11 @@ for c in data.get("captures", []):
             problems.append("%s: glyph %.1f px < %g px" % (label, c["glyphHeightPx"], glyph_min))
         if c.get("contrast", 99.0) < contrast_min:
             problems.append("%s: contrast %.2f < %g" % (label, c["contrast"], contrast_min))
+    # Transient control feedback must be on screen in the saved frame: the capture records the note / readout it drew.
+    if pose == "rejected" and not str(c.get("notice", "")).strip():
+        problems.append("%s: no rejection note on screen" % label)
+    if pose == "drag" and not str(c.get("readout", "")).strip():
+        problems.append("%s: no drag readout on screen" % label)
     if pose in ("wall", "wallidle"):
         # The status wall's detail plate (U2): same absolute glyph and contrast limits as the CRTs, measured on the rendered text,
         # and the text must fit its plate. A missing measurement is a failure, never a pass.

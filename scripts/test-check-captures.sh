@@ -181,13 +181,33 @@ mkdir -p "$tmp/wallhalf/1600x900"
 head -c 30000 /dev/zero > "$tmp/wallhalf/1600x900/w.png"
 echo '{"captures":[{"pose":"wall","label":"wall","file":"w.png","glyphHeightPx":12,"contrast":7,"detailFits":true}]}' > "$tmp/wallhalf/1600x900/captures.json"
 expect 1 "a missing wallidle capture fails" "$tmp/wallhalf" --only wall,wallidle
+# control feedback cases: the rejected and drag captures must record the note / readout that was on screen
+mkfeed() {   # mkfeed <dir> <notice> <readout>
+  local d="$1/1600x900"
+  mkdir -p "$d"
+  head -c 30000 /dev/zero > "$d/r.png"
+  cat > "$d/captures.json" <<EOF
+{"captures":[
+ {"pose":"rejected","label":"rejected-press","file":"r.png","notice":"$2"},
+ {"pose":"drag","label":"drag-readout","file":"r.png","readout":"$3"}
+]}
+EOF
+}
+mkfeed "$tmp/feedok" "Indicator. Right-click to pin it." "Boron dilute 0.62 (+0.12)"
+mkfeed "$tmp/feednonote" "" "Boron dilute 0.62 (+0.12)"
+mkfeed "$tmp/feednoread" "Indicator. Right-click to pin it." ""
+expect 0 "rejected and drag captures that show their feedback pass" "$tmp/feedok" --only rejected,drag
+expect 1 "a rejected capture with no note on screen fails" "$tmp/feednonote" --only rejected,drag
+expect 1 "a drag capture with no readout on screen fails" "$tmp/feednoread" --only rejected,drag
 # both wall poses are in the default required list: a full run without them fails, with them passes
 mkfull() {   # mkfull <dir> <with wall: yes|no>
   local d="$1/1600x900"
   mkdir -p "$d"
   head -c 30000 /dev/zero > "$d/f.png"
   local body='{"pose":"seat","label":"seat","file":"f.png"}'
-  for pz in stand tooltip rejected drag checklist pause tablet clipboard menu; do body="$body,{\"pose\":\"$pz\",\"label\":\"$pz\",\"file\":\"f.png\"}"; done
+  for pz in stand tooltip checklist pause tablet clipboard menu; do body="$body,{\"pose\":\"$pz\",\"label\":\"$pz\",\"file\":\"f.png\"}"; done
+  body="$body,{\"pose\":\"rejected\",\"label\":\"rejected\",\"file\":\"f.png\",\"notice\":\"Indicator.\"}"
+  body="$body,{\"pose\":\"drag\",\"label\":\"drag\",\"file\":\"f.png\",\"readout\":\"Boron dilute 0.62\"}"
   body="$body,{\"pose\":\"crt\",\"label\":\"crt\",\"file\":\"f.png\",\"glyphHeightPx\":12,\"contrast\":7}"
   if [ "$2" = yes ]; then
     body="$body,{\"pose\":\"wall\",\"label\":\"wall\",\"file\":\"f.png\",\"glyphHeightPx\":12,\"contrast\":7,\"detailFits\":true}"
