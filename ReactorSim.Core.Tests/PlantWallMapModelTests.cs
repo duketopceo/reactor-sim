@@ -148,4 +148,60 @@ public class PlantWallMapModelTests
         Assert.Equal(0, PlantWallMapModel.RotorSpeed(false, s));
         Assert.Equal(0, PlantWallMapModel.RotorSpeed(true, s));
     }
+
+    static readonly string[] Components = { "Reactor", "Safety", "PrimaryPump", "Pressurizer", "SteamGenerator", "Turbine",
+        "Generator", "Grid", "Condenser", "Cooling", "FeedPump", "Chemistry" };
+
+    // Every reading valid, so any unavailable marker below comes from a missing source, not from bad data.
+    static PlantSnapshot FullyPopulated() => new PlantSnapshot { Mode = "Power", Power = .8, FuelTempC = 600,
+        TotalReactivityPcm = 0, PeriodSeconds = 900, PrimaryFlowFrac = .9, PrimaryTempC = 300, PrimaryLevelFrac = .5,
+        PrimaryPressureBar = 155, PrimarySatMarginC = 20, HeaterPowerFrac = .3, SprayFrac = .1, SecondaryPressureBar = 60,
+        SecondaryTempC = 270, SecondaryLevelFrac = .5, SteamDemandFrac = .8, DumpSteamKW = 500, TurbineRpm = 1800,
+        TurbineSteamKW = 90000, GeneratorKw = 30000, GeneratorSynced = true, GridFrequencyHz = 60, GridOutputFrac = .8,
+        CondenserPressureBar = .08, HotwellInventoryFrac = .6, VacuumPumpFrac = 1, CoolingWaterFrac = 1,
+        FeedwaterDeliveredFrac = .8, FeedwaterFlowFrac = .9, FeedwaterAvailabilityFrac = 1, BoronPpm = 800, Ph = 7.2,
+        SimSeconds = 3725 };
+
+    [Fact]
+    public void ReadingsWithoutAnAuthoritativeSourceStayUnavailableEvenWhenEverythingElseIsValid()
+    {
+        var s = FullyPopulated();
+        Assert.Contains("SAFETY FLOW N/M", PlantWallMapModel.ComponentReadout("Safety", s));
+        Assert.Contains("CHEMISTRY FLOW N/M", PlantWallMapModel.ComponentReadout("Chemistry", s));
+        string grouped = PlantWallMapModel.GroupedReadout(s);
+        Assert.Contains("FIRST-OUT N/M", grouped);
+        Assert.Contains("PROCEDURE N/M", grouped);
+        // The snapshot has one shared secondary state, so no per-generator or per-pump reading may appear.
+        foreach (string name in Components)
+        {
+            string text = PlantWallMapModel.ComponentReadout(name, s);
+            Assert.DoesNotMatch(@"\b(SG|RCP|PUMP)[ -]?[1-4A-D]\b", text);
+        }
+    }
+
+    [Fact]
+    public void DemandedRatesAreAlwaysLabeledAsCommands()
+    {
+        var s = FullyPopulated();
+        Assert.Contains("THROTTLE 80.0 % command", PlantWallMapModel.ComponentReadout("SteamGenerator", s));
+        Assert.Contains("VACUUM PUMP 100.0 % command", PlantWallMapModel.ComponentReadout("Condenser", s));
+        string feed = PlantWallMapModel.ComponentReadout("FeedPump", s);
+        Assert.Contains("PUMP 90.0 % command", feed);
+        Assert.Contains("DELIVERED 80.0 % rated", feed);
+    }
+
+    [Fact]
+    public void HeatRatesNeverCarryAMassFlowUnit()
+    {
+        var s = FullyPopulated();
+        Assert.Contains("STEAM 90000 kW heat", PlantWallMapModel.ComponentReadout("Turbine", s));
+        Assert.Contains("DUMP 500 kW heat", PlantWallMapModel.ComponentReadout("SteamGenerator", s));
+        foreach (string name in Components)
+        {
+            string text = PlantWallMapModel.ComponentReadout(name, s);
+            Assert.DoesNotContain("kg/s", text);
+            Assert.DoesNotContain("t/h", text);
+        }
+        Assert.DoesNotContain("kg/s", PlantWallMapModel.GroupedReadout(s));
+    }
 }
