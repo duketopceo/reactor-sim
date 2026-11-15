@@ -68,8 +68,6 @@ public static class GaugeNumerals
 
     // The edgewise bars (K02): the minimum and maximum stand just past the ends of the pointer's travel, the unit rides
     // on the maximum, so a level reads off the strip. The middle is left off: the tick lines already mark it.
-    private const float BarFaceWidthM = 0.14f, BarFaceHeightM = 0.34f;
-    private const float BarEndGapM = 0.022f, BarEndInsetM = 0.03f;
 
     public static bool IsBarKit(Transform pivot)
     {
@@ -95,27 +93,19 @@ public static class GaugeNumerals
         var parent = new GameObject(pivot.name + "_Scale").transform;
         parent.SetParent(kit, false);
         float centre = Vector3.Dot(pivot.localPosition, ControlRoom3DBinder.KitFaceUp);
-        float limit = BarFaceHeightM * 0.5f - 0.02f;
         Vector3 off = pivot.localPosition - ControlRoom3DBinder.KitFaceUp * centre;
         var marks = GaugeScale.Marks(src.Min, src.Max, src.Units);
         string unit = GaugeScale.UnitLabel(src.Units);
-        float lo = centre - travelM * 0.5f - BarEndGapM;
-        float hi = centre + travelM * 0.5f + BarEndGapM;
-        // A long strip leaves no room past its ends: the numerals then stand beside the pointer's travel instead of on it.
-        Vector3 side = Vector3.zero;
-        if (lo < -limit || hi > limit)
-        {
-            // inside the strip, a little in from its ends, so the limit markers there do not sit on the numerals
-            lo = Mathf.Max(-limit, lo) + BarEndInsetM;
-            hi = Mathf.Min(limit, hi) - BarEndInsetM;
-            side = -ControlRoom3DBinder.KitFaceRight * (BarFaceWidthM * 0.14f);   // toward the face's left, derived from the kit axes
-        }
-        float size = BarFaceWidthM * 0.15f;
-        // The unit rides on the maximum only when it fits the strip's width; a long one stays in the tooltip.
+        // Positions come from the pure layout (GaugeScale.BarLabels), which GaugeScaleTests keeps inside the strip's rails.
+        var layout = GaugeScale.BarLabels(travelM);
+        float lo = centre + layout.Lo, hi = centre + layout.Hi;
+        Vector3 side = -ControlRoom3DBinder.KitFaceRight * layout.Side;   // toward the face's left, derived from the kit axes
+        float size = layout.Size;
+        // The unit rides on the maximum only when the numeral still fits between the rails; a long one stays in the tooltip.
         string maxText = marks[2].Text + (unit.Length == 0 || unit == "%" ? unit : " " + unit);
-        if (maxText.Length > 6) maxText = marks[2].Text;
-        Make(parent, kit, marks[0].Text, off + side + ControlRoom3DBinder.KitFaceUp * lo, faceRot, size, BarFaceWidthM, k, ls, ThemeColors.TextInkOnPaper);
-        Make(parent, kit, maxText, off + side + ControlRoom3DBinder.KitFaceUp * hi, faceRot, size, BarFaceWidthM, k, ls, ThemeColors.TextInkOnPaper);
+        if (maxText.Length > GaugeScale.BarMaxChars(layout)) maxText = marks[2].Text;
+        Make(parent, kit, marks[0].Text, off + side + ControlRoom3DBinder.KitFaceUp * lo, faceRot, size, GaugeScale.BarFaceWidthM, k, ls, ThemeColors.TextInkOnPaper);
+        Make(parent, kit, maxText, off + side + ControlRoom3DBinder.KitFaceUp * hi, faceRot, size, GaugeScale.BarFaceWidthM, k, ls, ThemeColors.TextInkOnPaper);
     }
 
     private static void Make(Transform parent, Transform kit, string text, Vector3 localPos, Quaternion rot, float fontSize,

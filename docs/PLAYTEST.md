@@ -26,7 +26,7 @@ seat and walk to the reactor window in the south wall (see "Reactor hall" below)
 2. Lineup: start the primary pumps (flow 80 % or more), heaters on (60 bar or more), cooling water and vacuum
    pump on (condenser 0.3 bar or lower).
 3. Pull shutdown banks D, C and B fully out. Boron still holds the core subcritical.
-4. Dilute boron to about 1200 ppm (diluting, not borating), then stop the dilution.
+4. Dilute boron to about 1300 ppm, anywhere from 1250 to 1350 (diluting, not borating), then stop the dilution.
 5. Withdraw bank A to about half, then trim it a little at a time until the critical lamp is on and power is
    above 2 %. Watch flux and period between pulls.
 6. Heat the primary to 250 C with a small steam draw, turbine governor on auto load, then open the throttle in

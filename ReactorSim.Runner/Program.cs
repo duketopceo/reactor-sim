@@ -204,6 +204,9 @@ namespace ReactorSim
             if (all || key == "startup-grid")
                 failures += RunCheck("U4 Startup: Checklist From Cold Start to Grid Sync, Player Intents Only", StartupScenarios.VerifyStartupToGrid);
 
+            if (all || key == "startup-boron")
+                failures += RunCheck("U4 Startup: Boron Band Leaves Bank A Critical Mid-Range", StartupScenarios.VerifyBoronBand);
+
             Console.WriteLine("=================================================================");
             if (failures == 0)
             {

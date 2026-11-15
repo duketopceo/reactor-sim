@@ -36,6 +36,9 @@ FOOTPRINTS = {
 }
 _PIVOT_GRAMMAR = {kid: k["pivot"] for kid, k in _CATALOGUE["kits"].items()}
 LABEL_PLATE = _CATALOGUE["label_plate"]  # {"height", "gap"}
+# Clear inner half-width of the circular gauges' bezel frame as a share of face_w. The dial's scale numerals must fit
+# inside it (GaugeScaleTests and InstrumentCheck read the same number from kits.json).
+BEZEL_INNER_FRAC = float(_CATALOGUE["circular_bezel_inner_frac"])
 
 
 # layout.json grid.min_plate_width: a label plate is as wide as its kit, but never narrower than this.
@@ -223,10 +226,40 @@ def _label_plate(ctx, text, mount):
 
 def _oos_tag(ctx):
     y = ctx.depth + 0.004
-    tag = ctx.box("OosTag", (0, y, 0), (0.08, 0.005, 0.05), ctx.m["M_ScramRed"])
+    # A pale tag with near-black lettering (the old light-on-dark-red tag was unreadable from the seat); the text fills
+    # the tag: 2 lines of up to 7 characters at ~12 mm cap height.
+    tag = ctx.box("OosTag", (0, y, 0), (0.084, 0.005, 0.052), ctx.m["M_GaugeFace"])
     tag["aux"] = 1
-    make_text(ctx.col, ctx.nm("OosText"), "OUT OF\nSERVICE", 0.012, ctx.m["M_GaugeFace"], ctx.root,
-              (0, y + 0.0025 + 0.0005, 0), max_width=0.07, extrude=0.0005)
+    make_text(ctx.col, ctx.nm("OosText"), "OUT OF\nSERVICE", 0.018, ctx.m["M_DarkRubber"], ctx.root,
+              (0, y + 0.0025 + 0.0005, 0), max_width=0.076, max_height=0.044, extrude=0.001)
+
+
+def _merge_static(ctx):
+    """Join the kit's decorative meshes that share a parent and a material into one mesh (one Unity renderer, one draw
+    call per material instead of one per tick/rail/screw). Left alone: text and plates (aux, other checks measure them),
+    the bound mover mesh (lamp lens, screen face, beacon dome; the binder finds it by name), and anything with modifiers
+    or several material slots. Pivot children merge only with siblings under the same pivot, so motion is unchanged."""
+    mover = ctx.root.get("mover_obj", "")
+    groups = {}
+    for o in ctx.root.children_recursive:
+        if o.type != "MESH" or o.get("aux") or o.name == mover or o.modifiers:
+            continue
+        mats = o.data.materials
+        if len(mats) != 1 or mats[0] is None or o.parent is None:
+            continue
+        groups.setdefault((o.parent.name, mats[0].name), []).append(o)
+    for (pname, mname), objs in sorted(groups.items()):
+        if len(objs) < 2:
+            continue
+        parent = bpy.data.objects[pname]
+        tgt = bpy.data.objects.new("%s_%s" % (ctx.ctl_id, mname[2:] if mname.startswith("M_") else mname),
+                                   bpy.data.meshes.new("%s_%s_mesh" % (ctx.ctl_id, mname)))
+        ctx.col.objects.link(tgt)
+        tgt.parent = parent
+        bpy.context.view_layer.update()
+        sel = [tgt] + objs
+        with bpy.context.temp_override(active_object=tgt, selected_objects=sel, selected_editable_objects=sel):
+            bpy.ops.object.join()
 
 
 def _register(kid):
@@ -254,7 +287,8 @@ def _register(kid):
                 root["label"] = label
             ctx = Ctx(kid, ctl_id, root, mover, col, label, label_size)
             body(ctx)
-            pose = POSE_CONTRACT.get(kid)
+            _merge_static(ctx)
+            pose =POSE_CONTRACT.get(kid)
             if pose:
                 for k, v in pose.items():
                     root[k] = v
@@ -284,18 +318,26 @@ def _gauge_circular(ctx, s):
     m = ctx.m
     sy = ctx.depth / 0.08
     ctx.base(m["M_PanelSlate"], 0.03 * sy)
-    # bezel ring: a dark disc proud of the slate, the square faceplate and dial face sit inside it
-    ctx.cyl("Bezel", (0, 0.031 * sy, 0), 0.106 * s, 0.008 * sy, m["M_BezelBlack"], verts=32)
-    ctx.box("Faceplate", (0, 0.032 * sy, 0), (0.19 * s, 0.004, 0.19 * s), m["M_GaugeFace"])
-    ctx.cyl("DialFace", (0, 0.0345 * sy, 0), 0.0965 * s, 0.0015, m["M_GaugeFace"], verts=32)
+    # Square bezel frame (four rails) around a square dial plate. The scale numerals (GaugeNumerals) stand in the plate's
+    # bottom corners, outside any circle the needle fits in, so a round ring always cut through them. The frame's clear
+    # inner half-width (kits.json circular_bezel_inner_frac * face_w) is the contract: GaugeScaleTests and
+    # InstrumentCheck keep every numeral inside it. No glass overlay: the exported glass material is opaque in Unity
+    # and hid the ticks and tinted the face.
+    inner = BEZEL_INNER_FRAC * ctx.fw             # clear half-width inside the rails
+    outer = 0.106 * s                             # the rails reach to just inside the footprint
+    rail = outer - inner
+    ctx.box("Faceplate", (0, 0.032 * sy, 0), (2.0 * inner, 0.004, 2.0 * inner), m["M_GaugeFace"])
+    for sx in (-1, 1):
+        ctx.box("Rail%d" % sx, (sx * (inner + rail / 2.0), 0.0335 * sy, 0), (rail, 0.005 * sy, 2.0 * outer), m["M_BezelBlack"])
+    for sz in (-1, 1):
+        ctx.box("Cap%d" % sz, (0, 0.0335 * sy, sz * (inner + rail / 2.0)), (2.0 * inner, 0.005 * sy, rail), m["M_BezelBlack"])
     ctx.ticks(ctx.root, (0, 0), 0.082 * s, [i / 10.0 for i in range(11)], 0.0355 * sy, 0.014 * s, m["M_DarkRubber"])
     ctx.ticks(ctx.root, (0, 0), 0.068 * s, [0.8], 0.0365 * sy, 0.016 * s, m["M_AmberGlow"], width=0.008 * s)
     ctx.ticks(ctx.root, (0, 0), 0.068 * s, [0.92], 0.0365 * sy, 0.016 * s, m["M_ScramRed"], width=0.008 * s)
-    ctx.cyl("Glass", (0, 0.0375 * sy, 0), 0.097 * s, 0.0012, m["M_ContainmentGlass"], verts=32)
-    for k in range(4):  # bezel screws at the diagonals
-        a = math.radians(45.0 + 90.0 * k)
-        ctx.cyl("Screw%d" % k, (0.100 * s * math.sin(a), 0.0345 * sy, 0.100 * s * math.cos(a)),
-                0.0035, 0.003, m["M_BrushedSteel"], verts=10)
+    c = outer - rail / 2.0
+    for sx in (-1, 1):  # bezel screws on the frame corners
+        for sz in (-1, 1):
+            ctx.cyl("Screw%d_%d" % (sx, sz), (sx * c, 0.037 * sy, sz * c), 0.0035, 0.003, m["M_BrushedSteel"], verts=10)
     piv = ctx.pivot((0, 0.045 * sy, 0))
     # long along Z: the binder turns the pivot about local Z (Blender Y), so the needle visibly sweeps
     ctx.box("Needle", (0, 0, 0.035 * s), (0.010 * s, 0.008, 0.100 * s), m["M_GaugeNeedle"], piv)
@@ -324,7 +366,6 @@ def _k02(ctx):
     for sz in (-1, 1):
         ctx.box("EndCap%d" % sz, (0, 0.032, sz * 0.153), (0.12, 0.004, 0.010), m["M_BezelBlack"])
     ctx.box("Strip", (0, 0.032, 0), (0.10, 0.004, 0.30), m["M_GaugeFace"])
-    ctx.box("Glass", (0, 0.040, 0), (0.096, 0.0012, 0.296), m["M_ContainmentGlass"])
     for i in range(11):
         ctx.box("Tick%d" % i, (-0.04, 0.037, -0.14 + i * 0.028), (0.03, 0.003, 0.003), m["M_DarkRubber"])
     ctx.box("TargetBug", (0, 0.037, 0.06), (0.10, 0.004, 0.012), m["M_AmberGlow"])
@@ -345,7 +386,6 @@ def _k03(ctx):
     for sz in (-1, 1):
         ctx.box("Cap%d" % sz, (0, 0.032, sz * 0.093), (0.24, 0.004, 0.008), m["M_BezelBlack"])
     ctx.box("Faceplate", (0, 0.032, 0), (0.23, 0.004, 0.17), m["M_GaugeFace"])
-    ctx.box("Glass", (0, 0.038, 0), (0.222, 0.0012, 0.162), m["M_ContainmentGlass"])
     ctx.ticks(ctx.root, (0, -0.025), 0.062, [i / 8.0 for i in range(9)], 0.0355, 0.012, m["M_DarkRubber"])
     ctx.box("Chip_Doppler", (-0.10, 0.0365, 0.07), (0.03, 0.004, 0.012), m["M_GreenGlow"])
     ctx.box("Chip_Xe", (0.10, 0.0365, 0.07), (0.03, 0.004, 0.012), m["M_AmberGlow"])
@@ -363,7 +403,6 @@ def _k04(ctx):
     ctx.box("Bezel", (0, 0.031, 0), (0.28, 0.004, 0.10), m["M_BezelBlack"])
     for i in range(5):
         ctx.box("Digit%d" % i, (-0.10 + i * 0.05, 0.034, 0), (0.04, 0.004, 0.07), m["M_CrtScreen"])
-    ctx.box("DigitGlass", (0, 0.0365, 0), (0.25, 0.0012, 0.085), m["M_ContainmentGlass"])
     ctx.pivot((0, 0.045, 0))  # BIND_GAUGE pivot with no child: the binder's rotation has nothing to move
 
 
@@ -398,17 +437,23 @@ def _k20(ctx):
 def _k06(ctx):
     m = ctx.m
     ctx.base(m["M_PanelSlate"], 0.025)
-    ctx.cyl("Collar", (0, 0.031, 0), 0.040, 0.012, m["M_BrushedSteel"])
-    ctx.cyl("CollarTrim", (0, 0.0365, 0), 0.036, 0.003, m["M_BezelBlack"], verts=24)
-    piv = ctx.pivot((0, 0.037, 0))
-    ctx.cyl("Plunger", (0, 0.009, 0), 0.028, 0.022, m["M_ScramRed"], piv)
-    ctx.cyl("PlungerRing", (0, 0.0105, 0), 0.030, 0.004, m["M_BezelBlack"], piv, verts=24)
-    # SCRAM cover: a red hood over the plunger on a bottom hinge; U3 flips it open when armed.
-    # Stack stays inside the 0.06 m depth contract: plunger top ~0.0495, cover top ~0.0595.
+    # Low steel collar with a dark well; the red mushroom stands tall out of it (rest: cap top at y 0.060, the full depth
+    # contract) and the binder presses it 0.025 m in, so it sinks until only the dome crowns the well (pressed).
+    ctx.cyl("Collar", (0, 0.029, 0), 0.040, 0.008, m["M_BrushedSteel"])
+    ctx.cyl("CollarTrim", (0, 0.0335, 0), 0.036, 0.001, m["M_BezelBlack"], verts=24)
+    piv = ctx.pivot((0, 0.033, 0))   # children are pivot-local: world y = 0.033 + local y
+    ctx.cyl("Stem", (0, 0.0085, 0), 0.016, 0.017, m["M_BrushedSteel"], piv, verts=20)
+    ctx.cyl("Plunger", (0, 0.0195, 0), 0.031, 0.009, m["M_ScramRed"], piv, verts=32)   # the mushroom cap
+    ctx.cyl("PlungerDome", (0, 0.0255, 0), 0.022, 0.003, m["M_ScramRed"], piv, verts=24)
+    # SCRAM guard: a steel hoop around the cap on a bottom hinge (the cap stays visible through it); U3 flips it open
+    # when armed. Hinge-local: the hoop is centred 0.038 up the face from the hinge, 12 tangent segments at r 0.038.
     cover = ctx.aux_pivot("PART_ScramCover", (0, 0.0505, -0.038))
     ctx.box("Hinge", (0, 0, 0), (0.070, 0.010, 0.010), m["M_BrushedSteel"], cover)
-    ctx.cyl("Cover", (0, 0.0045, 0.038), 0.042, 0.008, m["M_ScramRed"], cover, verts=24)
-    ctx.cyl("CoverRim", (0, 0.008, 0.038), 0.044, 0.002, m["M_BezelBlack"], cover, verts=24)
+    for k in range(12):
+        a = 2.0 * math.pi * k / 12.0
+        seg = ctx.box("Cover%d" % k, (0.038 * math.sin(a), 0.0045, 0.038 + 0.038 * math.cos(a)), (0.022, 0.008, 0.008),
+                      m["M_BrushedSteel"], cover)
+        seg.rotation_euler = (0, a, 0)
 
 
 @_register("K07")
@@ -620,9 +665,9 @@ def _k22(ctx):
 @_register("K23")
 def _k23(ctx):
     m = ctx.m
-    ctx.base(m["M_ScramRed"], 0.005)
-    make_text(ctx.col, ctx.nm("TagText"), "OUT OF\nSERVICE", 0.012, m["M_GaugeFace"], ctx.root,
-              (0, 0.005 + 0.0005, 0), max_width=0.07, extrude=0.0005)
+    ctx.base(m["M_GaugeFace"], 0.005)   # same pale tag + near-black lettering as _oos_tag
+    make_text(ctx.col, ctx.nm("TagText"), "OUT OF\nSERVICE", 0.018, m["M_DarkRubber"], ctx.root,
+              (0, 0.005 + 0.0005, 0), max_width=0.072, max_height=0.042, extrude=0.001)
 
 
 # ---------------------------------------------------------------------------------------------------------------
