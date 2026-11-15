@@ -103,15 +103,32 @@ public static class ReactorAssetCheck
         for (int i = 0; i < ReliefAnchors.SecondaryCount; i++)
             CheckAnchor(hall, ReliefAnchors.SecondaryName(i), ReliefAnchors.Secondary(i));
         CheckAnchor(hall, ReliefAnchors.BypassName, ReliefAnchors.Bypass());
-        int primary = 0, secondary = 0, bypass = 0;
+        CheckAnchor(hall, ReliefAnchors.SpargerPrimaryName, ReliefAnchors.SpargerPrimary());
+        CheckAnchor(hall, ReliefAnchors.SpargerSecondaryName, ReliefAnchors.SpargerSecondary());
+        CheckAnchor(hall, ReliefAnchors.SpargerBypassName, ReliefAnchors.SpargerBypass());
+        int primary = 0, secondary = 0, bypass = 0, sPrimary = 0, sSecondary = 0, sBypass = 0;
         foreach (Transform t in hall.GetComponentsInChildren<Transform>(true))
         {
             if (t.name.StartsWith("VFX_PORV_SteamJet")) primary++;
-            else if (t.name.StartsWith("VFX_SGRelief")) secondary++;
+            else if (t.name.StartsWith("VFX_SGRelief_SteamJet")) secondary++;
             else if (t.name.StartsWith("VFX_Bypass_SteamJet")) bypass++;
+            else if (t.name.StartsWith("VFX_PORV_Sparger")) sPrimary++;
+            else if (t.name.StartsWith("VFX_SGRelief_Sparger")) sSecondary++;
+            else if (t.name.StartsWith("VFX_Bypass_Sparger")) sBypass++;
         }
         Require(primary == 1 && secondary == ReliefAnchors.SecondaryCount && bypass == 1,
             "exactly one PORV, " + ReliefAnchors.SecondaryCount + " SG relief and one bypass anchor bind (found " + primary + "/" + secondary + "/" + bypass + ")");
+        Require(sPrimary == 1 && sSecondary == 1 && sBypass == 1,
+            "exactly one PORV, one SG relief and one bypass sparger anchor bind (found " + sPrimary + "/" + sSecondary + "/" + sBypass + ")");
+        // The relief lines and the spargers are real geometry the operator sees through the window; they must be built and under water.
+        foreach (string meshName in new[] { "ReliefLines", "Spargers", "SpargerPerforations" })
+        {
+            Transform m = Find(hall, meshName);
+            var filter = m.GetComponent<MeshFilter>();
+            Require(filter != null && filter.sharedMesh != null && filter.sharedMesh.triangles.Length > 0, meshName + " has geometry");
+            Require(m.GetComponent<Renderer>().bounds.max.y < hall.transform.position.y + HallDimensions.WaterDepth, meshName + " stays under the water surface");
+        }
+        Require(Find(hall, "Spargers").GetComponent<Renderer>().bounds.min.y > hall.transform.position.y + HallDimensions.VesselBandLow - 1.0f, "spargers sit at the fuel-display depth, in the window's band");
         int triangles, renderers, lights;
         HallBuilder.Stats(hall, out triangles, out renderers, out lights);
         Require(triangles <= HallDimensions.MaxHallTriangles, "hall triangles " + triangles + " <= " + HallDimensions.MaxHallTriangles + " with the anchors");

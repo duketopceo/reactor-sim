@@ -23,7 +23,7 @@ public static class PlantFeedbackPlayCapture
         SessionState.SetFloat(Started, (float)EditorApplication.timeSinceStartup);
         Arm();
         PlayModeGuard.Prepare();
-        EditorApplication.isPlaying = true;
+        EditorApplication.isEmitting = true;
     }
 
     private static void Arm() { EditorApplication.update -= Poll; EditorApplication.update += Poll; }
@@ -33,8 +33,8 @@ public static class PlantFeedbackPlayCapture
         if (stage == 0) return;
         if (EditorApplication.timeSinceStartup - SessionState.GetFloat(Started, 0) > 120)
         { Debug.LogError("[PlantFeedbackPlayCapture] Timeout"); Finish(1); return; }
-        if (stage == 3) { if (!EditorApplication.isPlayingOrWillChangePlaymode) Finish(0); return; }
-        if (!EditorApplication.isPlaying) return;
+        if (stage == 3) { if (!EditorApplication.isEmittingOrWillChangePlaymode) Finish(0); return; }
+        if (!EditorApplication.isEmitting) return;
         try
         {
             var hall = HallVisibility.FindHall();
@@ -120,7 +120,7 @@ public static class PlantFeedbackPlayCapture
             Capture(cam, Path.Combine(dir, "wall-metrics-close.png"));
             Debug.Log("[PlantFeedbackPlayCapture] PASS bubbles=" + ps.particleCount + " " + dir);
             SessionState.SetInt(Stage, 3);
-            EditorApplication.isPlaying = false;
+            EditorApplication.isEmitting = false;
         }
         catch (Exception ex) { Debug.LogError("[PlantFeedbackPlayCapture] FAIL " + ex); Finish(1); }
     }
@@ -165,15 +165,27 @@ public static class PlantFeedbackPlayCapture
         var sec = new System.Collections.Generic.List<ParticleSystem>();
         for (int i = 0; i < ReliefAnchors.SecondaryCount; i++) sec.Add(JetAt(hall, ReliefAnchors.SecondaryName(i)));
         var byp = JetAt(hall, ReliefAnchors.BypassName);
+        // The submerged plumes off the three spargers, bound to the same signals as the jets and independent of one another.
+        var pPri = JetAt(hall, ReliefAnchors.SpargerPrimaryName);
+        var pSec = JetAt(hall, ReliefAnchors.SpargerSecondaryName);
+        var pByp = JetAt(hall, ReliefAnchors.SpargerBypassName);
+        Expect(Rate(pri) == 0 && Rate(pPri) == 0 && Rate(pSec) == 0 && Rate(pByp) == 0, "idle: no jet and no plume");
         binder.ApplyReliefState(true, false); binder.ApplyBypass(0f);
         Expect(Rate(pri) > 0 && Rate(sec[0]) == 0 && Rate(sec[1]) == 0 && Rate(byp) == 0, "primary relief alone drives only the PORV jet");
+        Expect(Rate(pPri) > 0 && Rate(pSec) == 0 && Rate(pByp) == 0 && pPri.isEmitting && !pSec.isEmitting && !pByp.isEmitting, "primary relief alone drives only the PORV plume");
         binder.ApplyReliefState(false, true);
         Expect(Rate(pri) == 0 && Rate(sec[0]) > 0 && Rate(sec[1]) > 0 && Rate(byp) == 0, "secondary relief alone drives only the SG relief jets");
+        Expect(Rate(pPri) == 0 && Rate(pSec) > 0 && Rate(pByp) == 0 && !pPri.isEmitting && pSec.isEmitting && !pByp.isEmitting, "secondary relief alone drives only the SG relief plume");
         var trip = HallSteamModel.From(new PlantSnapshot { TurbineTripped = true, TurbineSteamKW = 0, DumpSteamKW = ReactorSim.Physics.RatedThermalKW * .3 });
         binder.ApplyReliefState(trip.PrimaryRelief, trip.SecondaryRelief); binder.ApplyBypass(trip.Bypass);
         Expect(Rate(pri) == 0 && Rate(sec[0]) == 0 && Rate(byp) > 0, "bypass steam alone (turbine tripped) drives only the bypass jet");
+        Expect(Rate(pPri) == 0 && Rate(pSec) == 0 && Rate(pByp) > 0 && !pPri.isEmitting && !pSec.isEmitting && pByp.isEmitting, "bypass steam alone (turbine tripped) drives only the bypass plume");
+        float small = Rate(pByp);
+        binder.ApplyBypass(1f);
+        Expect(Rate(pByp) > small, "a bigger dump flow makes a denser bypass plume");
         binder.ApplyReliefState(false, false); binder.ApplyBypass(0f);
         Expect(Rate(pri) == 0 && Rate(sec[0]) == 0 && Rate(byp) == 0, "all jets stop when nothing is open");
+        Expect(Rate(pPri) == 0 && Rate(pSec) == 0 && Rate(pByp) == 0 && !pPri.isEmitting && !pSec.isEmitting && !pByp.isEmitting, "all plumes stop when nothing is open");
     }
 
     private static ParticleSystem JetAt(GameObject hall, string anchor)

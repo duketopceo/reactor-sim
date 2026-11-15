@@ -57,9 +57,11 @@ public static class ReactorAssetRender
         }
     }
 
-    // Phase 1 U3: the relief and bypass jets in four states, from the standing and seated poses through the window and in two close views.
-    // Edit mode never runs Awake, so wake the binder by hand (it binds the anchors and builds their jets) and advance each jet's particles
-    // with Simulate. Output: <dir>/relief/<state>-<view>.png.
+    // Phase 1 U3: the relief and bypass visuals in four states (idle, primary-only, secondary-only, trip-bypass), from the standing and
+    // seated poses through the observation window (the plumes off the spargers, which is what the operator sees) and in three close views
+    // (the head jet, the steam-line jets, the spargers from just outside the glass). Edit mode never runs Awake, so wake the binder by hand
+    // (it binds the anchors and builds their jets and plumes) and advance every VFX particle system with Simulate long enough for a bubble
+    // to climb the whole pane. Output: <dir>/relief/<state>-<view><REACTOR_ASSET_RENDER_SUFFIX>.png.
     public static void RunRelief()
     {
         try
@@ -70,7 +72,16 @@ public static class ReactorAssetRender
             foreach (var lod in hall.GetComponentsInChildren<LODGroup>()) lod.ForceLOD(0);
             var binder = hall.GetComponent<PlantEquipmentBinder>();
             typeof(PlantEquipmentBinder).GetMethod("Awake", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(binder, null);
+            // The pool bubbles and the core halo are part of what the plumes are seen against, so wake them as the real scene does.
+            var atmosphere = hall.GetComponent<ReactorWaterAtmosphere>();
+            typeof(ReactorWaterAtmosphere).GetMethod("Awake", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(atmosphere, null);
+            atmosphere.ApplyPower(1f);
+            atmosphere.Settle(9f);
+            var motion = hall.GetComponent<ReactorAssetMotion>();
+            motion.Bind();
+            motion.Apply(new PlantSnapshot { BankInsertion = new[] { 0.0, 0.35, 0.7, 1.0 }, FuelTempC = 350 }, 1.0, false, 0);
             string requested = Environment.GetEnvironmentVariable("REACTOR_ASSET_RENDER_DIR");
+            string suffix = Environment.GetEnvironmentVariable("REACTOR_ASSET_RENDER_SUFFIX") ?? "";
             string directory = Path.Combine(Path.GetFullPath(string.IsNullOrEmpty(requested)
                 ? Path.Combine(Application.dataPath, "../../out/reactor-assets") : requested), "relief");
             Directory.CreateDirectory(directory);
@@ -79,7 +90,7 @@ public static class ReactorAssetRender
             var seat = HallSightline.EyeInHallSpace(HallSightline.Seat());
             float windowY = HallDimensions.RoomFloorAbovePoolFloor + HallDimensions.WindowSill + HallDimensions.WindowHeight * 0.5f;
             var windowCentre = new Vector3(-HallDimensions.VesselShiftX, windowY, -HallDimensions.PoolAxisFromWall);
-            double[] port = ReliefAnchors.Primary(), line = ReliefAnchors.Secondary(0), byp = ReliefAnchors.Bypass();
+            double[] port = ReliefAnchors.Primary(), line = ReliefAnchors.Secondary(0), byp = ReliefAnchors.Bypass(), spg = ReliefAnchors.SpargerSecondary();
             var states = new[]
             {
                 new { name = "idle", snap = new PlantSnapshot() },
@@ -93,13 +104,15 @@ public static class ReactorAssetRender
                 binder.ApplyReliefState(steam.PrimaryRelief, steam.SecondaryRelief);
                 binder.ApplyBypass(steam.Bypass);
                 foreach (var ps in hall.GetComponentsInChildren<ParticleSystem>(true))
-                    if (ps.name.StartsWith("VFX_")) ps.Simulate(2.2f, true, true);
-                Render(hall, new Vector3((float)stand[0], (float)stand[1], (float)stand[2]), windowCentre, 55, Path.Combine(directory, state.name + "-stand.png"), false);
-                Render(hall, new Vector3((float)seat[0], (float)seat[1], (float)seat[2]), windowCentre, 55, Path.Combine(directory, state.name + "-seat.png"), false);
+                    if (ps.name.StartsWith("VFX_")) ps.Simulate(6f, true, true);
+                Render(hall, new Vector3((float)stand[0], (float)stand[1], (float)stand[2]), windowCentre, 55, Path.Combine(directory, state.name + "-stand" + suffix + ".png"), false);
+                Render(hall, new Vector3((float)seat[0], (float)seat[1], (float)seat[2]), windowCentre, 55, Path.Combine(directory, state.name + "-seat" + suffix + ".png"), false);
                 Render(hall, new Vector3((float)port[0] + 1.5f, (float)port[1] - 1.5f, mz - 6f), new Vector3((float)port[0], (float)port[1] + 0.8f, (float)port[2]), 50,
-                    Path.Combine(directory, state.name + "-head-close.png"), true);
+                    Path.Combine(directory, state.name + "-head-close" + suffix + ".png"), true);
                 Render(hall, new Vector3((float)(line[0] + byp[0]) * 0.5f, (float)line[1] - 1.8f, mz - 7f), new Vector3((float)(line[0] + byp[0]) * 0.5f, (float)line[1] + 0.6f, (float)line[2]), 55,
-                    Path.Combine(directory, state.name + "-steamline-close.png"), true);
+                    Path.Combine(directory, state.name + "-steamline-close" + suffix + ".png"), true);
+                Render(hall, new Vector3((float)spg[0], (float)spg[1] + 0.6f, (float)spg[2] - 3.2f), new Vector3((float)spg[0], (float)spg[1] + 1.2f, (float)spg[2]), 60,
+                    Path.Combine(directory, state.name + "-sparger-close" + suffix + ".png"), true);
             }
             Debug.Log("[ReactorAssetRender] RELIEF PASS " + directory);
             if (Application.isBatchMode) EditorApplication.Exit(0);

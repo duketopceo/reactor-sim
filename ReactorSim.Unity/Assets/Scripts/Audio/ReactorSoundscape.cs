@@ -96,10 +96,10 @@ public sealed class ReactorSoundscape : MonoBehaviour
             {
                 core.transform.position = hall.transform.TransformPoint(new Vector3(0, HallDimensions.VesselBase + 5.2f, HallDimensions.ModuleZ));
                 water.transform.position = hall.transform.TransformPoint(new Vector3(-HallDimensions.VesselShiftX, HallDimensions.WaterDepth + HallDimensions.GalleryEyeAboveWater, -HallDimensions.PoolAxisFromWall + 1f));
-                // Relief and bypass sound come from the same hall points as their steam jets (HallBuilder.BuildReliefAnchors).
-                primaryRelief.transform.position = hall.transform.TransformPoint(HallPoint(ReliefAnchors.Primary()));
-                secondaryRelief.transform.position = hall.transform.TransformPoint(HallPoint(ReliefAnchors.SecondarySound()));
-                bypass.transform.position = hall.transform.TransformPoint(HallPoint(ReliefAnchors.Bypass()));
+                // Relief and bypass sound come from the spargers the operator sees bubbling (HallBuilder.BuildReliefAnchors): the discharge condenses there.
+                primaryRelief.transform.position = hall.transform.TransformPoint(HallPoint(ReliefAnchors.SpargerPrimary()));
+                secondaryRelief.transform.position = hall.transform.TransformPoint(HallPoint(ReliefAnchors.SpargerSecondary()));
+                bypass.transform.position = hall.transform.TransformPoint(HallPoint(ReliefAnchors.SpargerBypass()));
                 cooling.transform.position = hall.transform.TransformPoint(new Vector3(4f, HallDimensions.VesselBase + 6f, HallDimensions.ModuleZ));
                 generator.transform.position = hall.transform.TransformPoint(new Vector3(-3f, HallDimensions.VesselBase + 4f, HallDimensions.ModuleZ));
                 positioned = true;

@@ -79,8 +79,9 @@ namespace ReactorSim.Core.Tests
         public void NamesAreDistinctAndNoNameMatchesAnotherKindsBinderPrefix()
         {
             // PlantEquipmentBinder binds by StartsWith, so a name that matches two prefixes would drive two signals.
-            string[] prefixes = { "VFX_PORV_SteamJet", "VFX_SGRelief", "VFX_Bypass_SteamJet" };
-            string[] names = { ReliefAnchors.PrimaryName, ReliefAnchors.SecondaryName(0), ReliefAnchors.SecondaryName(1), ReliefAnchors.BypassName };
+            string[] prefixes = { "VFX_PORV_SteamJet", "VFX_SGRelief_SteamJet", "VFX_Bypass_SteamJet", "VFX_PORV_Sparger", "VFX_SGRelief_Sparger", "VFX_Bypass_Sparger" };
+            string[] names = { ReliefAnchors.PrimaryName, ReliefAnchors.SecondaryName(0), ReliefAnchors.SecondaryName(1), ReliefAnchors.BypassName,
+                ReliefAnchors.SpargerPrimaryName, ReliefAnchors.SpargerSecondaryName, ReliefAnchors.SpargerBypassName };
             Assert.Equal(names.Length, new System.Collections.Generic.HashSet<string>(names).Count);
             foreach (string name in names)
             {
@@ -89,17 +90,146 @@ namespace ReactorSim.Core.Tests
                 Assert.Equal(1, matches);
             }
             Assert.StartsWith("VFX_PORV_SteamJet", ReliefAnchors.PrimaryName);
-            Assert.StartsWith("VFX_SGRelief", ReliefAnchors.SecondaryName(0));
+            Assert.StartsWith("VFX_SGRelief_SteamJet", ReliefAnchors.SecondaryName(0));
             Assert.StartsWith("VFX_Bypass_SteamJet", ReliefAnchors.BypassName);
         }
 
         [Fact]
-        public void SecondaryReliefSoundSitsBetweenItsValves()
+        public void SecondaryReliefHeaderSitsBetweenItsValves()
         {
-            double[] a = ReliefAnchors.Secondary(0), b = ReliefAnchors.Secondary(1), m = ReliefAnchors.SecondarySound();
+            double[] a = ReliefAnchors.Secondary(0), b = ReliefAnchors.Secondary(1), m = ReliefAnchors.SecondaryHeader();
             Assert.InRange(m[0], a[0], b[0]);
             Assert.Equal(a[1], m[1], 6);
             Assert.Equal(a[2], m[2], 6);
+        }
+
+        // ---- submerged discharge: each relief line ends in a sparger in view of the observation window ----
+
+        private static double[][] Spargers()
+        {
+            return new[] { ReliefAnchors.SpargerPrimary(), ReliefAnchors.SpargerSecondary(), ReliefAnchors.SpargerBypass() };
+        }
+
+        private static double[][][] Downcomers()
+        {
+            return new[] { ReliefAnchors.PrimaryDowncomer(), ReliefAnchors.SecondaryDowncomer(), ReliefAnchors.BypassDowncomer() };
+        }
+
+        [Fact]
+        public void EverySpargerSitsInsideTheBandTheWindowFramesFromTheStandAndTheSeat()
+        {
+            foreach (double[] sp in Spargers())
+                foreach (var view in new[] { HallSightline.Stand(), HallSightline.Seat() })
+                {
+                    double beyond = sp[2] + HallDimensions.PoolAxisFromWall;     // metres behind the glass
+                    double low, high;
+                    HallSightline.VisibleBandAt(view, beyond, out low, out high);
+                    Assert.True(sp[1] >= low + 0.5, view.name + ": sparger " + sp[1] + " m is under the framed band (" + low + ")");
+                    Assert.True(sp[1] <= high - 1.5, view.name + ": no room above the sparger for the plume to climb inside the window (" + high + ")");
+                    Assert.True(HallSightline.EdgeMarginAt(view, sp[0], beyond) >= HallDimensions.SightEdgeMargin, view.name + ": sparger at x " + sp[0] + " is too near a window edge");
+                }
+        }
+
+        [Fact]
+        public void TheJetAnchorsAloneAreFarAboveWhatTheWindowFramesWhichIsWhyTheSpargersExist()
+        {
+            // Negative control for the band test: the anchors sit just under the surface, over 12 m above the top of the framed band.
+            var anchors = new System.Collections.Generic.List<double[]> { ReliefAnchors.Primary(), ReliefAnchors.Bypass(), ReliefAnchors.Secondary(0), ReliefAnchors.Secondary(1) };
+            foreach (double[] a in anchors)
+                foreach (var view in new[] { HallSightline.Stand(), HallSightline.Seat() })
+                {
+                    double low, high;
+                    HallSightline.VisibleBandAt(view, a[2] + HallDimensions.PoolAxisFromWall, out low, out high);
+                    Assert.True(a[1] > high + 10.0, view.name + ": anchor at " + a[1] + " m vs framed top " + high + " m");
+                }
+        }
+
+        [Fact]
+        public void SpargersSitAtTheFuelDisplayDepth()
+        {
+            foreach (double[] sp in Spargers())
+                Assert.InRange(sp[1], HallDimensions.SightTargetHeight - 0.5, HallDimensions.SightTargetHeight + 0.5);
+        }
+
+        [Fact]
+        public void SpargersAreFarEnoughApartToTellApartFromTheStandAndTheSeat()
+        {
+            double[][] sp = Spargers();
+            for (int i = 0; i < sp.Length; i++)
+                for (int j = i + 1; j < sp.Length; j++)
+                {
+                    Assert.True(Math.Abs(sp[i][0] - sp[j][0]) >= 0.9, "hall x separation of spargers " + i + " and " + j);
+                    foreach (var v in new[] { HallSightline.Stand(), HallSightline.Seat() })
+                    {
+                        double beyond = sp[i][2] + HallDimensions.PoolAxisFromWall;
+                        double a = HallSightline.CrossingAlong(v.along, sp[i][0] + HallDimensions.VesselShiftX, v.back, beyond);
+                        double b = HallSightline.CrossingAlong(v.along, sp[j][0] + HallDimensions.VesselShiftX, v.back, beyond);
+                        Assert.True(Math.Abs(a - b) >= 0.6, v.name + ": spargers " + i + " and " + j + " cross the glass " + Math.Abs(a - b) + " m apart");
+                    }
+                }
+        }
+
+        [Fact]
+        public void SpargersLeftToRightFollowTheAnchorsOnTheModule()
+        {
+            // PORV (opposite the steam lines), then the SG relief, then the bypass tee: the same order as the anchors along module x.
+            double[][] sp = Spargers();
+            Assert.True(sp[0][0] < sp[1][0] && sp[1][0] < sp[2][0]);
+            Assert.True(ReliefAnchors.Primary()[0] < ReliefAnchors.Secondary(0)[0] && ReliefAnchors.Secondary(1)[0] < ReliefAnchors.Bypass()[0]);
+        }
+
+        [Fact]
+        public void SpargersAreUnderWaterInTheOpenWaterBetweenTheGlassAndTheContainment()
+        {
+            double front = HallDimensions.ModuleZ - HallDimensions.ContainmentDiameter * 0.5;
+            foreach (double[] sp in Spargers())
+            {
+                Assert.InRange(sp[1], 1.0, HallDimensions.WaterDepth - 1.0);
+                Assert.True(Radius(sp) < HallDimensions.PoolRadius - 0.5, "inside the pool");
+                Assert.True(sp[2] < front - 0.2, "in front of the containment shell, not inside it or behind it");
+                Assert.True(sp[2] > -HallDimensions.PoolAxisFromWall + 0.5, "clear of the glass");
+            }
+        }
+
+        [Fact]
+        public void EachDowncomerRunsFromItsReliefAnchorDownToItsSpargerAndStaysUnderWater()
+        {
+            double[][] from = { ReliefAnchors.Primary(), ReliefAnchors.SecondaryHeader(), ReliefAnchors.Bypass() };
+            double[][] to = Spargers();
+            double[][][] runs = Downcomers();
+            for (int k = 0; k < runs.Length; k++)
+            {
+                double[][] run = runs[k];
+                Assert.True(run.Length >= 3);
+                Assert.Equal(from[k], run[0]);
+                Assert.Equal(to[k], run[run.Length - 1]);
+                double[] a = run[run.Length - 2], b = run[run.Length - 1];
+                Assert.Equal(a[0], b[0], 6);
+                Assert.Equal(a[2], b[2], 6);
+                Assert.True(a[1] > b[1] + 5.0, "a long vertical drop into the window's view");
+                foreach (double[] c in run) Assert.True(c[1] < HallDimensions.WaterDepth, "no corner above the surface");
+            }
+        }
+
+        [Fact]
+        public void DowncomerRunsDoNotOverlapEachOther()
+        {
+            // Lanes differ in z (or y), so no two horizontal runs share a line.
+            var lanes = new System.Collections.Generic.HashSet<string>();
+            foreach (double[][] run in Downcomers())
+                for (int i = 0; i + 1 < run.Length; i++)
+                {
+                    double[] a = run[i], b = run[i + 1];
+                    bool horizontalAlongX = Math.Abs(a[1] - b[1]) < 1e-9 && Math.Abs(a[2] - b[2]) < 1e-9 && Math.Abs(a[0] - b[0]) > 1e-9;
+                    if (horizontalAlongX) Assert.True(lanes.Add(a[1].ToString("0.000") + "/" + a[2].ToString("0.000")), "two relief runs share a lane");
+                }
+        }
+
+        [Fact]
+        public void TheHeaderLinkingTheTwoSgReliefValvesCarriesNoAnchorOfItsOwn()
+        {
+            Assert.Equal(ReliefAnchors.Secondary(0)[2], ReliefAnchors.SecondaryHeader()[2], 6);
+            Assert.Equal(ReliefAnchors.Secondary(0)[1], ReliefAnchors.SecondaryHeader()[1], 6);
         }
 
         // AE1: only one relief open -> only that jet.
