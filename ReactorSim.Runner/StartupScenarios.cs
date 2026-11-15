@@ -115,7 +115,7 @@ namespace ReactorSim
                     op.Bank(0, 0); op.Bank(1, 0); op.Bank(2, 0);
                     break;
                 case "dilute-boron":
-                    op.Dilute(s.BoronPpm > 1260 ? 2.5 : 0.8);
+                    op.Dilute(s.BoronPpm > 1410 ? 2.5 : 0.8);
                     break;
                 case "withdraw-bank-a":
                     op.Dilute(0);
@@ -271,6 +271,99 @@ namespace ReactorSim
         {
             run.Failed = true; run.Failure = msg;
             return run;
+        }
+
+        // Step-5 plant state: the startup run stopped with the dilute-boron step current (lineup done,
+        // shutdown banks out, bank A still fully in, boron at its sandbox value).
+        internal static Simulation Step5State(Procedure proc)
+        {
+            int dil = IndexOf(proc, "dilute-boron");
+            var run = Run(proc, null, (sim, st) => st.CurrentIndex == dil);
+            if (run.Failed) throw new InvalidOperationException("run to step 5 failed: " + run.Failure);
+            return run.Sim;
+        }
+
+        // Critical bank A insertion at a fixed boron (ppm), from the step-5 state: boron is set by dilution
+        // with Player intents (dilute at the given rate until at or below ppm, then stopped), then bank A is
+        // withdrawn in 2 % steps with a settle between steps until total reactivity crosses zero; the
+        // crossing is interpolated. Returns -1 when the core is still subcritical with bank A fully out.
+        internal static double CriticalBankA(Procedure proc, double ppm, out double boronReached)
+        {
+            var sim = Step5State(proc);
+            var snap = sim.CaptureSnapshot();
+            int guard = (int)(120 * sim.TicksPerGameMinute);
+            while (snap.BoronPpm > ppm && guard-- > 0)
+            {
+                sim.EnqueueIntent(PlantIntent.SetDilute(snap.BoronPpm > ppm + 60 ? 2.5 : 0.8));
+                sim.Tick();
+                snap = sim.CaptureSnapshot();
+            }
+            sim.EnqueueIntent(PlantIntent.SetDilute(0.0));
+            sim.RunGameMinutes(1.0, null);
+            boronReached = sim.CaptureSnapshot().BoronPpm;
+            double prevA = 1.0, prevRho = sim.CaptureSnapshot().TotalReactivityPcm;
+            for (double a = 0.98; a >= -1e-9; a -= 0.02)
+            {
+                double aa = Math.Max(0.0, a);
+                sim.EnqueueIntent(PlantIntent.SetRodBank(3, aa));
+                sim.RunGameMinutes(0.25, s => s.Plant.AssertFinite("startup:boron-sweep"));
+                var s2 = sim.CaptureSnapshot();
+                if (s2.TotalReactivityPcm >= 0.0)
+                {
+                    double f = prevRho / (prevRho - s2.TotalReactivityPcm);
+                    return prevA + f * (s2.BankInsertion[3] - prevA);
+                }
+                prevA = s2.BankInsertion[3]; prevRho = s2.TotalReactivityPcm;
+            }
+            return -1.0;
+        }
+
+        // Critical bank A insertion (and total reactivity with bank A at 50 %) at a fixed boron, see CriticalBankA.
+        // --scenario startup-boron prints the table and holds the procedure's boron band to it.
+        internal const double SafeCriticalMin = 0.30;     // critical bank A must sit at least this inserted (rods have range left)
+        internal const double SafeCriticalMax = 0.48;     // and at least 2 % of bank A below the step 6 target of 50 %
+
+        public static void VerifyBoronBand()
+        {
+            var proc = LoadProcedure();
+            var dil = proc.Steps[IndexOf(proc, "dilute-boron")];
+            double lo = dil.Value2, hi = dil.Value;
+            Console.WriteLine();
+            Console.WriteLine("    boron target ppm | boron reached | critical bank A inserted");
+            double at1200 = -1.0;
+            foreach (double ppm in new[] { 1100.0, 1150.0, 1200.0, 1250.0, 1300.0, 1350.0, 1400.0 })
+            {
+                double reached;
+                double a = CriticalBankA(proc, ppm, out reached);
+                Console.WriteLine("      " + F(ppm).PadLeft(8) + "       | " + F(reached).PadLeft(8) + "      | " + (a < 0 ? "none (subcritical, bank A out)" : F(a * 100) + " %"));
+                if (ppm == 1200.0) at1200 = a;
+                // Every boron the procedure accepts must leave bank A critical in the safe window.
+                if (ppm >= lo && ppm <= hi && (a < SafeCriticalMin || a > SafeCriticalMax))
+                    throw new InvalidOperationException("boron " + F(ppm) + " ppm is inside the procedure band [" + F(lo) + ", " + F(hi) + "] but critical bank A is " + F(a * 100) + " % (want " + F(SafeCriticalMin * 100) + " to " + F(SafeCriticalMax * 100) + " %)");
+            }
+            // The old 1200 ppm target: critical sits within 1 % of the step 6 position (the trap).
+            if (Math.Abs(at1200 - 0.5) > 0.01)
+                throw new InvalidOperationException("expected the 1200 ppm critical bank A near 50 %, got " + F(at1200 * 100) + " %");
+            if (lo <= 1200.0) throw new InvalidOperationException("procedure band lower bound " + F(lo) + " ppm is at or below the 1200 ppm trap");
+
+            // Steps 5 to 7 by the shipped policies: boron is fixed once step 5 ticks, so criticality must come
+            // from bank A trim alone, with bank A critical inside the safe window.
+            int s5 = IndexOf(proc, "dilute-boron"), s7 = IndexOf(proc, "reach-critical");
+            double boronAtStep5 = -1.0;
+            var run = Run(proc, null, (sim, st) =>
+            {
+                if (boronAtStep5 < 0.0 && st.CurrentIndex > s5) boronAtStep5 = sim.CaptureSnapshot().BoronPpm;
+                return st.CurrentIndex > s7;
+            });
+            if (run.Failed) throw new InvalidOperationException("steps 5-7 walk failed: " + run.Failure);
+            var fin = run.Sim.CaptureSnapshot();
+            if (!fin.IsCritical || fin.Power < 0.02) throw new InvalidOperationException("not critical at the end of step 7; " + Live(fin));
+            if (boronAtStep5 < lo || boronAtStep5 > hi) throw new InvalidOperationException("boron " + F(boronAtStep5) + " ppm at the end of step 5 is outside the band; " + Live(fin));
+            // A little dilution still in flight when the step ticks is fine (one policy interval); boron must stay in the band.
+            if (fin.BoronPpm < lo || fin.BoronPpm > hi || boronAtStep5 - fin.BoronPpm > 15.0) throw new InvalidOperationException("boron drifted after step 5 (" + F(boronAtStep5) + " -> " + F(fin.BoronPpm) + "); criticality was not by rods alone");
+            if (fin.BankInsertion[3] < SafeCriticalMin || fin.BankInsertion[3] > 0.5)
+                throw new InvalidOperationException("bank A " + F(fin.BankInsertion[3] * 100) + " % at criticality, outside the safe window; " + Live(fin));
+            Console.WriteLine("    steps 5-7: boron " + F(boronAtStep5) + " ppm at step 5, critical by bank A trim alone at A=" + F(fin.BankInsertion[3] * 100) + " % inserted, ticked at " + F(run.Sim.GameMinutes) + " min");
         }
 
         // --scenario startup-grid

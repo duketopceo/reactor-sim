@@ -22,7 +22,7 @@ A SCRAM from power therefore sends you back to the rod step; the lineup steps (1
 
 Game minutes are from `dotnet run --project ReactorSim.Runner -- --scenario startup-grid` (a scripted operator
 using Player intents only, from the sandbox start). "At" is the game minute the step first ticked; "+" is the
-time since the previous step ticked. Total: **67.3 game minutes** to grid output at or above target.
+time since the previous step ticked. Total: **65.8 game minutes** to grid output at or above target.
 Steps that tick on the same minute as the one before them were already satisfied by the earlier action.
 
 | # | Step | Action | Control | Target and done-condition | Why it comes here | At (min) | + (min) |
@@ -31,23 +31,56 @@ Steps that tick on the same minute as the one before them were already satisfied
 | 2 | pressurize | Heaters on. Bring primary pressure up so the water stays liquid when it warms. | Pressurizer heater control | Primary pressure 60 bar or more | Pressure must be up before the primary warms, or the water would boil in the core. | 0.5 | 0.4 |
 | 3 | draw-vacuum | Cooling water on and vacuum pump running, so the condenser is ready before any steam exists. | Vacuum pump knob, cooling water knob | Condenser 0.3 bar or lower | The condenser must be able to take steam before the first steam is made; it is slow to pull down. | 0.6 | 0.1 |
 | 4 | pull-shutdown-banks | Pull shutdown banks D, C and B fully out. Boron still holds the core subcritical. | Bank D, C and B levers | All three banks out (under 5 % inserted) | Takes the big rod worth out first, while the core is still safely held down by boron. | 2.3 | 1.8 |
-| 5 | dilute-boron | Dilute boron down to about 1200 ppm, then stop the dilution. Boron is the slow, coarse control. | Dilute rate knob | Boron 1200 ppm or lower, then dilute to zero | Boron sets the coarse reactivity budget so that bank A alone can finish the approach. | 5.1 | 2.8 |
-| 6 | withdraw-bank-a | Withdraw bank A to about half. Move slowly and watch flux between pulls. | Bank A lever | Bank A about 50 % inserted or less | Gets close to critical in a coarse move, leaving only fine trimming. | 6.1 | 1.0 |
-| 7 | reach-critical | Trim bank A until flux holds steady with a long period. Critical, power above 2 %. | Bank A lever | Critical lamp on, power 2 % or more | The fine approach: small pulls, then wait and watch the period. | 7.4 | 1.3 |
-| 8 | heat-up | Heat the primary with the reactor. Keep the steam draw below reactor power while it warms. | Bank A lever, throttle | Primary 250 C or hotter | The reactor is the only heat source; a small steam draw lets steam exist without cooling the primary. | 42.6 | 35.2 |
-| 9 | auto-load | Turbine governor on auto load, so it follows the grid once synced. | Auto/manual load switch | Auto load on | A one-switch step set before the roll so the governor is ready at speed. | 42.6 | 0.0 |
-| 10 | roll-turbine | Open the throttle in small steps and bring the turbine to rated speed. Trim bank A as you go so the primary holds its heat. | Throttle handwheel, bank A lever | Rotor 2940 rpm or more | Steam to the turbine pulls heat from the primary, so rods must follow. | 47.3 | 4.8 |
-| 11 | close-breaker | Close the generator breaker inside the sync band. Red lamp on means synced. | Generator breaker switch | Breaker closed (red lamp) | Only at rated speed and frequency can the generator join the grid. | 47.3 | 0.0 |
-| 12 | raise-power | With the generator on the grid, raise power with bank A and boron, and open the throttle in step so steam matches power. | Bank A lever, dilute knob, throttle | Power about 40 % | Power can rise only as fast as steam is taken. | 67.3 | 19.9 |
-| 13 | take-load | Take load on the grid. | Grid demand knob | Grid output 20 % or more | Last, once there is steam and power to carry it. | 67.3 | 0.0 |
+| 5 | dilute-boron | Dilute boron down to about 1300 ppm (between 1250 and 1350), then stop the dilution. Do not go lower: bank A is meant to finish the approach. Boron is the slow, coarse control. | Dilute rate knob | Boron 1250 to 1350 ppm, then dilute to zero | Boron sets the coarse reactivity budget so that bank A alone can finish the approach, with bank A critical between about 44 and 48 % inserted (see "Boron target"). | 4.1 | 1.8 |
+| 6 | withdraw-bank-a | Withdraw bank A to about half. Move slowly and watch flux between pulls. | Bank A lever | Bank A about 50 % inserted or less | Gets close to critical in a coarse move, leaving only fine trimming. | 5.1 | 1.0 |
+| 7 | reach-critical | Trim bank A until flux holds steady with a long period. Critical, power above 2 %. | Bank A lever | Critical lamp on, power 2 % or more | The fine approach: small pulls, then wait and watch the period. | 8.1 | 3.0 |
+| 8 | heat-up | Heat the primary with the reactor. Keep the steam draw below reactor power while it warms. | Bank A lever, throttle | Primary 250 C or hotter | The reactor is the only heat source; a small steam draw lets steam exist without cooling the primary. | 45.2 | 37.1 |
+| 9 | auto-load | Turbine governor on auto load, so it follows the grid once synced. | Auto/manual load switch | Auto load on | A one-switch step set before the roll so the governor is ready at speed. | 45.2 | 0.0 |
+| 10 | roll-turbine | Open the throttle in small steps and bring the turbine to rated speed. Trim bank A as you go so the primary holds its heat. | Throttle handwheel, bank A lever | Rotor 2940 rpm or more | Steam to the turbine pulls heat from the primary, so rods must follow. | 49.5 | 4.3 |
+| 11 | close-breaker | Close the generator breaker inside the sync band. Red lamp on means synced. | Generator breaker switch | Breaker closed (red lamp) | Only at rated speed and frequency can the generator join the grid. | 49.5 | 0.0 |
+| 12 | raise-power | With the generator on the grid, raise power with bank A and boron, and open the throttle in step so steam matches power. | Bank A lever, dilute knob, throttle | Power about 40 % | Power can rise only as fast as steam is taken. | 50.5 | 1.0 |
+| 13 | take-load | Take load on the grid. | Grid demand knob | Grid output 20 % or more | Last, once there is steam and power to carry it. | 65.8 | 15.3 |
 
 The scenario groups them into four phases (the panel shows the phase): A. Lineup (1 to 3), B. Approach (4 to 7),
-C. Heat-up and sync (8 to 11), D. Power on the grid (12 to 13). Measured: approach to critical about 7.4 min,
-heat-up about 35 min at about 15 % power, turbine roll about 5 min, raise power about 20 min.
+C. Heat-up and sync (8 to 11), D. Power on the grid (12 to 13). Measured: approach to critical about 8.1 min,
+heat-up about 37 min at about 15 % power, turbine roll about 4 min, raise power about 16 min.
 
 The scenario holds step targets and policies against each other: a step cap of 45 game minutes fails the run
 naming the step and live values, and the run ends with no SCRAM and no balance-of-plant trip. `--verify` check
 `STARTUP-01` runs it twice and compares the per-step minutes and the final state hash.
+
+## Boron target
+
+Step 5 used to say "1200 ppm or lower". At 1200 ppm the core goes critical with bank A at 50 % inserted, which is
+exactly where step 6 ("bank A about half") ends, so step 6 and step 7 blur into one move, and diluting further
+makes the core critical before bank A reaches half. The band below leaves bank A critical a few percent past the
+step 6 position, so step 6 stays subcritical and step 7 is a small trim by rods alone.
+
+Critical bank A insertion versus boron at the step-5 plant state (lineup done, banks D, C and B out, cold, no
+xenon), from `dotnet run --project ReactorSim.Runner -- --scenario startup-boron` (bank A withdrawn in 2 % steps,
+total reactivity interpolated to zero):
+
+| Boron (ppm) | Critical bank A inserted |
+|---|---|
+| 1100 | 54.3 % |
+| 1150 | 52.2 % |
+| 1200 | 50.1 % (the old target: critical right at the step 6 position) |
+| 1250 | 48.0 % |
+| 1300 | 45.9 % |
+| 1350 | 43.7 % |
+| 1400 | 41.5 % |
+
+Each 100 ppm moves the critical position about 4.2 % of bank A. The target is therefore **1300 ppm, accepted from
+1250 to 1350**: bank A is critical between about 44 and 48 % inserted, 2 to 6 % of bank A short of the step 6
+position and well inside the rod range.
+
+The step uses the predicate `boron_band_until_bank_a_pulled` with `"value": 1350` (upper bound) and
+`"value2": 1250` (lower bound). `value2` is an optional step field, 0 when absent, so existing procedures are
+unchanged. The step ticks only while boron is at most 1350 ppm and, while bank A is still more than half inserted,
+at least 1250 ppm: over-diluting before bank A is pulled unticks the step and the panel asks for the band again
+(borate a little). Once bank A is at half or less the lower bound is released, because step 12 dilutes on purpose.
+`startup-boron` also walks steps 5 to 7 with the shipped policies and fails unless criticality comes from bank A
+trim alone with boron held in the band.
 
 ## Pace
 
@@ -78,7 +111,7 @@ These come from a recorded playtest session and are covered by `STARTUP-01`.
   the plant stays cold and subcritical with step 1 still current. The checklist keeps pointing at the primary
   pumps.
 - **Boron raised instead of diluted.** Boron is the dilution knob, not a borate knob. Pushing boron up adds
-  negative reactivity, so bank withdrawal never reaches critical. Target is 1200 ppm or lower, which means
+  negative reactivity, so bank withdrawal never reaches critical. Target is 1250 to 1350 ppm, which means
   diluting, then stopping the dilution at zero.
 - **Too much steam in heat-up.** A draw at or above reactor power cools the primary and stalls step 8; keep
   steam below power until 250 C.
