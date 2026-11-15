@@ -1,8 +1,9 @@
 ---
 title: "feat: final visual pass (PR5)"
 type: feat
-status: active
+status: completed
 date: 2026-11-10
+status_note: landed on master (PR #5)
 ---
 
 # Final visual pass (PR5)

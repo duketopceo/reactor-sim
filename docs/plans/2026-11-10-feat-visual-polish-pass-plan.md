@@ -2,9 +2,11 @@
 title: Visual Polish Pass - Screens, Labels, Checklist, Menus, Control-Room Lighting - Plan
 type: feat
 date: 2026-11-10
+status: completed
 artifact_contract: ce-unified-plan/v1
 product_contract_source: ce-plan-bootstrap
 execution: code
+status_note: landed on master (PR #3)
 ---
 
 # Visual Polish Pass - Plan

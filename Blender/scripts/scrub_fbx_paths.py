@@ -1,3 +1,5 @@
+# ReactorSim Blender - strips the exporting machine's profile path from FBX string metadata (same byte length) so no personal path is committed.
+# Called by export_unity.py after each export; standalone: python3 Blender/scripts/scrub_fbx_paths.py <file.fbx>...
 """Remove this machine's profile path from FBX string metadata without changing byte offsets."""
 import os
 import re

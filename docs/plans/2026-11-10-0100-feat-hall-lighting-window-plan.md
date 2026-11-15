@@ -2,9 +2,11 @@
 title: Reactor Hall Lighting and Window Visibility (PR4) - Plan
 type: feat
 date: 2026-11-10
+status: completed
 artifact_contract: ce-unified-plan/v1
 product_contract_source: ce-plan-bootstrap
 execution: code
+status_note: landed on master (PR #4); geometry superseded by PR #6
 ---
 
 # Reactor Hall Lighting and Window Visibility (PR4) - Plan

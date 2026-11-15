@@ -2,10 +2,12 @@
 title: Living Reactor Core Assets (Blender → FBX → Unity) - Plan
 type: feat
 date: 2026-11-11
+status: completed
 artifact_contract: ce-unified-plan/v1
 product_contract_source: ce-plan-bootstrap
 execution: code
 origin: docs/plans/2026-11-11-blender-reactor-assets-brief.md
+status_note: implemented in PR #11 (feat/living-reactor-assets, not yet on master); Blender regeneration is not part of ci.sh
 ---
 
 # Living Reactor Core Assets (Blender → FBX → Unity) - Plan

@@ -1,3 +1,5 @@
+# ReactorSim Blender - rotating equipment: shoulder pump motors and volutes, turbine/generator rotors, with spin pivots
+# Regenerable: blender -b --python-exit-code 1 --python Blender/scripts/make_rotating_equipment.py   (writes Blender/RotatingEquipment.blend)
 import math
 import os
 import sys

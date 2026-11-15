@@ -2,8 +2,10 @@
 title: Live Plant Counterparts and Readable Status Wall
 type: feat
 date: 2026-11-14
+status: in-progress
 artifact_contract: ce-unified-plan/v1
 execution: code
+status_note: first slice in PR #11; the rest continues in the Phase 1 plan
 ---
 
 # Live Plant Counterparts and Readable Status Wall

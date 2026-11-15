@@ -1,4 +1,5 @@
 # ReactorSim Blender — Reactor Plant Equipment P01-P08 (U12)
+# Regenerable: blender -b --python-exit-code 1 --python Blender/scripts/make_plant_equipment.py   (writes Blender/PlantEquipment.blend)
 import bpy
 import sys
 import os
