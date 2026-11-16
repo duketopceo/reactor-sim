@@ -167,6 +167,42 @@ namespace ReactorSim
         // High fuel temperature: the 1204 C (2200 F) peak-cladding-temperature limit, 10 CFR 50.46(b)(1); bound 1600 C.
         public const double TripHighFuelTempC = 1204.0;
 
+        // ---- Primary pressure protection ----
+        // The model's normal primary pressure is the 2235 psig (154.1 bar gauge, 155.1 bar absolute) operating point of a
+        // Westinghouse-type PWR; the model's pressure is absolute (it follows the IAPWS saturation curve), so the
+        // setpoints below are the typical Westinghouse values converted psig -> bar absolute (x 0.0689476 + 1.01325).
+        // Trip and safety-valve lift: NUREG-1431 (Westinghouse Standard Technical Specifications) Table 3.3.1-1
+        // "Pressurizer Pressure - High" nominal trip 2385 psig, and LCO 3.4.10 safety valve lift setting 2485 psig +/- 1 %.
+        // The PORV lift is plant specific (typically 2335 psig in public FSARs); the 4 bar reset gap is an original gameplay
+        // design choice so the valve does not chatter at sub-second period (real plants reseat a little below the lift).
+        public const double NormalPrimaryPressureBar = 155.0;      // 2235 psig
+        public const double PorvOpenBar = 162.0;                   // 2335 psig
+        public const double PorvCloseBar = 158.0;                  // gameplay design choice: 4 bar reset, still above normal
+        public const double TripHighPrimaryPressureBar = 165.4;    // 2385 psig, reactor trip
+        public const double SafetyValveOpenBar = 172.3;            // 2485 psig, code safety valves
+        public const double SafetyValveCloseBar = 167.1;           // 3 % blowdown (ASME Section III style), 172.3 x 0.97
+        // Discharge capacity, gameplay scale: the PORV out-draws a normal heater/insurge drive (3.5 bar/s slew) only
+        // when the driver is moderate; the safety valves add a much larger capacity so the 200 bar bound is never reached.
+        public const double PorvDischargeBarPerS = 2.0;
+        public const double SafetyValveDischargeBarPerS = 6.0;
+        // While a relief valve is open the pressurizer cannot hold its heater/temperature target: the target is pulled this far down.
+        public const double ReliefTargetSagBar = 20.0;
+
+        // Primary pressure is open loop in this model: P = Psat(Tprimary) + 80 bar x heaters - 40 bar x spray, so it follows the
+        // primary temperature up (about 170 bar at 305 C with the heaters pegged, the 200 bar bound near 337 C). The operator
+        // therefore has to ease the heaters back as the primary heats. TrimHeaterDemand is that rule: the heater demand that
+        // holds the normal pressure at the measured primary temperature, plus a small correction on the pressure error.
+        // The feedback term moves the pressure by 80 bar x 0.005 = 0.4 bar per bar of error, so it converges without oscillating.
+        public const double PressurizerHeaterBarAtFull = 80.0;
+        public const double HeaterTrimGainPerBar = 0.005;
+        public static double TrimHeaterDemand(double primaryTempC, double primaryPressureBar)
+        {
+            double psat;
+            if (!TrySaturationPressureBar(primaryTempC + 273.15, out psat)) psat = 0.0;
+            double ff = (NormalPrimaryPressureBar - psat) / PressurizerHeaterBarAtFull;
+            return Clamp(ff + HeaterTrimGainPerBar * (NormalPrimaryPressureBar - primaryPressureBar), 0.0, 1.0);
+        }
+
         public const double PowerMaxAssert = 5.0;
         public const double FuelTempMaxC = 1600.0;
         public const double PrimaryTempMaxC = 360.0;

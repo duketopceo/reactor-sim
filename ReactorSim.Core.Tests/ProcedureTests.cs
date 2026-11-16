@@ -285,11 +285,19 @@ namespace ReactorSim.Tests
             Assert.False(cold.Evaluate(sim.CaptureSnapshot()).Complete);   // a cold plant starts un-ticked
 
             Action<PlantIntent> send = i => sim.EnqueueIntent(i);
-            Action<double> run = minutes => sim.RunGameMinutes(minutes, s =>
+            Action<double> run = minutes =>
             {
-                var snap = s.CaptureSnapshot();
-                foreach (var p in procs) if (p.Evaluate(snap).Complete) everComplete.Add(p.Id);
-            });
+                // Pressure follows temperature in this model: the operator trims the heaters every tick (Physics.TrimHeaterDemand).
+                int ticks = (int)Math.Round(minutes * sim.TicksPerGameMinute);
+                for (int i = 0; i < ticks; i++)
+                {
+                    sim.Tick();
+                    var snap = sim.CaptureSnapshot();
+                    send(PlantIntent.SetHeaters(Physics.TrimHeaterDemand(snap.PrimaryTempC, snap.PrimaryPressureBar)));
+                    if ((i + 1) % sim.TicksPerGameMinute == 0)
+                        foreach (var p in procs) if (p.Evaluate(snap).Complete) everComplete.Add(p.Id);
+                }
+            };
             Action<double, double, int> hold = (target, steam, minutes) =>
             {
                 for (int m = 0; m < minutes; m++)
@@ -315,7 +323,6 @@ namespace ReactorSim.Tests
             send(PlantIntent.SetRodBank(3, 0.35)); run(6);
             send(PlantIntent.SetDilute(0.0)); send(PlantIntent.SetRodBank(3, 0.12)); run(5);
             hold(0.2, 0.05, 20);
-            send(PlantIntent.SetHeaters(0.2));
             hold(0.5, 0.5, 25);
 
             var end = sim.CaptureSnapshot();

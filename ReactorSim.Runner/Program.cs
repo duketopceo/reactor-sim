@@ -210,6 +210,9 @@ namespace ReactorSim
             if (all || key == "parity")
                 failures += RunCheck("U5 Parity: R13 scenario matrix reaches its named states", ParityScenarios.Verify);
 
+            if (all || key == "pressure")
+                failures += RunCheck("U5 Pressure: High-Pressure Trip, Automatic PORV, Manual PORV, Save/Restore", PressureScenarios.Verify);
+
             Console.WriteLine("=================================================================");
             if (failures == 0)
             {
@@ -377,7 +380,14 @@ namespace ReactorSim
 
             // Set Regulating Bank A to 0.35 while waiting out the pit so power levels off cleanly once Xenon decays
             sim.EnqueueIntent(PlantIntent.SetRodBank("A", 0.35));
-            sim.RunGameMinutes(12.0, null);
+            // The restart overshoots to about 150 % power and heats the primary about 50 C in a minute. Pressure follows
+            // temperature, so an operator who leaves the heaters alone trips the reactor on high pressure (165.4 bar) there;
+            // this one trims the heaters every tick (Physics.TrimHeaterDemand) and the plant rides the overshoot out.
+            for (int i = 0; i < 12 * sim.TicksPerGameMinute; i++)
+            {
+                sim.Tick();
+                sim.EnqueueIntent(PlantIntent.SetHeaters(Physics.TrimHeaterDemand(p.Thermal.PrimaryTempC, p.Thermal.PrimaryPressureBar)));
+            }
             AssertTrue(p.Core.Xenon135 < 1.55, $"Xenon should decay below 1.55 after waiting, got {p.Core.Xenon135:F2}");
             AssertTrue(p.Core.Power > 0.02, $"Reactor should recover criticality and rise above 2% power once Xenon decays, got {p.Core.Power:P2}");
         }

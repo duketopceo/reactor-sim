@@ -70,7 +70,10 @@ namespace ReactorSim
         public bool SecondaryReliefOpen;
         public double HeaterPowerFrac;
         public double SprayFrac;
-        public bool ReliefOpen;
+        public bool ReliefOpen;                // effective primary relief: manual, automatic PORV or safety valve
+        public bool ReliefManualOpen;          // defaults on restore: ReliefOpen of a save written before the automatic PORV
+        public bool ReliefAutoOpen;
+        public bool SafetyValveOpen;
 
         // Balance of plant (defaults = a snapshot written before the BOP existed)
         public double SteamDumpFrac;
@@ -139,6 +142,8 @@ namespace ReactorSim
                 SecondaryLevelFrac, FeedwaterFlowFrac, SecondaryReliefOpen ? "true" : "false");
             sb.AppendFormat(ic, "\"heaterPowerFrac\":{0:G17},\"sprayFrac\":{1:G17},\"reliefOpen\":{2},",
                 HeaterPowerFrac, SprayFrac, ReliefOpen ? "true" : "false");
+            sb.AppendFormat(ic, "\"reliefManualOpen\":{0},\"reliefAutoOpen\":{1},\"safetyValveOpen\":{2},",
+                ReliefManualOpen ? "true" : "false", ReliefAutoOpen ? "true" : "false", SafetyValveOpen ? "true" : "false");
 
             sb.AppendFormat(ic, "\"steamDumpFrac\":{0:G17},\"turbineSteamKW\":{1:G17},\"feedwaterAvailabilityFrac\":{2:G17},",
                 SteamDumpFrac, TurbineSteamKW, FeedwaterAvailabilityFrac);
@@ -230,6 +235,9 @@ namespace ReactorSim
             s.HeaterPowerFrac = PlantIntent.ExtractJsonDouble(json, "heaterPowerFrac", 0.25);
             s.SprayFrac = PlantIntent.ExtractJsonDouble(json, "sprayFrac", 0.0);
             s.ReliefOpen = PlantIntent.ExtractJsonBool(json, "reliefOpen", false);
+            s.ReliefAutoOpen = PlantIntent.ExtractJsonBool(json, "reliefAutoOpen", false);
+            s.SafetyValveOpen = PlantIntent.ExtractJsonBool(json, "safetyValveOpen", false);
+            s.ReliefManualOpen = PlantIntent.ExtractJsonBool(json, "reliefManualOpen", s.ReliefOpen && !s.ReliefAutoOpen && !s.SafetyValveOpen);
 
             s.SteamDumpFrac = PlantIntent.ExtractJsonDouble(json, "steamDumpFrac", 0.0);
             s.TurbineSteamKW = PlantIntent.ExtractJsonDouble(json, "turbineSteamKW", 0.0);

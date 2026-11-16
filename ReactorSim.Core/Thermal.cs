@@ -62,10 +62,17 @@ namespace ReactorSim
         // ---- Pressurizer ----
         public double HeaterPowerFrac { get; set; } = 0.25; // default bias keeps subcooling margin
         public double SprayFrac { get; set; }
-        public bool ReliefOpen { get; set; }
-        public double PressurizerHeaterKWK = 80.0;
+        // Primary relief. The valve is open when the operator opened it (manual), when the automatic PORV channel has
+        // latched open above Physics.PorvOpenBar (until pressure falls to Physics.PorvCloseBar), or when the code safety
+        // valves are lifted (Physics.SafetyValveOpenBar until Physics.SafetyValveCloseBar). The channels combine as OR:
+        // a manual close never blocks an automatic opening and the automatic reset never closes a manually opened valve.
+        public bool ReliefManualOpen { get; set; }
+        public bool ReliefAutoOpen { get; private set; }
+        public bool SafetyValveOpen { get; private set; }
+        public bool ReliefOpen { get { return ReliefManualOpen || ReliefAutoOpen || SafetyValveOpen; } }
+        public double PressurizerHeaterKWK = Physics.PressurizerHeaterBarAtFull;
         public double PressurizerSprayKWK = 40.0;
-        public double ReliefRateBarPerS = 2.0;
+        public double ReliefRateBarPerS = Physics.PorvDischargeBarPerS;
 
         // Derived boiling margin: how close primary is to flashing (positive = subcooled).
         public double PrimarySatMarginC
@@ -151,18 +158,36 @@ namespace ReactorSim
             double overpressure = HeaterPowerFrac * PressurizerHeaterKWK
                                 - SprayFrac * PressurizerSprayKWK;
             double target = Physics.Clamp(pSat + overpressure, 1.0, 200.0);
-            double rate = (ReliefOpen ? ReliefRateBarPerS * 5.0 : 3.5); // bar/s slew
-            double dP = Physics.Clamp(target - PrimaryPressureBar, -rate * dt, rate * dt);
-            PrimaryPressureBar += dP;
+            // Relief valves act on the pressure they see: latch/release them on the pressure at the start of the step,
+            // drain at the discharge rate while open, and re-evaluate on the new pressure so the reported state matches it.
+            UpdateReliefValves();
+            double drain = 0.0;
             if (ReliefOpen)
-                PrimaryPressureBar = Math.Max(1.0, PrimaryPressureBar - ReliefRateBarPerS * dt);
+            {
+                target = Math.Max(1.0, target - Physics.ReliefTargetSagBar);
+                drain = ReliefRateBarPerS + (SafetyValveOpen ? Physics.SafetyValveDischargeBarPerS : 0.0);
+            }
+            double rate = 3.5; // bar/s slew
+            double dP = Physics.Clamp(target - PrimaryPressureBar, -rate * dt, rate * dt);
+            PrimaryPressureBar += dP - drain * dt;
             PrimaryPressureBar = Physics.Clamp(Physics.Sanitize(PrimaryPressureBar, 1.0), 1.0, 200.0);
+            UpdateReliefValves();
 
             // 5) Vessel voiding: when pressure can no longer keep primary liquid.
             double flashing = Math.Max(0, PrimaryTempC - (Physics.SaturationTempK(PrimaryPressureBar) - 273.15));
             double targetVoid = Physics.Clamp(flashing / 20.0 + (1.0 - PrimaryLevelFrac), 0, 1);
             SteamLevelFrac += (targetVoid - SteamLevelFrac) * Math.Min(1.0, dt * 0.5);
             SteamLevelFrac = Physics.Clamp(Physics.Sanitize(SteamLevelFrac, 0.0), 0.0, 1.0);
+        }
+
+        // Automatic PORV channel and code safety valves, both with hysteresis (state persists between steps).
+        private void UpdateReliefValves()
+        {
+            double p = PrimaryPressureBar;
+            if (p >= Physics.PorvOpenBar) ReliefAutoOpen = true;
+            else if (p <= Physics.PorvCloseBar) ReliefAutoOpen = false;
+            if (p >= Physics.SafetyValveOpenBar) SafetyValveOpen = true;
+            else if (p <= Physics.SafetyValveCloseBar) SafetyValveOpen = false;
         }
 
         public void RestoreState(
@@ -178,7 +203,9 @@ namespace ReactorSim
             double heaterPowerFrac,
             double sprayFrac,
             bool reliefOpen,
-            double steamLevelFrac)
+            double steamLevelFrac,
+            bool reliefAutoOpen = false,
+            bool safetyValveOpen = false)
         {
             FuelTempC = Physics.Clamp(Physics.Sanitize(fuelTempC, 60.0), 20.0, 2200.0);
             PrimaryTempC = Physics.Clamp(Physics.Sanitize(primaryTempC, 60.0), 20.0, 365.0);
@@ -191,7 +218,10 @@ namespace ReactorSim
             FeedwaterFlowFrac = Physics.Clamp(Physics.Sanitize(feedwaterFlowFrac, 1.0), 0.0, 2.0);
             HeaterPowerFrac = Physics.Clamp(Physics.Sanitize(heaterPowerFrac, 0.25), 0.0, 1.0);
             SprayFrac = Physics.Clamp(Physics.Sanitize(sprayFrac, 0.0), 0.0, 1.0);
-            ReliefOpen = reliefOpen;
+            // reliefOpen is the effective state: whatever the automatic channels do not account for was the operator.
+            ReliefAutoOpen = reliefAutoOpen;
+            SafetyValveOpen = safetyValveOpen;
+            ReliefManualOpen = reliefOpen && !reliefAutoOpen && !safetyValveOpen;
             SteamLevelFrac = Physics.Clamp(Physics.Sanitize(steamLevelFrac, 0.0), 0.0, 1.0);
         }
     }

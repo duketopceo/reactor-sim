@@ -219,7 +219,7 @@ namespace ReactorSim
                     return true;
 
                 case IntentKind.ReliefValve:
-                    Thermal.ReliefOpen = intent.Value >= 0.5;
+                    Thermal.ReliefManualOpen = intent.Value >= 0.5;
                     return true;
 
                 case IntentKind.Scram:
@@ -322,7 +322,8 @@ namespace ReactorSim
         private void CheckProtection()
         {
             if (Scrammed) return;
-            if (Thermal.PrimaryTempC >= Physics.TripHighPrimaryTempC) ScramBecause("high primary temperature");
+            if (Thermal.PrimaryPressureBar >= Physics.TripHighPrimaryPressureBar) ScramBecause("high primary pressure");
+            else if (Thermal.PrimaryTempC >= Physics.TripHighPrimaryTempC) ScramBecause("high primary temperature");
             else if (Thermal.FuelTempC >= Physics.TripHighFuelTempC) ScramBecause("high fuel temperature");
         }
 
@@ -485,6 +486,9 @@ namespace ReactorSim
                 HeaterPowerFrac = Thermal.HeaterPowerFrac,
                 SprayFrac = Thermal.SprayFrac,
                 ReliefOpen = Thermal.ReliefOpen,
+                ReliefManualOpen = Thermal.ReliefManualOpen,
+                ReliefAutoOpen = Thermal.ReliefAutoOpen,
+                SafetyValveOpen = Thermal.SafetyValveOpen,
 
                 SteamDumpFrac = Thermal.SteamDumpFrac,
                 TurbineSteamKW = Thermal.TurbineSteamKW,
@@ -551,7 +555,8 @@ namespace ReactorSim
                 s.FuelTempC, s.PrimaryTempC, s.PrimaryPressureBar,
                 s.PrimaryLevelFrac, s.PrimaryFlowFrac, s.SecondaryPressureBar,
                 s.SteamDemandFrac, s.SecondaryLevelFrac, s.FeedwaterFlowFrac,
-                s.HeaterPowerFrac, s.SprayFrac, s.ReliefOpen, s.SteamLevelFrac);
+                s.HeaterPowerFrac, s.SprayFrac, s.ReliefOpen, s.SteamLevelFrac, s.ReliefAutoOpen, s.SafetyValveOpen);
+            Thermal.ReliefManualOpen = s.ReliefManualOpen;
             Thermal.SteamDumpFrac = Physics.Clamp(Physics.Sanitize(s.SteamDumpFrac, 0.0), 0.0, 1.0);
             Thermal.RestoreMeasuredFlows(s.TurbineSteamKW, s.DumpSteamKW, s.FeedwaterDeliveredFrac);
             Bop.Restore(s.BopAutoLoad, s.GridDemandFrac, s.VacuumPumpFrac, s.CoolingWaterFrac,
