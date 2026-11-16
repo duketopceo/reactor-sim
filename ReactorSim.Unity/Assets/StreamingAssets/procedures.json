@@ -78,10 +78,10 @@
         {
           "id": "heat-up",
           "phase": "C. Heat-up and sync",
-          "text": "Heat the primary with the reactor. Keep the steam draw below reactor power while it warms.",
-          "control": "Bank A lever, throttle",
-          "target": "Primary 250 C or hotter",
-          "rows": ["primary_temp_a", "fuel_temp", "steam_demand_ctl", "rod_bank_3_ctl"],
+          "text": "Heat the primary with the reactor. Keep the steam draw below reactor power while it warms. Pressure rises with temperature: ease the heaters back as it heats and hold primary pressure near 155 bar.",
+          "control": "Bank A lever, throttle, pressurizer heater control",
+          "target": "Primary 250 C or hotter, pressure held near 155 bar",
+          "rows": ["primary_temp_a", "fuel_temp", "steam_demand_ctl", "rod_bank_3_ctl", "pzr_heater_ctl", "primary_pressure"],
           "when": "primary_temp_at_least",
           "value": 250
         },
@@ -118,7 +118,7 @@
         {
           "id": "raise-power",
           "phase": "D. Power on the grid",
-          "text": "With the generator on the grid, raise power with bank A and boron, and open the throttle in step so steam matches power.",
+          "text": "With the generator on the grid, raise power with bank A and boron, and open the throttle in step so steam matches power. Keep trimming the heaters so primary pressure stays near 155 bar: the reactor trips at 165 bar.",
           "control": "Bank A lever, dilute knob, throttle",
           "target": "Power about 40 %",
           "rows": ["rod_bank_3_ctl", "dilute_ctl", "steam_demand_ctl", "core_power_mwt", "core_power_pct"],

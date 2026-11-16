@@ -203,6 +203,9 @@ namespace ReactorSim
             a("Thermal.HeaterPowerFrac", D(t.HeaterPowerFrac));
             a("Thermal.SprayFrac", D(t.SprayFrac));
             a("Thermal.ReliefOpen", t.ReliefOpen ? "1" : "0");
+            a("Thermal.ReliefManualOpen", t.ReliefManualOpen ? "1" : "0");
+            a("Thermal.ReliefAutoOpen", t.ReliefAutoOpen ? "1" : "0");
+            a("Thermal.SafetyValveOpen", t.SafetyValveOpen ? "1" : "0");
             a("Thermal.SteamLevelFrac", D(t.SteamLevelFrac));
             // Process-wide mutable state that influences results.
             a("Physics.PoisonTimeWarp", D(Physics.PoisonTimeWarp));

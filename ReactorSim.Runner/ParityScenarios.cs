@@ -79,15 +79,15 @@ namespace ReactorSim
                     Record(c, sim, 6);
                     break;
                 case HighPressure:
-                    // Heaters full, spray off, secondary heat sink starved of steam demand: primary pressure climbs.
+                    // Heaters full, spray off, secondary heat sink starved of steam demand: primary pressure climbs, the automatic PORV
+                    // lifts at Physics.PorvOpenBar, and the high-pressure reactor trip latches at Physics.TripHighPrimaryPressureBar.
+                    // Run until the trip (or 12 game minutes), then three minutes of aftermath.
                     Record(c, sim, 2);
                     sim.EnqueueIntent(PlantIntent.SetSpray(0.0, "u5"));
                     sim.EnqueueIntent(PlantIntent.SetHeaters(1.0, "u5"));
                     sim.EnqueueIntent(PlantIntent.SetSteamDemand(0.0, "u5"));
-                    for (int i = 0; i < 12 * sim.TicksPerGameMinute && c.Frames[c.Frames.Count - 1].PrimaryPressureBar <= LampPressureHi + 5.0; i++)
+                    for (int i = 0; i < 12 * sim.TicksPerGameMinute && !c.Frames[c.Frames.Count - 1].Scrammed; i++)
                         Record(c, sim, 1.0 / sim.TicksPerGameMinute);
-                    // The operator lifts the primary relief valve (the PORV is manual only), so primary and secondary relief both show.
-                    sim.EnqueueIntent(PlantIntent.SetReliefValve(true, "u5"));
                     Record(c, sim, 3);
                     break;
                 case FeedStarvation:
@@ -171,7 +171,7 @@ namespace ReactorSim
                         Need(minFlow < 0.25, n, "primary flow must fall under the low-flow lamp setpoint");
                         break;
                     case HighPressure:
-                        Need(maxP > LampPressureHi && relief, n, "primary pressure must pass the high-pressure lamp setpoint and the PORV must be open at some point");
+                        Need(maxP > LampPressureHi && relief && scram && maxP < Physics.SafetyValveOpenBar, n, "primary pressure must pass the high-pressure lamp setpoint, the PORV must lift and the high-pressure trip must latch below the safety valve setpoint");
                         break;
                     case FeedStarvation:
                         Need(minFeed < 0.05, n, "feedwater flow must fall under the feed-fail setpoint");

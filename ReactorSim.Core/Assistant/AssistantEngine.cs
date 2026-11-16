@@ -122,6 +122,7 @@ namespace ReactorSim
         // Previous tick values for trend calculation
         private double _prevFuelTemp = 60.0;
         private double _prevPriTemp = 60.0;
+        private double? _prevPriPress; // null until the first observation, so the first trend reads Steady
         private double _prevSgPress = 1.0;
         private double _prevXenon = 0.0;
         private string _lastLoggedSignature = "";
@@ -361,6 +362,7 @@ namespace ReactorSim
 
             double dFuel = p.Thermal.FuelTempC - _prevFuelTemp;
             double dPri = p.Thermal.PrimaryTempC - _prevPriTemp;
+            double dPriPress = _prevPriPress.HasValue ? p.Thermal.PrimaryPressureBar - _prevPriPress.Value : 0.0;
             double dSgP = p.Thermal.SecondaryPressureBar - _prevSgPress;
             double dXe = p.Core.Xenon135 - _prevXenon;
 
@@ -452,6 +454,22 @@ namespace ReactorSim
                 });
             }
 
+            // High primary pressure: the pressure follows the primary temperature up, so heaters left high while the plant heats
+            // walk it into the PORV (Physics.PorvOpenBar) and the reactor trip (Physics.TripHighPrimaryPressureBar).
+            if (p.Thermal.PrimaryPressureBar >= Physics.PorvCloseBar)
+            {
+                ActiveAlarms.Add(new PlantAlarm
+                {
+                    Code = "HIGH_PRI_PRESSURE",
+                    Severity = p.Thermal.PrimaryPressureBar >= Physics.PorvOpenBar ? AlarmSeverity.Critical : AlarmSeverity.Caution,
+                    Title = p.Thermal.ReliefOpen ? "PRIMARY RELIEF LIFTING (HIGH PRESSURE)" : "HIGH PRIMARY PRESSURE",
+                    Cause = string.Format(CultureInfo.InvariantCulture, "Primary pressure ({0:F1} bar) follows primary temp ({1:F0}C) plus pressurizer heater power ({2:P0}) less spray ({3:P0}).", p.Thermal.PrimaryPressureBar, p.Thermal.PrimaryTempC, p.Thermal.HeaterPowerFrac, p.Thermal.SprayFrac),
+                    CurrentVsLimit = string.Format(CultureInfo.InvariantCulture, "P={0:F1} bar / normal {1:F0} bar (PORV {2:F0}, reactor trip {3:F1})", p.Thermal.PrimaryPressureBar, Physics.NormalPrimaryPressureBar, Physics.PorvOpenBar, Physics.TripHighPrimaryPressureBar),
+                    Trend = TrendLabel(dPriPress, 0.2),
+                    NextAction = "Reduce Pressurizer Heaters toward the pressure that holds 155 bar at this temperature, and open Pressurizer Spray if it keeps rising."
+                });
+            }
+
             // Xenon Pit Advisory / Warning (AE2)
             if (p.Core.Xenon135 > 1.25 && p.Core.Power < 0.05)
             {
@@ -527,6 +545,7 @@ namespace ReactorSim
 
             _prevFuelTemp = p.Thermal.FuelTempC;
             _prevPriTemp = p.Thermal.PrimaryTempC;
+            _prevPriPress = p.Thermal.PrimaryPressureBar;
             _prevSgPress = p.Thermal.SecondaryPressureBar;
             _prevXenon = p.Core.Xenon135;
         }

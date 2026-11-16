@@ -139,7 +139,8 @@ namespace ReactorSim.Tests
                 tfMax = Math.Max(tfMax, p.Thermal.FuelTempC);
             }
             Assert.True(p.Scrammed);
-            Assert.Equal("high primary temperature", p.LastScramCause);
+            // Pressure follows temperature, so the high-pressure trip (165 bar) now fires before the 345 C temperature trip.
+            Assert.Equal("high primary pressure", p.LastScramCause);
             Assert.True(tpMax < Physics.PrimaryTempMaxC - 1.0, "primary max " + tpMax);
             Assert.True(tfMax < Physics.FuelTempMaxC - 1.0, "fuel max " + tfMax);
             Assert.All(p.Banks, b => Assert.Equal(1.0, b.Insertion, 6));

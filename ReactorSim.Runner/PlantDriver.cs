@@ -12,12 +12,19 @@ namespace ReactorSim
 
         internal static void Run(Simulation sim, double minutes, string tag)
         {
-            sim.RunGameMinutes(minutes, s =>
+            // The operator trims the pressurizer heaters every tick: primary pressure follows temperature (see
+            // Physics.TrimHeaterDemand), so a pegged heater setting would climb into the high-pressure trip as the primary heats.
+            int ticks = (int)Math.Round(minutes * sim.TicksPerGameMinute);
+            for (int i = 0; i < ticks; i++)
             {
-                s.Plant.AssertFinite(tag + ":t=" + s.GameMinutes.ToString("F1"));
+                sim.Tick();
+                var th = sim.Plant.Thermal;
+                th.HeaterPowerFrac = Physics.TrimHeaterDemand(th.PrimaryTempC, th.PrimaryPressureBar);
+                if ((i + 1) % sim.TicksPerGameMinute != 0) continue;
+                sim.Plant.AssertFinite(tag + ":t=" + sim.GameMinutes.ToString("F1"));
                 if (Verbose)
-                    Console.WriteLine(s.Plant.Telemetry(s.GameMinutes));
-            });
+                    Console.WriteLine(sim.Plant.Telemetry(sim.GameMinutes));
+            }
         }
 
         internal static Simulation BringToPower(double target, double steam, Action<Simulation> configure = null)
@@ -44,7 +51,6 @@ namespace ReactorSim
 
             // Nuclear + heater heat-up at low steam demand.
             HoldNearPower(sim, Math.Min(0.2, Math.Max(0.08, target * 0.25)), steam: 0.05, minutes: 20, tag: "bring:heatup");
-            p.Thermal.HeaterPowerFrac = 0.2;
 
             // Climb to target with steam matched to power.
             HoldNearPower(sim, target, steam, minutes: 25, tag: "bring:hold");

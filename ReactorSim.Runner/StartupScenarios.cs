@@ -100,13 +100,17 @@ namespace ReactorSim
         // Operator policy for one step. Issues what this step asks for and nothing later.
         private static void Policy(string id, Op op, PlantSnapshot s)
         {
+            // Pressure trim: heaters full while pressurizing (the demand saturates at 1.0 while the primary is cold), then eased
+            // back as the primary heats so the pressure holds the normal value (the model's pressure follows temperature,
+            // see Physics.TrimHeaterDemand).
+            if (id != "start-rcps") op.Heaters(Math.Round(Physics.TrimHeaterDemand(s.PrimaryTempC, s.PrimaryPressureBar), 2));
             switch (id)
             {
                 case "start-rcps":
                     op.Flow(1.0);
                     break;
                 case "pressurize":
-                    op.Flow(1.0); op.Heaters(1.0);
+                    op.Flow(1.0);
                     break;
                 case "draw-vacuum":
                     op.Vacuum(1.0); op.Cooling(1.0);
