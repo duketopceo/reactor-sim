@@ -380,6 +380,7 @@ public class OperatorController : MonoBehaviour
             if (f.sqrMagnitude < bestD) { bestD = f.sqrMagnitude; best = i; }
         }
         if (best >= 0) TravelTo(best + 1);
+        eye = OperatorMath.EyeHeight(seated);   // aim from the settled eye, not the lerp's current value (it depends on the previous pose)
         Vector3 d = point - EyePosition();
         yaw = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg;
         pitch = OperatorMath.ClampPitch(-Mathf.Atan2(d.y, new Vector2(d.x, d.z).magnitude) * Mathf.Rad2Deg);
