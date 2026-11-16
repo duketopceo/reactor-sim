@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Grades a fetched capture run (scripts/capture-playtest.sh, or a local -capture run) against fixed thresholds.
-#   bash scripts/check-captures.sh <dir> [--allow-skip pose,pose] [--only pose,pose] [--baseline <dir> [--budget-only]]
+#   bash scripts/check-captures.sh <dir> [--allow-skip pose,pose] [--only pose,pose] [--baseline <dir> [--budget-only] [--room-budget]]
 # <dir> holds <WxH>/captures.json and the PNGs next to it. The thresholds live here, not in the build, so the build cannot grade
 # itself. With --baseline <dir> (a capture run of the same poses before the hall change) it also grades the hall's runtime
 # budget (KTD9): the gallery and gallery-away captures must both exist in both runs. Exit 0: every check passed. 
 # --budget-only grades only the gallery and gallery-away poses (a run made with -poses gallery,away). --only a,b requires only
 # those poses (for example glowoff,glowidle,glowfull). When glow poses are present or requested, the rack glow must rise from off through idle and mid to full power.
+# --room-budget (needs --baseline) also grades the control-room runtime budget (R15): the seat and stand poses must exist in both runs
+# and their p95, p99 and draw-call rise over the baseline stays within the ROOM_* limits, so instrument detail added to the room
+# is measured (the gallery poses alone never see the room). It adds seat and stand to the poses a --budget-only run requires.
 # Exit 1: a check failed (each failure is named). Exit 2: bad usage or nothing to grade.
 set -uo pipefail
 
@@ -18,6 +21,11 @@ BUDGET_P95_MS=4          # gallery pose: p95 frame time may rise at most this mu
 BUDGET_DRAWS=120         # gallery pose: draw calls may rise at most this much over the baseline
 BUDGET_GALLERY_P99_MS=12 # gallery pose: p99 frame time, absolute (at least 120 fps)
 BUDGET_AWAY_MS=1         # gallery-away pose (window out of view): p95 may rise at most this much
+# control-room runtime budget (R15), only graded with --baseline --room-budget: seat and stand poses, measured as a rise over the baseline
+ROOM_P95_MS=4            # p95 frame time may rise at most this much (same delta as the gallery pose)
+ROOM_P99_MS=6            # p99 frame time may rise at most this much
+ROOM_DRAWS=120           # draw calls may rise at most this much (same delta as the gallery pose)
+ROOM_POSES="seat stand"
 # rack glow (U7): mean rendered brightness over the racks, measured against a glowoff frame (no glow at all)
 GLOW_FULL_OVER_FLOOR_MIN=4    # (full - off) must be at least this multiple of (idle - off): "a set multiple of the floor"
 GLOW_FULL_DELTA_MIN=0.01      # and at least this much absolute mean luminance (0..1), so a flat render cannot pass
@@ -26,11 +34,13 @@ REQUIRED_POSES="seat stand crt tooltip rejected drag checklist pause tablet clip
 DIR=""
 BASELINE=""
 BUDGET_ONLY=""
+ROOM_BUDGET=""
 ONLY=""
 ALLOW_SKIP=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --budget-only) BUDGET_ONLY=1; shift ;;
+    --room-budget) ROOM_BUDGET=1; shift ;;
     --only) [ $# -ge 2 ] || { echo "--only needs a pose list" >&2; exit 2; }; ONLY="${2//,/ }"; [ -n "${ONLY// /}" ] || { echo "--only needs at least one pose" >&2; exit 2; }; shift 2 ;;
     --baseline) [ $# -ge 2 ] || { echo "--baseline needs a directory" >&2; exit 2; }; BASELINE="$2"; shift 2 ;;
     --allow-skip) [ $# -ge 2 ] || { echo "--allow-skip needs a value" >&2; exit 2; }; ALLOW_SKIP="$2"; shift 2 ;;
@@ -39,9 +49,11 @@ while [ $# -gt 0 ]; do
     *) [ -z "$DIR" ] || { echo "one directory only" >&2; exit 2; }; DIR="$1"; shift ;;
   esac
 done
-[ -n "$DIR" ] && [ -d "$DIR" ] || { echo "usage: check-captures.sh <dir> [--allow-skip pose,pose] [--only pose,pose] [--baseline <dir> [--budget-only]]" >&2; exit 2; }
+[ -n "$DIR" ] && [ -d "$DIR" ] || { echo "usage: check-captures.sh <dir> [--allow-skip pose,pose] [--only pose,pose] [--baseline <dir> [--budget-only] [--room-budget]]" >&2; exit 2; }
 [ -z "$BUDGET_ONLY" ] || [ -n "$BASELINE" ] || { echo "--budget-only needs --baseline" >&2; exit 2; }
+[ -z "$ROOM_BUDGET" ] || [ -n "$BASELINE" ] || { echo "--room-budget needs --baseline" >&2; exit 2; }
 [ -z "$BUDGET_ONLY" ] || REQUIRED_POSES="gallery away"
+[ -z "$BUDGET_ONLY" ] || [ -z "$ROOM_BUDGET" ] || REQUIRED_POSES="gallery away $ROOM_POSES"
 [ -z "$ONLY" ] || REQUIRED_POSES="$ONLY"
 [ -z "$BASELINE" ] || [ -d "$BASELINE" ] || { echo "baseline directory not found: $BASELINE" >&2; exit 2; }
 
@@ -187,6 +199,64 @@ for size in sizes:
         problems.append("%s: gallery p99 %.2f ms > %g" % (size, ng.get("frameMsP99", 0), lim["BUDGET_GALLERY_P99_MS"]))
     if dav > lim["BUDGET_AWAY_MS"]:
         problems.append("%s: out-of-view p95 rose by %.2f ms > %g" % (size, dav, lim["BUDGET_AWAY_MS"]))
+if problems:
+    for p in problems:
+        print("FAIL " + p)
+    sys.exit(1)
+print("PASS")
+PY
+  [ "$?" -eq 0 ] || fail=1
+fi
+
+if [ -n "$ROOM_BUDGET" ]; then
+  echo "== control-room runtime budget against $BASELINE"
+  ROOM_P95_MS="$ROOM_P95_MS" ROOM_P99_MS="$ROOM_P99_MS" ROOM_DRAWS="$ROOM_DRAWS" ROOM_POSES="$ROOM_POSES" \
+    python3 -I - "$BASELINE" "$DIR" <<'PY'
+import glob, json, os, sys
+
+base_dir, new_dir = sys.argv[1], sys.argv[2]
+lim = {k: float(os.environ[k]) for k in ("ROOM_P95_MS", "ROOM_P99_MS", "ROOM_DRAWS")}
+poses = os.environ["ROOM_POSES"].split()
+
+def load(d):
+    out = {}
+    for j in sorted(glob.glob(os.path.join(d, "**", "captures.json"), recursive=True)):
+        size = os.path.basename(os.path.dirname(j))
+        for c in json.load(open(j)).get("captures", []):
+            if "skipped" not in c:
+                out[(size, c.get("pose"))] = c
+    return out
+
+base, new = load(base_dir), load(new_dir)
+sizes = sorted({s for (s, _p) in new})
+problems = []
+if not sizes:
+    problems.append("no captures to grade in %s" % new_dir)
+for size in sizes:
+    for pose in poses:
+        missing = [n for n, d in (("baseline", base), ("new", new)) if (size, pose) not in d]
+        for n in missing:
+            problems.append("%s %s: no %s capture, the room budget cannot be graded" % (size, pose, n))
+        if missing:
+            continue
+        b, n = base[(size, pose)], new[(size, pose)]
+        if any(k not in c for c in (b, n) for k in ("frameMsP95", "frameMsP99")):
+            problems.append("%s %s: frame-time percentiles missing, the room budget cannot be graded" % (size, pose))
+            continue
+        if n.get("drawCalls", -1) < 0 or b.get("drawCalls", -1) < 0:
+            problems.append("%s %s: draw-call counter unavailable, the room budget cannot be graded" % (size, pose))
+            continue
+        d95 = n["frameMsP95"] - b["frameMsP95"]
+        d99 = n["frameMsP99"] - b["frameMsP99"]
+        dd = n["drawCalls"] - b["drawCalls"]
+        print("  %s %-6s p95 %+.2f ms (limit %g)  p99 %+.2f ms (limit %g)  draws %+d (limit %g)" % (
+            size, pose, d95, lim["ROOM_P95_MS"], d99, lim["ROOM_P99_MS"], dd, lim["ROOM_DRAWS"]))
+        if d95 > lim["ROOM_P95_MS"]:
+            problems.append("%s %s: p95 rose by %.2f ms > %g" % (size, pose, d95, lim["ROOM_P95_MS"]))
+        if d99 > lim["ROOM_P99_MS"]:
+            problems.append("%s %s: p99 rose by %.2f ms > %g" % (size, pose, d99, lim["ROOM_P99_MS"]))
+        if dd > lim["ROOM_DRAWS"]:
+            problems.append("%s %s: draw calls rose by %d > %g" % (size, pose, dd, lim["ROOM_DRAWS"]))
 if problems:
     for p in problems:
         print("FAIL " + p)
