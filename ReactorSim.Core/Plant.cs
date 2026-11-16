@@ -298,17 +298,39 @@ namespace ReactorSim
             return -1;
         }
 
+        // The SCRAM latch lives here, at the single rod-target entry point, so no caller (intent, harness, UI)
+        // can withdraw rods while tripped: the request is ignored until ResetScram() (verification SCR-02).
         public void SetAllRods(double target)
         {
             if (double.IsNaN(target) || double.IsInfinity(target))
                 throw new ArgumentOutOfRangeException(nameof(target), target, "rod target must be finite");
+            if (Scrammed) return;
             foreach (var b in Banks) b.InsertionTarget = Physics.Clamp(target, 0, 1);
         }
 
+        // What tripped the plant last (not part of the snapshot: Scrammed itself is). Null before any trip
+        // or after a restore; "operator" for a manual Scram().
+        public string LastScramCause { get; private set; }
+
         public void Scram()
         {
+            ScramBecause("operator");
+        }
+
+        // Reactor protection: latch a SCRAM before Thermal.Step would have to clamp a state variable at a
+        // model bound (verification EDGE-08). Setpoints and rationale are in Physics.
+        private void CheckProtection()
+        {
+            if (Scrammed) return;
+            if (Thermal.PrimaryTempC >= Physics.TripHighPrimaryTempC) ScramBecause("high primary temperature");
+            else if (Thermal.FuelTempC >= Physics.TripHighFuelTempC) ScramBecause("high fuel temperature");
+        }
+
+        private void ScramBecause(string cause)
+        {
+            LastScramCause = cause;
             Scrammed = true;
-            SetAllRods(1.0);
+            foreach (var b in Banks) b.InsertionTarget = 1.0;
             foreach (var b in Banks) b.SpeedPerSec = Physics.RodScramSpeedPerSec; // fast insert
             Core.Scram();
             Mode = OperatingMode.Shutdown;
@@ -360,6 +382,7 @@ namespace ReactorSim
 
                 Thermal.Step(h, Core.TotalHeatPower * RatedThermalKW);
                 Bop.Step(h, Thermal);
+                CheckProtection();
             }
 
             UpdateReactivityLedger();

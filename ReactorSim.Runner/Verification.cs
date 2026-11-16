@@ -36,7 +36,7 @@ namespace ReactorSim
             new[] { "DEF-SAVE",   "Save/load round trip, corruption, version migration", "no serializer exists on master; Verification.Capture is a test-only canonical view, not a save format" },
             new[] { "DEF-PRNG",   "PRNG stream restoration", "ReactorSim.Core contains no random source; add when sensor noise/faults land" },
             new[] { "DEF-CMD",    "Simultaneous command ordering and duplicate semantics", "no command queue on master (intent API lives in open PR #1)" },
-            new[] { "DEF-TRIP",   "Trip hysteresis/latching and threshold chatter", "no automatic protection logic in Core; only manual Scram()" },
+            new[] { "DEF-TRIP",   "Trip hysteresis/latching and threshold chatter", "only temperature trips exist (high primary / fuel temperature); no setpoint hysteresis, pressure or flux trips, no trip-cause persistence in snapshots" },
             new[] { "DEF-SENSOR", "Sensor bias/dropout/disagreement", "no sensor layer; every reading is process truth" },
             new[] { "DEF-CTRL",   "Controller saturation / anti-windup", "no in-Core controllers; Runner TrimPower is test-harness logic" },
             new[] { "DEF-PUMP",   "Pump trip / coastdown, flow reversal, stuck valves", "PrimaryFlowFrac is a bare input; no pump/valve/network model" },
@@ -65,10 +65,10 @@ namespace ReactorSim
             Add("NUM-06", "numerical", "Control-rod integral worth: endpoints, monotonic, symmetric S-curve", null, NumRodWorth);
             Add("NUM-07", "numerical", "Saturation pressure vs IAPWS-IF97 verification points; inverse round trip", null, NumSaturation);
             Add("NUM-08", "numerical", "Decay-heat equilibrium share and heat accounting (informational values printed)", null, NumDecayEquilibrium);
-            Add("DOM-01", "numerical", "Saturation property call outside its domain is reported, not silently clamped", "KD-02", DomainSaturation);
+            Add("DOM-01", "numerical", "Saturation property call outside its domain is reported, not silently clamped", null, DomainSaturation);
             // ---- SCRAM / decay heat on the real plant ----
             Add("SCR-01", "scram", "SCRAM from power: fission collapses, rods in, decay heat bounded and monotone", null, ScramBehavior);
-            Add("SCR-02", "scram", "SCRAM latch inhibits rod withdrawal until ResetScram()", "KD-03", ScramLatch);
+            Add("SCR-02", "scram", "SCRAM latch inhibits rod withdrawal until ResetScram()", null, ScramLatch);
             // ---- Input / timestep edge cases ----
             Add("EDGE-01", "edge", "dt = 0 advances no integrated state (derived ledger terms may refresh)", null, EdgeZeroDt);
             Add("EDGE-02", "edge", "Non-finite dt is detected by AssertFinite (not silently absorbed)", null, EdgeNonFiniteDtDetected);
@@ -77,7 +77,7 @@ namespace ReactorSim
             Add("EDGE-05", "edge", "NaN command that is accepted is at least detected by AssertFinite", null, EdgeNanCommandDetected);
             Add("EDGE-06", "edge", "Out-of-range bounded commands saturate with documented semantics", null, EdgeSaturation);
             Add("EDGE-07", "edge", "Less primary flow never lowers primary temperature (flow 0 finite)", null, EdgeFlow);
-            Add("EDGE-08", "edge", "Loss of heat sink at power stays finite and does not sit on a model clamp", "KD-06", EdgeLossOfSink);
+            Add("EDGE-08", "edge", "Loss of heat sink at power stays finite and does not sit on a model clamp", null, EdgeLossOfSink);
         }
 
         private static void Add(string id, string kind, string title, string knownDefect, Func<string> body)
@@ -536,13 +536,34 @@ namespace ReactorSim
             return null;
         }
 
+        // "Reported" means the call is rejected (ArgumentOutOfRangeException) or returns a non-finite value.
+        // The original check accepted only a non-finite return; a domain exception is the same boundary
+        // semantics as Plant.Step / Plant.SetAllRods and cannot leak a NaN into the plant, so both count.
+        private static string Reported(string call, Func<double> f)
+        {
+            try { double v = f(); return Physics.IsFinite(v) ? call + " returned " + v.ToString("F2", CultureInfo.InvariantCulture) + " with no fault" : null; }
+            catch (ArgumentOutOfRangeException) { return null; }
+        }
+
         private static string DomainSaturation()
         {
-            double above = Physics.SaturationPressureBar(700.0);   // above the critical temperature (647.096 K)
-            double high = Physics.SaturationTempK(500.0);          // above critical pressure (220.64 bar)
             var problems = new List<string>();
-            if (Physics.IsFinite(above)) problems.Add("SaturationPressureBar(700 K) returned " + above.ToString("F2", CultureInfo.InvariantCulture) + " bar with no fault");
-            if (Physics.IsFinite(high)) problems.Add("SaturationTempK(500 bar) returned " + high.ToString("F2", CultureInfo.InvariantCulture) + " K with no fault");
+            Action<string> add = m => { if (m != null) problems.Add(m); };
+            add(Reported("SaturationPressureBar(700 K)", () => Physics.SaturationPressureBar(700.0)));    // above the critical temperature (647.096 K)
+            add(Reported("SaturationPressureBar(200 K)", () => Physics.SaturationPressureBar(200.0)));    // below the triple point
+            add(Reported("SaturationPressureBar(NaN)", () => Physics.SaturationPressureBar(double.NaN)));
+            add(Reported("SaturationTempK(500 bar)", () => Physics.SaturationTempK(500.0)));              // above critical pressure (220.64 bar)
+            add(Reported("SaturationTempK(0 bar)", () => Physics.SaturationTempK(0.0)));
+            add(Reported("SaturationTempK(+Inf)", () => Physics.SaturationTempK(double.PositiveInfinity)));
+            // The valid domain, endpoints included, must still answer.
+            try
+            {
+                double a = Physics.SaturationPressureBar(Physics.CriticalTempK), b = Physics.SaturationPressureBar(Physics.TripleTempK);
+                double c = Physics.SaturationTempK(Physics.CriticalPressureBar);
+                if (Math.Abs(a - Physics.CriticalPressureBar) > 1e-3 || !Physics.IsFinite(b) || !Physics.IsFinite(c))
+                    problems.Add("domain endpoints give p(Tc)=" + a + " p(Ttriple)=" + b + " T(pc)=" + c);
+            }
+            catch (ArgumentOutOfRangeException ex) { problems.Add("valid domain endpoint rejected: " + ex.Message); }
             return problems.Count == 0 ? null : string.Join("; ", problems.ToArray());
         }
 
@@ -730,6 +751,7 @@ namespace ReactorSim
         {
             var sim = PlantDriver.BringToPower(0.5, 0.5);
             var p = sim.Plant;
+            if (p.Scrammed || p.Core.Power < 0.2) return "precondition failed: Plant.Scrammed=" + p.Scrammed + " (" + p.LastScramCause + ") Core.Power=" + p.Core.Power.ToString("F3", CultureInfo.InvariantCulture) + " before the sink is lost";
             p.Thermal.SteamDemandFrac = 0.0;
             p.Thermal.PrimaryFlowFrac = 0.0;
             double tpMax = 0, tfMax = 0, pMax = 0;
@@ -742,6 +764,8 @@ namespace ReactorSim
             }
             if (Physics.SanitizeHits > 0) return "Sanitize replaced non-finite values during loss of sink";
             string tail = " (Thermal.PrimaryTempC max " + tpMax.ToString("F1", CultureInfo.InvariantCulture) + " C, FuelTempC max " + tfMax.ToString("F1", CultureInfo.InvariantCulture) + " C, PrimaryPressureBar max " + pMax.ToString("F1", CultureInfo.InvariantCulture) + " bar)";
+            if (!p.Scrammed) return "no automatic SCRAM during loss of sink" + tail;
+            if (string.IsNullOrEmpty(p.LastScramCause) || p.LastScramCause == "operator") return "SCRAM cause not recorded as protective: " + p.LastScramCause + tail;
             if (tpMax >= Physics.PrimaryTempMaxC - 0.01) return "Thermal.PrimaryTempC pinned at clamp " + Physics.PrimaryTempMaxC + " C with no model-limit fault" + tail;
             if (tfMax >= Physics.FuelTempMaxC - 0.01) return "Thermal.FuelTempC pinned at clamp with no model-limit fault" + tail;
             if (pMax >= Physics.PressureMaxBar - 0.01) return "Thermal.PrimaryPressureBar pinned at clamp with no model-limit fault" + tail;
