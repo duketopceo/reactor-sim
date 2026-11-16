@@ -317,23 +317,23 @@ public class CaptureMode : MonoBehaviour
         PlantEquipmentBinder.PowerOverride = null;
     }
 
-    // The spent-fuel racks as the window shows them from the stand (the quick-travel stop nearest the glass) or from the first chair
+    // The underwater window as a player sees it from the stand (the quick-travel stop nearest the glass) or from the first chair
     // (at the real seated eye height, aimed at the glass; the window is behind the chair so this is a capture-only view), with the
-    // plant power forced to shutdown (idle glow) or full power. cropMean is the mean brightness over the racks; a rack that is not
-    // fully in frame records none, which check-captures.sh grades as a failure.
+    // plant power forced to shutdown (idle glow) or full power. cropMean is the mean brightness over the glass pane's screen
+    // rectangle, i.e. over the fuel array and glow as the window shows them (the spent-fuel racks themselves sit below the
+    // window's sightline from here, so measuring them would grade wall pixels). A pane that is not fully in front of the camera
+    // records none, which check-captures.sh grades as a failure.
     private IEnumerator WindowShot(string pose)
     {
         var glass = WindowGlass();
         var hallRoot = HallVisibility.FindHall();
-        Transform focus = hallRoot != null ? hallRoot.transform.Find("RackFocus") : null;
-        if (glass == null || focus == null) { Skip(pose, "no window or no rack focus in the scene"); yield break; }
-        var cells = new List<Renderer>();
-        foreach (var r in hallRoot.GetComponentsInChildren<Renderer>(true)) if (r.name.StartsWith("RackGlow_Cells_")) cells.Add(r);
-        // Aimed at the middle of the glass, as the gallery pose is: that is where a player looks, and the racks sit low behind it.
+        if (glass == null || hallRoot == null) { Skip(pose, "no window or no hall in the scene"); yield break; }
+        var pane = new List<Renderer> { glass };
+        // Aimed at the middle of the glass, as the gallery pose is: that is where a player looks.
         if (pose.StartsWith("winseat", System.StringComparison.Ordinal)) op.CaptureSeatLookAt(glass.bounds.center, 60f);
         else op.CaptureLookAt(glass.bounds.center, 60f);
         PlantEquipmentBinder.PowerOverride = pose.EndsWith("full", System.StringComparison.Ordinal) ? 1.0 : 0.0;
-        yield return Shot(pose, pose, 40, 0.8f, null, cells);
+        yield return Shot(pose, pose, 40, 0.8f, null, pane);
         PlantEquipmentBinder.PowerOverride = null;
     }
 
