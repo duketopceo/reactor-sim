@@ -318,7 +318,7 @@ public class CaptureMode : MonoBehaviour
     }
 
     // The spent-fuel racks as the window shows them from the stand (the quick-travel stop nearest the glass) or from the first chair
-    // (at the real seated eye height, aimed at the racks; the window is behind the chair so this is a capture-only view), with the
+    // (at the real seated eye height, aimed at the glass; the window is behind the chair so this is a capture-only view), with the
     // plant power forced to shutdown (idle glow) or full power. cropMean is the mean brightness over the racks; a rack that is not
     // fully in frame records none, which check-captures.sh grades as a failure.
     private IEnumerator WindowShot(string pose)
@@ -329,8 +329,9 @@ public class CaptureMode : MonoBehaviour
         if (glass == null || focus == null) { Skip(pose, "no window or no rack focus in the scene"); yield break; }
         var cells = new List<Renderer>();
         foreach (var r in hallRoot.GetComponentsInChildren<Renderer>(true)) if (r.name.StartsWith("RackGlow_Cells_")) cells.Add(r);
-        if (pose.StartsWith("winseat", System.StringComparison.Ordinal)) op.CaptureSeatLookAt(focus.position, 50f);
-        else op.CaptureLookAt(focus.position, 50f);
+        // Aimed at the middle of the glass, as the gallery pose is: that is where a player looks, and the racks sit low behind it.
+        if (pose.StartsWith("winseat", System.StringComparison.Ordinal)) op.CaptureSeatLookAt(glass.bounds.center, 60f);
+        else op.CaptureLookAt(glass.bounds.center, 60f);
         PlantEquipmentBinder.PowerOverride = pose.EndsWith("full", System.StringComparison.Ordinal) ? 1.0 : 0.0;
         yield return Shot(pose, pose, 40, 0.8f, null, cells);
         PlantEquipmentBinder.PowerOverride = null;
