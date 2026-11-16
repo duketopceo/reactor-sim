@@ -28,8 +28,8 @@ namespace ReactorSim.Instruments
         public const double RackEmissionMax = 2.6;
         /// <summary>Haze cone opacity at zero power.</summary>
         public const double HazeFloor = 0.02;
-        /// <summary>Haze cone opacity at rated power and above (raised from 0.22 in U5: through the window from the stand and seat the glow rose by only 0.008 mean brightness against the 0.01 floor).</summary>
-        public const double HazeMax = 0.45;
+        /// <summary>Haze cone opacity at rated power and above.</summary>
+        public const double HazeMax = 0.22;
 
         /// <summary>Power is normalised (1.0 = rated). Result is always finite and within [Floor, Max].</summary>
         public static double Glow(double power)
@@ -57,10 +57,14 @@ namespace ReactorSim.Instruments
             return HazeFloor + (HazeMax - HazeFloor) * Level(powerFraction);
         }
 
-        /// <summary>Scale (0.15 to 1.5) applied to a rack point light's base intensity; the light count is capped by the builder.</summary>
+        /// <summary>
+        /// Scale (0.15 to 3.15) applied to a rack point light's base intensity; the light count is capped by the builder, only the
+        /// intensity rises. Raised from a 1.5 maximum in U5: through the window from the stand and seat the power glow was a rise of
+        /// only +0.008 in mean pane brightness, under the 0.01 floor check-captures.sh holds the window poses to.
+        /// </summary>
         public static double LightScale(double powerFraction)
         {
-            return 0.15 + 1.35 * Glow(powerFraction);
+            return 0.15 + 3.0 * Glow(powerFraction);
         }
     }
 }
