@@ -57,10 +57,14 @@ namespace ReactorSim.Instruments
             return HazeFloor + (HazeMax - HazeFloor) * Level(powerFraction);
         }
 
-        /// <summary>Scale (0.15 to 1.5) applied to a rack point light's base intensity; the light count is capped by the builder.</summary>
+        /// <summary>
+        /// Scale (0.15 to 3.15) applied to a rack point light's base intensity; the light count is capped by the builder, only the
+        /// intensity rises. Raised from a 1.5 maximum in U5: through the window from the stand and seat the power glow was a rise of
+        /// only +0.008 in mean pane brightness, under the 0.01 floor check-captures.sh holds the window poses to.
+        /// </summary>
         public static double LightScale(double powerFraction)
         {
-            return 0.15 + 1.35 * Glow(powerFraction);
+            return 0.15 + 3.0 * Glow(powerFraction);
         }
     }
 }

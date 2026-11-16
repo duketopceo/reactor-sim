@@ -35,6 +35,10 @@ public class DiegeticInteractable : MonoBehaviour
     public string pinSelector = "";
     public int pinIndex = -1;
 
+    [Header("Wall detail select (Phase 1 U2, set by ControlRoomSceneBuilder on the status wall's System_ nodes)")]
+    [Tooltip("A WallDetailModel component name: a click selects it on the wall's detail plate. Read-only: nothing is submitted to the plant.")]
+    public string wallComponent = "";
+
     private const float GuardSeconds = 3f;
     private const float MoveLogSeconds = 0.25f;
 
@@ -123,13 +127,16 @@ public class DiegeticInteractable : MonoBehaviour
         }
     }
 
+    /// <summary>True for a status-wall component: a click selects it for the detail plate, it is not a control and never hovers.</summary>
+    public bool IsWallNode { get { return !string.IsNullOrEmpty(wallComponent); } }
+
     /// <summary>True for a control the player can operate (not an indicator, not out of service).</summary>
     public bool Operable { get { return Spec != null && !outOfService && !pinnable; } }
 
     private void Awake()
     {
         col = GetComponent<Collider>();
-        if (outOfService || pinnable)
+        if (outOfService || pinnable || IsWallNode)
         {
             Status = ParseStatus.NotControl;
             return;
@@ -193,16 +200,8 @@ public class DiegeticInteractable : MonoBehaviour
     /// <summary>The one-line on-screen note for a rejected press.</summary>
     public string RejectNote(string reason)
     {
-        switch (reason)
-        {
-            case ControlTooltipModel.RejectIndicator:
-                return ControlTooltipModel.IndicatorNote(ControlTooltipModel.RelatedControl(RuntimeInventoryStore.Inventory, rowId));
-            case ControlTooltipModel.RejectOutOfService:
-            case ControlTooltipModel.RejectOutOfRange:
-                return HoverNote;
-            default:
-                return (string.IsNullOrEmpty(rowLabel) ? RowName : rowLabel) + " is not wired to anything";
-        }
+        return ControlTooltipModel.RejectNoteFor(reason, string.IsNullOrEmpty(rowLabel) ? RowName : rowLabel, HoverNote,
+            reason == ControlTooltipModel.RejectIndicator ? ControlTooltipModel.RelatedControl(RuntimeInventoryStore.Inventory, rowId) : null);
     }
 
     /// <summary>Logs a rejected press and tells the player why on screen.</summary>
@@ -219,6 +218,14 @@ public class DiegeticInteractable : MonoBehaviour
     private void OnMouseDown()
     {
         if (Dragging != null) return;
+        if (IsWallNode)
+        {
+            // A read-only selection, so no interaction range applies: the wall is read from across the room.
+            var view = GetComponentInParent<PlantWallMapView>();
+            if (view != null) view.ClickComponent(wallComponent);
+            else Reject(ControlTooltipModel.RejectNoSpec);
+            return;
+        }
         string reason = RejectReason();
         if (reason != null)
         {

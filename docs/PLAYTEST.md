@@ -118,6 +118,14 @@ speed, and electrical output control the brightness of their respective routes. 
 route responds; a steam dump can carry heat to the condenser even when the turbine is tripped. The chemistry, surge, and safety
 connections remain static circuit markings because the snapshot does not expose a measured flow for those particular paths.
 
+Click a component on the wall (reactor, safety, primary pump, pressurizer, steam generator, turbine, generator, grid, condenser,
+cooling, feed pump, boron/makeup) to select it: it turns yellow and its readings (actual values with units, commands labeled as
+commands, `N/M` where no source exists) fill the lower plate. Click it again to clear; click another to move the selection; with
+nothing selected the plate asks you to select a component. The click only selects: it never changes the plant, and it works from
+any distance. Small arrowheads travel along the primary, steam, steam-dump, turbine-exhaust, feedwater and grid routes while they
+carry flow, and are absent when a route is idle or its reading is missing; the cooling circuit has none because the model does not
+define a flow direction for it.
+
 - **The module.** A small modular reactor of the pumped integral type: a 2.7 m wide, 18.8 m tall reactor vessel standing in
   a 4.5 m wide containment shell, in the pool with the containment head just under the water. The steam generators and the
   pressurizer are inside the vessel, so there is no external primary loop. What you see outside the vessel is what such a
@@ -152,7 +160,7 @@ ROOM_RENDER=1 ROOM_RENDER_SIZE=1920x1080 UNITY_EXE=... bash scripts/ci.sh      #
 On the Windows machine (graphics session):
 
 ```
-bash scripts/capture-playtest.sh --sizes 1920x1080 --poses gallery,away,hall,glowoff,glowidle,glowmid,glowfull
+bash scripts/capture-playtest.sh --sizes 1920x1080 --poses gallery,away,hall,glowoff,glowidle,glowmid,glowfull,winstandidle,winstandfull,winseatidle,winseatfull
 bash scripts/check-captures.sh <dir> --only glowoff,glowidle,glowmid,glowfull --allow-skip gallery,away,hall   # rack glow rises with power
 bash scripts/check-captures.sh <dir> --baseline <baseline dir> --budget-only                                   # runtime budget
 bash scripts/check-captures.sh <dir> --baseline <baseline dir> --budget-only --room-budget                     # + seat/stand room budget
@@ -166,6 +174,29 @@ The baseline is a run of the same poses on a build with the old hall: the commit
 (`gallery`, `away`) added to it, because those poses do not exist in older builds. Frame time on a shared machine is noisy (the
 same build has measured between 5.7 and 15.6 ms at p95 in different runs), so run the budget check on a quiet machine, and
 compare runs made back to back.
+
+### Phase 1 U5 checks (what was verified, and what was not)
+
+Checked by tools on the integration of PRs #13 to #19 plus U5, on the Windows build machine unless noted:
+
+- **Scenario parity (Linux CI, `PresentationParityTests`).** Eight scenarios, every tick: relief, trip, alarm, steam and bypass
+  agree across the status wall, sound mix, lamps, alarm priority and hall steam model. A turbine trip with bypass has
+  `TurbineSteam` 0 and `DumpSteam` above 0; after a SCRAM the horn sounds until acknowledged, then every model is silent until a
+  new condition is raised. The matrix is listed in [TESTING.md](TESTING.md) (`--scenario parity`).
+- **Captures at 1600x900 and 1920x1080** (`scripts/capture-playtest.sh`, then `scripts/check-captures.sh`, absolute thresholds,
+  nothing loosened): every control pose (seat, stand, tooltip, rejected press, drag readout, checklist, pause, tablet,
+  clipboard, menu), the CRT faces and the two wall poses pass the glyph (10 px) and contrast (4.5) floors; the rack glow rises
+  from off through idle and mid to full.
+- **Underwater window (R9).** Four poses (`winstandidle`, `winstandfull`, `winseatidle`, `winseatfull`) photograph the window
+  from the stand and from the chair at shutdown and at full power; the mean brightness over the glass pane must rise by at
+  least the rack-glow floor (0.01). The first run read +0.008 from both views (the glow was a faint cue at that distance), so
+  the rack and core light gain with power was raised (`GlowMapping.LightScale` maximum 1.5 to 3.15, intensity only: no new
+  lights, renderers or triangles). Now +0.020 from both views at both sizes. A haze-opacity change was tried first and had no
+  effect on the window views, so it was reverted.
+- **Not done by an agent:** the owner's visual pass of these captures and the **listening pass** (quiet, startup, full-load and
+  emergency states, horn and voice priority, category sliders). No agent plays audio; the sound mix is checked as numbers only.
+  The frame-time budgets against a baseline (`--baseline --room-budget`) were not graded: they need a baseline run from before
+  the hall change on the same machine.
 
 ## Not in this build
 

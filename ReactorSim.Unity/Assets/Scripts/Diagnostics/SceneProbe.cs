@@ -20,6 +20,7 @@ public static class SceneProbe
         foreach (var d in Object.FindObjectsByType<DiegeticInteractable>(FindObjectsInactive.Include))
         {
             if (d.OutOfService) { outOfService++; continue; }
+            if (d.IsWallNode) continue;                 // status-wall selection targets, not controls
             if (d.pinnable) { pinnable++; continue; }   // indicator hover targets for tablet pins, not controls
             controls++;
             var c = d.GetComponent<Collider>();

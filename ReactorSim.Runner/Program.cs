@@ -207,6 +207,9 @@ namespace ReactorSim
             if (all || key == "startup-boron")
                 failures += RunCheck("U4 Startup: Boron Band Leaves Bank A Critical Mid-Range", StartupScenarios.VerifyBoronBand);
 
+            if (all || key == "parity")
+                failures += RunCheck("U5 Parity: R13 scenario matrix reaches its named states", ParityScenarios.Verify);
+
             Console.WriteLine("=================================================================");
             if (failures == 0)
             {

@@ -31,6 +31,7 @@ namespace ReactorSim.Core.Tests
             new Allow("View3D/AlarmFeedback.cs", null, "alarm emission and room light colors"),
             new Allow("View3D/CounterDisplay.cs", null, "seven-segment emission, a physical display"),
             new Allow("View3D/PlantEquipmentBinder.cs", null, "particle/steam material"),
+            new Allow("View3D/ReliefParticles.cs", null, "white soft-sprite texels and the neutral additive tint of the relief particle material"),
             new Allow("View3D/ControlRoom3DBinder.cs", @"Lamp(Off|Amber|Red|Green)\b|\bfc\b|SetLampRaw|emission", "lamp tile colors and emission"),
             new Allow("UI/ProcedureClipboard.cs", @"Part\(""", "clipboard prop geometry (board, paper, clip)"),
             new Allow("UI/OperatorTablet.cs", @"var color = new Color", "world-space pointer arrow geometry"),

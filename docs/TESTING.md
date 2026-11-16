@@ -80,6 +80,7 @@ run in a sandboxed CI container is broken by definition.
 | `--scenario bop` | All U10 |
 | `--scenario startup-boron` | U4 boron band: prints critical bank A insertion versus boron (1100 to 1400 ppm) at the step-5 state; fails unless every boron the procedure accepts leaves bank A critical between 30 and 48 % inserted, the old 1200 ppm target sits at about 50 %, and steps 5 to 7 reach criticality by bank A trim alone |
 | `--scenario startup-grid` | U4 operator policy walks `cold-start-to-grid` (13 steps, `procedures.json`) from `SandboxStart.Apply` with Player intents only: every step ticks in order, generator synced, grid output at the procedure target, no SCRAM or BOP trip, finite state each tick. Prints per-step game minutes and the final state hash; a per-step 45-minute cap fails naming the step and live values |
+| `--scenario parity` | U5 / R13 scenario matrix (`ParityScenarios`): cold startup to grid, steady load, flow loss, high pressure (with the PORV lifted), SCRAM with acknowledge, turbine trip with bypass, feed starvation to the steam generator low-level trip, bypass while tripped. One snapshot per tick; each case must reach the state it is named for. `ReactorSim.Core.Tests/PresentationParityTests.cs` feeds the same snapshots through `PlantWallMapModel`, `ReactorSoundMix`, `LampPredicates`, `AudioPriority` with `AlarmTracker` (the horn) and `HallSteamModel` and asserts relief, trip, alarm, steam and bypass agree |
 | `--verify [--check <id>] [-v]` / `--list` | Determinism / numerics / edge-case contract. `STARTUP-01`: the startup run twice (same step minutes, intents, state hash); a SCRAM from power unticks the rod step and later but keeps the lineup ticked; the playtest order (throttle 0.05 to 0.11 first) leaves step 1 current and the plant subcritical |
 
 Dev artifacts: `--log <file.jsonl>` (one deterministic JSON object per tick),
@@ -139,9 +140,19 @@ are used; when only some exist, the run fails naming the missing one.
 "<Unity.exe>" -batchmode -projectPath ReactorSim.Unity -executeMethod RoomRender.Run -logFile out/unity-RoomRender.log
 #   or as a CI step: ROOM_RENDER=1 UNITY_EXE=... bash scripts/ci.sh
 
+# Relief and bypass visuals (jets and the sparger plumes seen through the window) in four states (idle, PORV only, SG relief only, tripped turbine with bypass), stand and seat -> <REACTOR_ASSET_RENDER_DIR or out/reactor-assets>/relief/<state>-<view><REACTOR_ASSET_RENDER_SUFFIX>.png
+"<Unity.exe>" -batchmode -projectPath ReactorSim.Unity -executeMethod ReactorAssetRender.RunRelief -logFile out/unity-relief.log
+
 # Back on Linux: copy out/render/*.png from the host into out/render/<timestamp>/
 REACTOR_SIM_WIN_HOST=my-windows-box REACTOR_SIM_WIN_REPO='C:\path\to\reactor-sim' bash scripts/fetch-renders.sh [--dest DIR]
 ```
+
+Capture poses graded by `scripts/check-captures.sh` (`REQUIRED_POSES`) include `wall` (the status wall's detail plate with the reactor
+selected through the real click path) and `wallidle` (nothing selected, the prompt). Each is measured on the rendered image: projected
+glyph height at least 10 px, text contrast at least 4.5, and the text must fit its plate (`detailFits`); a missing measurement fails.
+`scripts/test-check-captures.sh` proves each limit can fail. `PlantFeedbackPlayCapture.Run -feedbackScene Assets/Scenes/Bootstrap.unity`
+(graphics session) clicks every wall node through `DiegeticInteractable`, asserts the plate text and highlight for normal, changed and
+all-NaN snapshots, the route cues (hidden at zero and NaN, shown while flowing, calibrated to their pipes) and saves close captures.
 
 `RoomRender` logs `[RoomRender] OK <path> <bytes>` per image or `[RoomRender] FAIL ...`, and fails on an empty,
 tiny (under 1 KB) or single-flat-colour image. `fetch-renders.sh` exits 0 fetched, 1 nothing found, 2 host

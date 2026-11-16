@@ -101,5 +101,6 @@ left uncommitted for user review.
 
 Latch-mechanism simulation and Core physics changes remain deferred. Pool bubbles
 (`ReactorWaterAtmosphere`, decorative) and independent primary/secondary relief jets
-(`PlantEquipmentBinder`) are implemented; the jets need authored relief anchors in the
-placed hall assets to appear.
+(`PlantEquipmentBinder`) are implemented. `HallBuilder.BuildReliefAnchors` places the PORV, SG relief and bypass
+anchors in the hall (positions in `ReliefAnchors`); `ReactorAssetCheck` asserts they exist, and
+`ReactorAssetRender.RunRelief` renders the four relief states from the stand and the seat through the window (set `REACTOR_ASSET_RENDER_SUFFIX` to tag a run). Each relief line also runs down to a sparger at the fuel-display depth where a bubble plume rises past the window (see `plant-counterparts-inventory.md`, Spargers).

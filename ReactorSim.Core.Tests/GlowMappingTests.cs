@@ -106,8 +106,8 @@ namespace ReactorSim.Core.Tests
             Assert.Equal(GlowMapping.HazeFloor, GlowMapping.Haze(0.0), 12);
             Assert.Equal(GlowMapping.HazeMax, GlowMapping.Haze(1.0), 12);
             Assert.True(GlowMapping.Haze(0.3) > GlowMapping.Haze(0.0) && GlowMapping.Haze(0.3) < GlowMapping.Haze(1.0));
-            Assert.InRange(GlowMapping.LightScale(0.0), 0.15, 1.5);
-            Assert.InRange(GlowMapping.LightScale(1.0), 0.15, 1.5);
+            Assert.InRange(GlowMapping.LightScale(0.0), 0.15, 3.15);
+            Assert.InRange(GlowMapping.LightScale(1.0), 0.15, 3.15);
             Assert.True(GlowMapping.LightScale(1.0) > GlowMapping.LightScale(0.0));
         }
 

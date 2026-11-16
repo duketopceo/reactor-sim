@@ -43,6 +43,8 @@ Plans may be designed in parallel, but a co-op or whole-plant claim is gated on 
 
 **Gate:** cold startup to grid, steady operation, SCRAM and turbine trip are playable; wall/desk/hall/audio agree, numeric values are legible, and tests plus a documented visual/listening pass succeed.
 
+**Status (2026-11-15):** implementation complete on the integration branch (PRs #13 to #19 plus U5); not closed. Done and verified: the three physics defects and the automatic SCRAM trips; the instrument budget gate; the wall detail view and control feedback (U2); primary and secondary relief anchors, bypass steam and effects (U3); audio categories, positioning and priority (U6); a parity test that runs eight scenarios through the wall, sound mix, lamps, alarm priority and hall steam model (U5); underwater-window and control captures at both sizes inside the absolute thresholds. Still open: the owner's visual pass and listening pass (recorded in [docs/PLAYTEST.md](docs/PLAYTEST.md) once done), the frame-time baseline run, and the save/load and golden-result verification noted above. The gate is not met until the owner's passes are recorded.
+
 ## Phase 2 — Player and first walkable plant route
 
 **Player outcome:** leave the control room and reach real equipment with a sense of scale and place.

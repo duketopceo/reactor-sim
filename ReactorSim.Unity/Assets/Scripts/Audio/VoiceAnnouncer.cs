@@ -8,8 +8,10 @@ using ReactorSim.Instruments;
 // The clips are assigned by the scene builder; this component only decides WHEN a line plays. Events come from the live
 // snapshot (SCRAM, turbine, breaker sync, assist tier, criticality, alarms), the assistant advisory log, and the
 // cold-start-to-grid procedure checklist (the step_* / heatup / power_ascension lines follow the current step).
-// One line at a time on a dedicated source; a new SCRAM interrupts whatever is speaking. A short global gap and a
-// per-line cooldown keep repeated state from machine-gunning the voice.
+// One line at a time on a dedicated source. Lines that fire in the same tick are collected and AudioPriority picks the
+// one to speak (SCRAM highest); a higher-ranked alarm line interrupts a lower-ranked one that is speaking. A short
+// global gap and a per-line cooldown keep repeated state from machine-gunning the voice. The Voice category gain from
+// UserSettings scales the source every frame.
 public class VoiceAnnouncer : MonoBehaviour
 {
     public PlantBridge bridge;
@@ -22,6 +24,8 @@ public class VoiceAnnouncer : MonoBehaviour
     private readonly Dictionary<string, AudioClip> bank = new Dictionary<string, AudioClip>();
     private readonly Dictionary<string, float> lastPlayed = new Dictionary<string, float>();
     private float lastAny = -999f;
+    private readonly List<string> pending = new List<string>();
+    private string playingKey;
 
     private Procedure startupProc;
     private int prevProcIndex = -2;       // -2 = not yet seen
@@ -58,23 +62,36 @@ public class VoiceAnnouncer : MonoBehaviour
         catch (System.Exception e) { Debug.LogWarning("[VoiceAnnouncer] procedures.json: " + e.Message); }
     }
 
-    private void Say(string key, bool interrupt = false)
+    // Queues a line for this tick if its clip exists and its per-line cooldown has passed; Flush picks the one to speak.
+    private void Say(string key)
     {
-        if (key == null) return;
+        if (key == null || pending.Contains(key)) return;
         AudioClip clip;
         if (!bank.TryGetValue(key, out clip) || clip == null) return;
-        float now = Time.unscaledTime;
         float last;
-        if (lastPlayed.TryGetValue(key, out last) && now - last < lineCooldown) return;
+        if (lastPlayed.TryGetValue(key, out last) && Time.unscaledTime - last < lineCooldown) return;
+        pending.Add(key);
+    }
+
+    private void Flush()
+    {
+        string key = AudioPriority.Pick(pending);
+        pending.Clear();
+        if (key == null) return;
+        float now = Time.unscaledTime;
+        if (!voice.isPlaying) playingKey = null;
+        bool interrupt = AudioPriority.Interrupts(key, playingKey);
         if (!interrupt && (voice.isPlaying || now - lastAny < minInterval)) return;
         lastPlayed[key] = now;
         lastAny = now;
-        voice.clip = clip;
+        playingKey = key;
+        voice.clip = bank[key];
         voice.Play();
     }
 
     private void Update()
     {
+        voice.volume = volume * UserSettings.Audio.VoiceGain;
         if (bridge == null) bridge = FindAnyObjectByType<PlantBridge>();
         if (bridge == null || bridge.Sim == null || Time.timeScale <= 0f) return;
         PlantSnapshot s = bridge.GetSnapshot();
@@ -83,7 +100,7 @@ public class VoiceAnnouncer : MonoBehaviour
         // --- hard plant events ---
         if (prev != null)
         {
-            if (s.Scrammed && !prev.Scrammed) Say("scram", true);
+            if (s.Scrammed && !prev.Scrammed) Say("scram");
             if (!s.Scrammed && prev.Scrammed) Say("scram_reset");
             if (s.TurbineTripped && !prev.TurbineTripped) Say("turbine_trip");
             if (s.GeneratorSynced && !prev.GeneratorSynced) Say("sync");
@@ -155,6 +172,7 @@ public class VoiceAnnouncer : MonoBehaviour
 
         prev = s;
         prevAssist = s.AssistTier;
+        Flush();
     }
 
     private void SayStep(string stepId)

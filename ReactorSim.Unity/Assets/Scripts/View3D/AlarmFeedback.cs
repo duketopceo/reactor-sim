@@ -4,7 +4,7 @@ using ReactorSim;
 
 // Dramatic feedback (R5): turns plant edges into sound, shake and light.
 //  - SCRAM / BOP trip edge: trip stinger + hard camera shake
-//  - PORV lift, new high-pressure or high-fuel-temp alarm: shorter sting + smaller shake
+//  - PORV lift (own sting) and secondary relief lift (own sting), new high-pressure or high-fuel-temp alarm: shorter sting + smaller shake
 //  - Chaos-class intents landing in the intent log: short sting + small shake
 //  - while any alarm holds: klaxon beacons pulse red and the room lights tint and flicker toward red
 // The klaxon loop itself lives in ProceduralPlantAudio.
@@ -30,6 +30,7 @@ public class AlarmFeedback : MonoBehaviour
     private bool prevScrammed;
     private int prevTripMask;
     private bool prevRelief;
+    private bool prevSecondaryRelief;
     private bool prevHot;
     private long lastChaosSeq = -1;
     private float nextChaosPoll;
@@ -76,11 +77,13 @@ public class AlarmFeedback : MonoBehaviour
             if (s.Scrammed && !prevScrammed) Trip(1f, 2.5f);
             if ((s.BopTripMask & ~prevTripMask) != 0) Trip(0.75f, 2f);
             if (s.ReliefOpen && !prevRelief) Sting(ProceduralPlantAudio.StingKind.Relief, 0.3f, 0.8f);
+            if (s.SecondaryReliefOpen && !prevSecondaryRelief) Sting(ProceduralPlantAudio.StingKind.SecondaryRelief, 0.25f, 0.7f);
             if (hot && !prevHot) Sting(ProceduralPlantAudio.StingKind.Alarm, 0.35f, 0.9f);
         }
         prevScrammed = s.Scrammed;
         prevTripMask = s.BopTripMask;
         prevRelief = s.ReliefOpen;
+        prevSecondaryRelief = s.SecondaryReliefOpen;
         prevHot = hot;
         primed = true;
 

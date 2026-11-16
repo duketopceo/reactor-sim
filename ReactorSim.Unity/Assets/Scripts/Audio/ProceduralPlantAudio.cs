@@ -17,9 +17,7 @@ public class ProceduralPlantAudio : MonoBehaviour
     /// <summary>The scene's audio, for control sounds (ControlRoom3DBinder plays them through PlayControl).</summary>
     public static ProceduralPlantAudio Instance { get; private set; }
 
-    // The horn sounds while any of these conditions is raised and not yet acknowledged. Tracked per condition, so after
-    // an acknowledge a NEW condition (a turbine trip during a scram) sounds the horn again.
-    private static readonly string[] HornAlarms = { "scram", "bop-trip", "high-pressure", "high-fuel-temp" };
+    // The horn sounds while any AudioPriority.HornAlarms condition is raised and not yet acknowledged (tracked per condition).
     private readonly ReactorSim.Instruments.AlarmTracker hornTracker = new ReactorSim.Instruments.AlarmTracker();
     private PlantSnapshot hornSnap;
     private System.Func<string, bool> hornRaised;
@@ -29,16 +27,7 @@ public class ProceduralPlantAudio : MonoBehaviour
 
     private bool HornConditionRaised(string name)
     {
-        var s = hornSnap;
-        if (s == null) return false;
-        switch (name)
-        {
-            case "scram": return s.Scrammed;
-            case "bop-trip": return s.BopTripMask != 0;
-            case "high-pressure": return s.PrimaryPressureBar > 165.0;
-            case "high-fuel-temp": return s.FuelTempC > 1200.0;
-            default: return false;
-        }
+        return AudioPriority.HornConditionRaised(name, hornSnap);
     }
 
     private void Awake()
@@ -99,7 +88,8 @@ public class ProceduralPlantAudio : MonoBehaviour
             clip = MakeControlClip(kind);
             controlClips[kind] = clip;
         }
-        sfxSource.PlayOneShot(clip, kind == ControlSound.Breaker ? 1f : (kind == ControlSound.Tick ? 0.35f : (kind == ControlSound.Reject ? 0.5f : 0.6f)));
+        float scale = kind == ControlSound.Breaker ? 1f : (kind == ControlSound.Tick ? 0.35f : (kind == ControlSound.Reject ? 0.5f : 0.6f));
+        sfxSource.PlayOneShot(clip, scale * UserSettings.Audio.PlantGain);
     }
 
     // Tick: a 4 ms click. Clunk: a short low thump with a noisy edge. Breaker: a deep, longer thud with a metallic ring.
@@ -187,12 +177,12 @@ public class ProceduralPlantAudio : MonoBehaviour
         return clip;
     }
 
-    public enum StingKind { Trip, Relief, Alarm, Chaos }
+    public enum StingKind { Trip, Relief, SecondaryRelief, Alarm, Chaos }
 
     private readonly System.Collections.Generic.Dictionary<StingKind, AudioClip> stings =
         new System.Collections.Generic.Dictionary<StingKind, AudioClip>();
 
-    /// <summary>One-shot stinger for a trip, relief lift, new alarm or chaos event (clips built on first use).</summary>
+    /// <summary>One-shot stinger for a trip, a primary or secondary relief lift, new alarm or chaos event (clips built on first use). Alarm category volume.</summary>
     public void PlaySting(StingKind kind)
     {
         if (sfxSource == null) return;
@@ -202,7 +192,7 @@ public class ProceduralPlantAudio : MonoBehaviour
             clip = MakeSting(kind);
             stings[kind] = clip;
         }
-        sfxSource.PlayOneShot(clip, kind == StingKind.Trip ? 1f : 0.7f);
+        sfxSource.PlayOneShot(clip, (kind == StingKind.Trip ? 1f : 0.7f) * UserSettings.Audio.AlarmGain);
     }
 
     private AudioClip MakeSting(StingKind kind)
@@ -212,7 +202,8 @@ public class ProceduralPlantAudio : MonoBehaviour
         switch (kind)
         {
             case StingKind.Trip: duration = 1.4f; f0 = 900f; f1 = 140f; break;      // falling siren
-            case StingKind.Relief: duration = 0.35f; f0 = 300f; f1 = 520f; break;    // short rising blip
+            case StingKind.Relief: duration = 0.35f; f0 = 300f; f1 = 520f; break;    // primary relief: short rising blip
+            case StingKind.SecondaryRelief: duration = 0.35f; f0 = 520f; f1 = 300f; break; // secondary relief: the falling counterpart
             case StingKind.Alarm: duration = 0.5f; f0 = 660f; f1 = 660f; break;
             default: duration = 0.45f; f0 = 180f; f1 = 620f; break;                   // chaos: springy "boing"
         }
@@ -280,19 +271,22 @@ public class ProceduralPlantAudio : MonoBehaviour
 
     private void Update()
     {
+        // Master volume is applied once, to the listener; the categories are multiplied into each source below.
+        AudioListener.volume = UserSettings.Audio.Master;
         if (bridge == null || bridge.Sim == null) return;
         PlantSnapshot s = bridge.GetSnapshot();
+        var cats = UserSettings.Audio;
 
         if (rcpLoop != null)
         {
-            rcpLoop.volume = Mathf.Clamp01((float)s.PrimaryFlowFrac) * 0.8f;
+            rcpLoop.volume = Mathf.Clamp01((float)s.PrimaryFlowFrac) * 0.8f * cats.PlantGain;
             rcpLoop.pitch = 0.6f + Mathf.Clamp01((float)s.PrimaryFlowFrac) * 0.8f;
         }
         if (steamLoop != null)
         {
             // Follow steam delivered to the turbine, not the throttle command: a trip closes its stop valve.
             float steam = ReactorSoundMix.From(s).TurbineSteam;
-            steamLoop.volume = steam * 0.7f;
+            steamLoop.volume = steam * 0.7f * cats.PlantGain;
             steamLoop.pitch = 0.7f + steam * 0.6f;
         }
         if (turbineLoop != null)
@@ -304,7 +298,7 @@ public class ProceduralPlantAudio : MonoBehaviour
                 turbineLoop.Play();
             }
             float rpmFrac = Mathf.Clamp01((float)s.TurbineRpm / 3000f);
-            turbineLoop.volume = rpmFrac * 0.28f;
+            turbineLoop.volume = rpmFrac * 0.28f * cats.PlantGain;
             turbineLoop.pitch = 0.5f + rpmFrac * 0.9f;
         }
         if (scramKlaxon != null)
@@ -312,8 +306,9 @@ public class ProceduralPlantAudio : MonoBehaviour
             // Acknowledge / silence (AcknowledgeAlarms) quiets the conditions raised so far; a new one sounds again.
             hornSnap = s;
             if (hornRaised == null) hornRaised = HornConditionRaised;
-            hornTracker.Update(HornAlarms, hornRaised, s.AlarmAckSeq);
+            hornTracker.Update(AudioPriority.HornAlarms, hornRaised, s.AlarmAckSeq);
             bool sound = hornTracker.AnyUnacked;
+            scramKlaxon.volume = cats.AlarmGain;
             if (sound && !scramKlaxon.isPlaying) scramKlaxon.Play();
             if (!sound && scramKlaxon.isPlaying) scramKlaxon.Stop();
         }
@@ -329,8 +324,7 @@ public class ProceduralPlantAudio : MonoBehaviour
             }
             if (moved && sfxSource != null)
             {
-                sfxSource.clip = MakeTone(140f, 0.09f, 0.8f);
-                sfxSource.Play();
+                sfxSource.PlayOneShot(MakeTone(140f, 0.09f, 0.8f), cats.PlantGain);
                 rodMoveCooldown = 0.15f;
             }
         }

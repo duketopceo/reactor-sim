@@ -14,7 +14,14 @@ public static class UserSettings
     private const string ChecklistHiddenKey = "reactorsim.checklistHidden";
     private const string InvertYKey = "reactorsim.invertY";
 
+    private const string MasterVolumeKey = "reactorsim.volume.master";
+    private const string PlantVolumeKey = "reactorsim.volume.plant";
+    private const string AlarmVolumeKey = "reactorsim.volume.alarms";
+    private const string VoiceVolumeKey = "reactorsim.volume.voice";
+
     private static bool loaded;
+    private static float? masterVolume, plantVolume, alarmVolume, voiceVolume;
+    private static bool alarmMuted;
     private static bool invertY;
     private static ReactorSim.Controls.InputTuning tuning;
     private static bool checklistHidden;
@@ -41,6 +48,47 @@ public static class UserSettings
     {
         get { Load(); return sensitivity; }
         set { Load(); sensitivity = OperatorMath.ClampSensitivity(value); Store(SensKey, sensitivity); }
+    }
+
+    /// <summary>Master volume 0-1 (applied to the listener); full when never set.</summary>
+    public static float MasterVolume
+    {
+        get { Load(); return masterVolume ?? AudioCategories.DefaultLevel; }
+        set { Load(); masterVolume = AudioCategories.Clamp(value); Store(MasterVolumeKey, masterVolume.Value); }
+    }
+
+    /// <summary>Plant sound category volume 0-1; full when never set.</summary>
+    public static float PlantVolume
+    {
+        get { Load(); return plantVolume ?? AudioCategories.DefaultLevel; }
+        set { Load(); plantVolume = AudioCategories.Clamp(value); Store(PlantVolumeKey, plantVolume.Value); }
+    }
+
+    /// <summary>Alarm sound category volume 0-1; full when never set.</summary>
+    public static float AlarmVolume
+    {
+        get { Load(); return alarmVolume ?? AudioCategories.DefaultLevel; }
+        set { Load(); alarmVolume = AudioCategories.Clamp(value); Store(AlarmVolumeKey, alarmVolume.Value); }
+    }
+
+    /// <summary>Voice category volume 0-1; full when never set.</summary>
+    public static float VoiceVolume
+    {
+        get { Load(); return voiceVolume ?? AudioCategories.DefaultLevel; }
+        set { Load(); voiceVolume = AudioCategories.Clamp(value); Store(VoiceVolumeKey, voiceVolume.Value); }
+    }
+
+    /// <summary>The pause menu's alarm mute: overrides the Alarms slider, lasts for the session (not saved).</summary>
+    public static bool AlarmMuted
+    {
+        get { return alarmMuted; }
+        set { alarmMuted = value; Version++; }
+    }
+
+    /// <summary>Master and category levels as one pure value (what every audio source multiplies in).</summary>
+    public static AudioCategories Audio
+    {
+        get { Load(); return AudioCategories.FromStored(masterVolume, plantVolume, alarmVolume, voiceVolume, alarmMuted); }
     }
 
     /// <summary>True when mouse-look pitch is inverted (default: mouse up looks up).</summary>
@@ -96,6 +144,17 @@ public static class UserSettings
         sensitivity = OperatorMath.ClampSensitivity(Read(SensKey, OperatorMath.SensitivityDefault));
         checklistHidden = Read(ChecklistHiddenKey, 0f) > 0.5f;
         invertY = Read(InvertYKey, 0f) > 0.5f;
+        masterVolume = ReadOptional(MasterVolumeKey);
+        plantVolume = ReadOptional(PlantVolumeKey);
+        alarmVolume = ReadOptional(AlarmVolumeKey);
+        voiceVolume = ReadOptional(VoiceVolumeKey);
+    }
+
+    // A key that was never written reads as null (the default), so older installs and a blocked PlayerPrefs stay full volume.
+    private static float? ReadOptional(string key)
+    {
+        try { return PlayerPrefs.HasKey(key) ? AudioCategories.Clamp(PlayerPrefs.GetFloat(key)) : (float?)null; }
+        catch (System.Exception) { return null; }
     }
 
     private static float Read(string key, float fallback)

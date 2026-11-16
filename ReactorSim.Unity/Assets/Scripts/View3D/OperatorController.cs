@@ -354,6 +354,19 @@ public class OperatorController : MonoBehaviour
         fovTarget = defaultFov;
     }
 
+    /// <summary>Capture only: sits on the first chair and looks at a point with the given field of view (the swivel range is bypassed).</summary>
+    public void CaptureSeatLookAt(Vector3 point, float fov)
+    {
+        if (seats[0] == null) return;
+        seated = true;
+        StandAt(seats[0]);
+        eye = OperatorMath.EyeHeight(true);
+        Vector3 d = point - EyePosition();
+        yaw = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg;
+        pitch = OperatorMath.ClampPitch(-Mathf.Atan2(d.y, new Vector2(d.x, d.z).magnitude) * Mathf.Rad2Deg);
+        fovTarget = Mathf.Clamp(fov, minFov, maxFov);
+    }
+
     /// <summary>Stands at the quick-travel stop nearest a world point, then looks at it with the given field of view.</summary>
     public void CaptureLookAt(Vector3 point, float fov)
     {
@@ -367,6 +380,7 @@ public class OperatorController : MonoBehaviour
             if (f.sqrMagnitude < bestD) { bestD = f.sqrMagnitude; best = i; }
         }
         if (best >= 0) TravelTo(best + 1);
+        eye = OperatorMath.EyeHeight(seated);   // aim from the settled eye, not the lerp's current value (it depends on the previous pose)
         Vector3 d = point - EyePosition();
         yaw = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg;
         pitch = OperatorMath.ClampPitch(-Mathf.Atan2(d.y, new Vector2(d.x, d.z).magnitude) * Mathf.Rad2Deg);
