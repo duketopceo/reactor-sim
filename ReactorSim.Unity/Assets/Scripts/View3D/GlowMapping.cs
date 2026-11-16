@@ -28,8 +28,8 @@ namespace ReactorSim.Instruments
         public const double RackEmissionMax = 2.6;
         /// <summary>Haze cone opacity at zero power.</summary>
         public const double HazeFloor = 0.02;
-        /// <summary>Haze cone opacity at rated power and above.</summary>
-        public const double HazeMax = 0.22;
+        /// <summary>Haze cone opacity at rated power and above (raised from 0.22 in U5: through the window from the stand and seat the glow rose by only 0.008 mean brightness against the 0.01 floor).</summary>
+        public const double HazeMax = 0.45;
 
         /// <summary>Power is normalised (1.0 = rated). Result is always finite and within [Floor, Max].</summary>
         public static double Glow(double power)
