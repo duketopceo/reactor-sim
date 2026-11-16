@@ -34,11 +34,11 @@ Steps that tick on the same minute as the one before them were already satisfied
 | 5 | dilute-boron | Dilute boron down to about 1300 ppm (between 1250 and 1350), then stop the dilution. Do not go lower: bank A is meant to finish the approach. Boron is the slow, coarse control. | Dilute rate knob | Boron 1250 to 1350 ppm, then dilute to zero | Boron sets the coarse reactivity budget so that bank A alone can finish the approach, with bank A critical between about 44 and 48 % inserted (see "Boron target"). | 4.1 | 1.8 |
 | 6 | withdraw-bank-a | Withdraw bank A to about half. Move slowly and watch flux between pulls. | Bank A lever | Bank A about 50 % inserted or less | Gets close to critical in a coarse move, leaving only fine trimming. | 5.1 | 1.0 |
 | 7 | reach-critical | Trim bank A until flux holds steady with a long period. Critical, power above 2 %. | Bank A lever | Critical lamp on, power 2 % or more | The fine approach: small pulls, then wait and watch the period. | 8.1 | 3.0 |
-| 8 | heat-up | Heat the primary with the reactor. Keep the steam draw below reactor power while it warms. | Bank A lever, throttle | Primary 250 C or hotter | The reactor is the only heat source; a small steam draw lets steam exist without cooling the primary. | 45.2 | 37.1 |
+| 8 | heat-up | Heat the primary with the reactor. Keep the steam draw below reactor power while it warms. Pressure rises with temperature: ease the heaters back as it heats and hold primary pressure near 155 bar. | Bank A lever, throttle, pressurizer heater control | Primary 250 C or hotter, pressure held near 155 bar | The reactor is the only heat source; a small steam draw lets steam exist without cooling the primary. | 45.2 | 37.1 |
 | 9 | auto-load | Turbine governor on auto load, so it follows the grid once synced. | Auto/manual load switch | Auto load on | A one-switch step set before the roll so the governor is ready at speed. | 45.2 | 0.0 |
 | 10 | roll-turbine | Open the throttle in small steps and bring the turbine to rated speed. Trim bank A as you go so the primary holds its heat. | Throttle handwheel, bank A lever | Rotor 2940 rpm or more | Steam to the turbine pulls heat from the primary, so rods must follow. | 49.5 | 4.3 |
 | 11 | close-breaker | Close the generator breaker inside the sync band. Red lamp on means synced. | Generator breaker switch | Breaker closed (red lamp) | Only at rated speed and frequency can the generator join the grid. | 49.5 | 0.0 |
-| 12 | raise-power | With the generator on the grid, raise power with bank A and boron, and open the throttle in step so steam matches power. | Bank A lever, dilute knob, throttle | Power about 40 % | Power can rise only as fast as steam is taken. | 50.5 | 1.0 |
+| 12 | raise-power | With the generator on the grid, raise power with bank A and boron, and open the throttle in step so steam matches power. Keep trimming the heaters so primary pressure stays near 155 bar: the reactor trips at 165 bar. | Bank A lever, dilute knob, throttle | Power about 40 % | Power can rise only as fast as steam is taken. | 50.5 | 1.0 |
 | 13 | take-load | Take load on the grid. | Grid demand knob | Grid output 20 % or more | Last, once there is steam and power to carry it. | 65.8 | 15.3 |
 
 The scenario groups them into four phases (the panel shows the phase): A. Lineup (1 to 3), B. Approach (4 to 7),
@@ -48,6 +48,22 @@ heat-up about 37 min at about 15 % power, turbine roll about 4 min, raise power 
 The scenario holds step targets and policies against each other: a step cap of 45 game minutes fails the run
 naming the step and live values, and the run ends with no SCRAM and no balance-of-plant trip. `--verify` check
 `STARTUP-01` runs it twice and compares the per-step minutes and the final state hash.
+
+## Primary pressure
+
+Primary pressure in this model is the saturation pressure at the primary temperature plus the heater bias (up to 80 bar)
+minus the spray. It follows temperature up: with the heaters pegged at 100 % it would reach about 170 bar at 305 C and
+the 200 bar model bound near 337 C. Protection (setpoints and sources in `Physics.cs`): the PORV lifts automatically at
+162 bar and reseats at 158 bar (the manual PORV button still works and is OR-combined with it), the reactor trips at
+165.4 bar ("high primary pressure"), and the code safety valves lift at 172.3 bar.
+
+So the heaters are full while the primary is cold (pressurize, step 2) and must be eased back as it heats. The scripted
+operator does this with `Physics.TrimHeaterDemand` (the heater demand that holds 155 bar at the measured temperature,
+plus a small correction on the pressure error): heaters 100 % until about 290 C, about 80 % at 305 C. On the scripted
+run primary pressure peaks at 155.7 bar (was 157.2 with the heaters left at 100 %, which only stayed under the new trip
+because the run ends at 45 % power and about 292 C); the PORV never lifts and nothing trips. A player who leaves the
+heaters at 100 % through a faster heat-up (about 330 C) reaches the trip. Steps 8 and 12 say to hold about 155 bar and
+the assistant raises `HIGH_PRI_PRESSURE` from 158 bar.
 
 ## Boron target
 
