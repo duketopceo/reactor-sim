@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Xunit;
+using ReactorSim.Controls;
 
 namespace ReactorSim.Tests
 {
@@ -344,6 +345,56 @@ namespace ReactorSim.Tests
             var c = ParityScenarios.Generate(ParityScenarios.HighPressure);
             Assert.Contains(c.Frames, s => s.ReliefOpen);
             Assert.Contains(c.Frames, s => s.Scrammed);
+        }
+    }
+
+    public class PrimaryPressureReviewTests
+    {
+        [Fact]
+        public void RestoredAtSetpoint_WithLowPressureTarget_StillTripsBeforeIntegration()
+        {
+            // Heaters off and spray on pull the target far below the setpoint, so the relief drain inside one substep
+            // would otherwise take the pressure under the trip value before the post-step check sees it.
+            var p = new Plant();
+            p.LoadPreset("full-power");
+            p.Thermal.RestoreState(605.0, 305.0, Physics.TripHighPrimaryPressureBar, 1.0, 1.0, 60.0, 0.96, 0.6, 1.0, 0.0, 1.0, false, 0.0);
+            p.Step(0.2);
+            Assert.True(p.Scrammed);
+            Assert.Equal("high primary pressure", p.LastScramCause);
+        }
+
+        [Fact]
+        public void ReliefButton_FollowsManualDemand_NotEffectiveRelief()
+        {
+            var p = new Plant();
+            p.LoadPreset("full-power");
+            p.Thermal.RestoreState(605.0, 305.0, Physics.PorvOpenBar + 1.0, 1.0, 1.0, 60.0, 0.96, 0.6, 1.0, 0.75, 0.0, false, 0.0, true, false);
+            var snap = p.CaptureState();
+            Assert.True(snap.ReliefOpen);
+            Assert.False(snap.ReliefManualOpen);
+            var r = PivotNameParser.Parse("INT_BTN_ReliefValve_PORV_1"); Assert.True(r.Status == ParseStatus.Ok); var spec = r.Spec;
+            Assert.False(ControlValues.ButtonOn(spec, snap));
+            // The press while auto relief is lifting therefore requests a manual OPEN, not a close.
+            Assert.Equal(1.0, ControlIntentFactory.BuildButton(spec, ControlValues.ButtonOn(spec, snap), 10.0, "d").Value);
+        }
+
+        [Fact]
+        public void HighPressureAlarmTrend_FollowsPressureNotTemperature()
+        {
+            var p = new Plant();
+            p.LoadPreset("full-power");
+            var a = new AssistantEngine(); // fresh history: first observation has no delta
+            p.Thermal.RestoreState(605.0, 305.0, 160.0, 1.0, 1.0, 60.0, 0.96, 0.6, 1.0, 0.75, 0.0, false, 0.0);
+            a.Evaluate(p, 0.0);
+            Assert.Equal("Steady", a.ActiveAlarms.Single(a => a.Code == "HIGH_PRI_PRESSURE").Trend);
+            // Pressure up 3 bar, temperature flat: must read Rising.
+            p.Thermal.RestoreState(605.0, 305.0, 163.0, 1.0, 1.0, 60.0, 0.96, 0.6, 1.0, 0.75, 0.0, false, 0.0);
+            a.Evaluate(p, 0.1);
+            Assert.Equal("Rising", a.ActiveAlarms.Single(a => a.Code == "HIGH_PRI_PRESSURE").Trend);
+            // Temperature up, pressure down: must read Falling.
+            p.Thermal.RestoreState(605.0, 310.0, 160.0, 1.0, 1.0, 60.0, 0.96, 0.6, 1.0, 0.75, 0.0, false, 0.0);
+            a.Evaluate(p, 0.2);
+            Assert.Equal("Falling", a.ActiveAlarms.Single(a => a.Code == "HIGH_PRI_PRESSURE").Trend);
         }
     }
 }

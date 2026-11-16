@@ -440,12 +440,15 @@ public class ControlDeskUI : MonoBehaviour
             v => _bridge.SubmitIntent(PlantIntent.SetSpray(v)));
 
         GUI.Label(new Rect(x + 26, cy + 132, 320, 28),
-            $"<b>PILOT-OPERATED RELIEF VALVE (PORV):</b> {(th.ReliefOpen ? "<color=" + HexCrit + ">OPEN (VENTING)</color>" : "<color=" + HexOk + ">CLOSED</color>")}",
+            $"<b>PRIMARY RELIEF:</b> {(th.ReliefOpen ? "<color=" + HexCrit + ">OPEN (VENTING)</color>" : "<color=" + HexOk + ">CLOSED</color>")}",
             _monoStyle);
-        if (GUI.Button(new Rect(x + 360, cy + 128, 226, 36), th.ReliefOpen ? "CLOSE PORV VALVE" : "OPEN PORV RELIEF VALVE", _buttonStyle))
+        if (GUI.Button(new Rect(x + 360, cy + 128, 226, 36), th.ReliefManualOpen ? "CLOSE MANUAL PORV" : "OPEN MANUAL PORV", _buttonStyle))
         {
-            _bridge.SubmitIntent(PlantIntent.SetReliefValve(!th.ReliefOpen));
+            _bridge.SubmitIntent(PlantIntent.SetReliefValve(!th.ReliefManualOpen));
         }
+        GUI.Label(new Rect(x + 26, cy + 160, w - 52, 24),
+            $"AUTO PORV: {(th.ReliefAutoOpen ? "OPEN" : "CLOSED")}  |  SAFETY VALVES: {(th.SafetyValveOpen ? "OPEN" : "CLOSED")}",
+            _monoStyle);
 
         cy += 204f;
 

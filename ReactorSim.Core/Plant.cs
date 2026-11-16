@@ -381,6 +381,7 @@ namespace ReactorSim
                 Core.StepPoisons(h, modDensity, Chemistry.IonExchangeRate);
                 Core.StepDecayHeat(h);
 
+                CheckProtection(); // before integration: a restored or reset state at the setpoint must latch before relief drains it
                 Thermal.Step(h, Core.TotalHeatPower * RatedThermalKW);
                 Bop.Step(h, Thermal);
                 CheckProtection();

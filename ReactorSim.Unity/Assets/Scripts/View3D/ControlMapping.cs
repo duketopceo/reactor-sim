@@ -184,7 +184,7 @@ namespace ReactorSim.Controls
             switch (spec.Kind)
             {
                 case IntentKind.Scram: return s.Scrammed;
-                case IntentKind.ReliefValve: return s.ReliefOpen;
+                case IntentKind.ReliefValve: return s.ReliefManualOpen; // manual demand, not the effective state, so the toggle can hold open while auto relief is lifting
                 case IntentKind.TurbineAutoLoad: return s.BopAutoLoad;
                 case IntentKind.GeneratorBreaker: return s.GeneratorSynced;
                 default: return false;
