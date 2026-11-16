@@ -1,3 +1,5 @@
+# ReactorSim Blender - inspects the saved reactor source assets (.blend) against assets/manifest.csv; --write-manifest regenerates the sidecar
+# Usage: blender -b --python-exit-code 1 --python Blender/scripts/check_reactor_assets.py [-- --write-manifest]
 """Inspect saved source assets; --write-manifest updates the import sidecar."""
 import csv
 import io

@@ -1,3 +1,5 @@
+# ReactorSim Blender - vessel internals: core barrel, support plates, the fuel assembly grid and the window-facing detailed assembly
+# Regenerable: blender -b --python-exit-code 1 --python Blender/scripts/make_vessel_internals.py   (writes Blender/VesselInternals.blend)
 import math
 import os
 import sys

@@ -2,9 +2,11 @@
 title: Playtest 2 - Operable, Readable Control Room and SMR Pool Hall - Plan
 type: feat
 date: 2026-11-09
+status: completed
 artifact_contract: ce-unified-plan/v1
 product_contract_source: ce-plan-bootstrap
 execution: code
+status_note: landed on master (visual polish and hall PRs #3 to #7)
 ---
 
 # Playtest 2 - Operable, Readable Control Room and SMR Pool Hall - Plan

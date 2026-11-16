@@ -2,8 +2,10 @@
 title: Whole-Plant Status Wall and Control-Room Visual Finish - Plan
 type: feat
 date: 2026-11-13
+status: in-progress
 artifact_contract: ce-unified-plan/v1
 execution: code
+status_note: data model, wall asset and live integration landed in PR #11; the visual and regression gate (U5) and room finish (U1) are partial and continue in the Phase 1 plan
 ---
 
 # Whole-Plant Status Wall and Control-Room Visual Finish
