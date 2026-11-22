@@ -16,7 +16,7 @@ execution: code
 - **Means:** a pure route contract (KTD1) drives deterministic builders for one new connected wing; equipment binds to the existing snapshot through pure models (KTD5).
 - **Authority:** Requirements own product behavior; KTDs own mechanism; units own files and sequencing. `ROADMAP.md` Phase 2 gate is the outer contract.
 - **Stop conditions:** stop and report if a route change would alter the underwater window view or a Phase 1 control-room check, or if a measured count exceeds its U1 cap (R10).
-- **Execution profile:** Linux for pure models, tests and Runner; Unity batchmode on the Windows box `cyberpowa`, one editor at a time; the owner's walk-through is reported, never claimed.
+- **Execution profile:** Linux for pure models, tests and Runner; Unity batchmode on the Windows build box, one editor at a time; the owner's walk-through is reported, never claimed.
 - **Finishing:** the owner merges PRs and does the walk-through; agents implement, verify and open PRs.
 
 ---
@@ -188,7 +188,7 @@ U1 (contract, caps and baseline) first. U2 (camera and body) and U3 (wing shell,
 |---|---|---|
 | Linux CI | `bash scripts/ci.sh` | every unit |
 | Core sync | `bash scripts/sync-core-to-unity.sh` after any `ReactorSim.Core` change | as needed |
-| Unity CI | `UNITY_EXE=... bash scripts/ci.sh` on `cyberpowa`: scene drift guard, `LayoutCheck`, `InstrumentCheck`, `HallCheck`, `ReactorAssetCheck`, `RoundTripCheck`, `ControlMapCheck`, plus `WalkRouteCheck` and `WingCheck` once they land | U2-U5 |
+| Unity CI | `UNITY_EXE=... bash scripts/ci.sh` on the Windows build box: scene drift guard, `LayoutCheck`, `InstrumentCheck`, `HallCheck`, `ReactorAssetCheck`, `RoundTripCheck`, `ControlMapCheck`, plus `WalkRouteCheck` and `WingCheck` once they land | U2-U5 |
 | Play-mode checks | `ROOM_RENDER=1 UNITY_EXE=... bash scripts/ci.sh`; `PlantFeedbackPlayCapture.Run` | U3-U5 |
 | Captures | `scripts/capture-playtest.sh` then `scripts/check-captures.sh` at 1600x900 and 1920x1080; `--baseline --room-budget` against the U1 baseline | U1-U5 |
 | Owner walk-through | the AE1 route, recorded in `docs/PLAYTEST.md` | end of phase |
