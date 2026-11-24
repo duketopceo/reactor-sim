@@ -28,6 +28,10 @@ This is a source audit of every presentation surface: the desk, the status wall,
 | Surge and safety routes | none | n/a | Static markings; safety lamp follows `Scrammed` | Route flow: `N/M` (`SAFETY FLOW N/M`) | none |
 | Pool atmosphere | `Power` | Decorative | `ReactorWaterAtmosphere` bubble streams | Not a measurement of boiling or flow | none |
 | Alarms and mode | `Mode`, alarm predicates (`LampPredicates`, desk `LampContext`), `AlarmAckSeq` | Actual | Desk and wall lamps, horn | First-out: `N/M` (alarm list is unordered) | U6 priority, U5 acknowledgement check |
+| Turbine hall: turbine rotor (`equip.turbine`) | `TurbineRpm` (rpm), `TurbineSteamKW` (kW heat), `TurbineTripped` (bool) | Actual | Rotor speed via `TurbineHallModel.RotorSpeed` with no added lag; plate `SPEED`, `STEAM`, `TRIPPED` | Missing reading: `N/M` | Phase 2 U4 |
+| Turbine hall: generator (`equip.generator`) | `GeneratorKw` (kW), `GeneratorSynced` (bool) | Actual | Plate `OUTPUT`, `SYNCED` or `BREAKER OPEN` | Missing reading: `N/M` | Phase 2 U4 |
+| Turbine hall: condenser (`equip.condenser`) | `CondenserPressureBar` (bar), `HotwellInventoryFrac` (fraction), `VacuumPumpFrac` (command) | Pressure and inventory actual; vacuum pump is a command | Plate `PRESS`, `HOTWELL`, `VACUUM PUMP % command` | Missing reading: `N/M` | Phase 2 U4 |
+| Turbine hall: feed pump group (`equip.feed_pump_group`) | `FeedwaterDeliveredFrac` (rated), `FeedwaterFlowFrac` (command), `FeedwaterAvailabilityFrac` (fraction) | Delivered is actual; pump is a command | One group plate, never a single pump | Individual pump readings: `N/M` | Phase 2 U4 |
 | Clock and procedure | `SimSeconds` (s); procedure state lives outside the snapshot | Clock actual | Wall `CLOCK`; clipboard shows procedure | Procedure step on the wall: `N/M` | none |
 
 ## Audio layers

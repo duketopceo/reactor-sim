@@ -199,6 +199,18 @@ volume starts at 16.1 m).
 blade sign over the corridor at the lobby opening (approach 6 m), `plate.turbine_entrance` "TURBINE HALL" on the corridor end wall
 (approach 8 m).
 
+**Turbine hall equipment** (pure model `TurbineHallModel.cs`, tested by `TurbineHallModelTests.cs`; the IDs share no name with the
+route IDs above). The rotor turns with the simulated `TurbineRpm` and adds no lag of its own; each plate uses the Phase 1 readout
+rules (`% command`, `kW heat`, `N/M` for anything unmodeled). The plant has only aggregate feed readings, so the pumps share one
+group plate.
+
+| ID | Equipment | Plate reads |
+|---|---|---|
+| `equip.turbine` | turbine and rotor | speed, steam `kW heat`, `TRIPPED` or `NOT TRIPPED` |
+| `equip.generator` | generator | output `kW`, `SYNCED` or `BREAKER OPEN` |
+| `equip.condenser` | condenser | pressure, hotwell, vacuum pump `% command` |
+| `equip.feed_pump_group` | feed pumps (one group plate) | delivered `% rated`, pump `% command`, supply |
+
 **Caps** (per space; a measured count over a cap fails the check). Sized from the existing hall budget: triangles are a share of
 `MaxHallTriangles` (120,000), renderers one per 200 triangles, colliders a quarter of the renderers (the hall has none and the room
 has no numeric cap, so those two are an original design choice), lights inside the 4-light pixel count with touching spaces summing

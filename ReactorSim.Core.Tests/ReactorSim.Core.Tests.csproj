@@ -49,6 +49,7 @@
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\HallDimensions.cs" Link="Unity\HallDimensions.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\HallSightline.cs" Link="Unity\HallSightline.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\RouteGraph.cs" Link="Unity\RouteGraph.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\TurbineHallModel.cs" Link="Unity\TurbineHallModel.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\HallExposure.cs" Link="Unity\HallExposure.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\ReliefAnchors.cs" Link="Unity\ReliefAnchors.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\SandboxStart.cs" Link="Unity\SandboxStart.cs" />
