@@ -49,10 +49,11 @@ public class TurbineHallModelTests
         {
             var s = c.Frames[i];
             double expected = Math.Max(0, Math.Min(1, s.TurbineRpm / Physics.TurbineRatedRpm));
-            Assert.Equal(expected, TurbineHallModel.RotorSpeed(s), 12);
-            Assert.True(TurbineHallModel.RotorSpeed(s) <= prev + 1e-9 || s.TurbineRpm > 0 && !s.TurbineTripped, "rotor sped up while tripped, frame " + i);
-            if (TurbineHallModel.RotorSpeed(s) < prev - 1e-9 && prev != double.MaxValue) slowed = true;
-            prev = TurbineHallModel.RotorSpeed(s);
+            double speed = TurbineHallModel.RotorSpeed(s);
+            Assert.Equal(expected, speed, 12);
+            Assert.True(speed <= prev + 1e-9 || (s.TurbineRpm > 0 && !s.TurbineTripped), "rotor sped up while tripped, frame " + i);
+            if (speed < prev - 1e-9 && prev != double.MaxValue) slowed = true;
+            prev = speed;
             string plate = TurbineHallModel.Plate(TurbineHallModel.Turbine, s);
             Assert.Contains("TRIPPED", plate);
             Assert.Contains("SPEED " + PlantWallMapModel.Reading(s.TurbineRpm, "rpm", 0), plate);

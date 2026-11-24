@@ -15,11 +15,11 @@ public static class TurbineHallModel
 
     public static readonly string[] EquipmentIds = { Turbine, Generator, Condenser, FeedPumpGroup };
 
-    // Visual rotor speed 0..1 for the turbine rotor; missing or non-finite readings stop it.
+    // Visual rotor speed 0..1 for the turbine rotor: the wall model's turbine speed, which already stops the rotor for a missing
+    // or non-finite reading, so the hall and the wall can never disagree.
     public static double RotorSpeed(PlantSnapshot s)
     {
-        double v = PlantWallMapModel.RotorSpeed(true, s);
-        return double.IsNaN(v) || double.IsInfinity(v) ? 0 : v;
+        return PlantWallMapModel.RotorSpeed(true, s);
     }
 
     // Status plate text for an equipment ID; null for an unknown ID, N/M for a missing snapshot.
