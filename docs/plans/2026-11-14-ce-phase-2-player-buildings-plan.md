@@ -3,7 +3,9 @@ title: "Phase 2: Player and First Connected Buildings - Plan"
 type: feat
 date: 2026-11-14
 deepened: 2026-11-22
+updated: 2026-11-24
 artifact_contract: ce-unified-plan/v1
+artifact_readiness: implementation-ready
 product_contract_source: ce-plan-bootstrap
 execution: code
 ---
@@ -16,7 +18,7 @@ execution: code
 - **Means:** a pure route contract (KTD1) drives deterministic builders for one new connected wing; equipment binds to the existing snapshot through pure models (KTD5).
 - **Authority:** Requirements own product behavior; KTDs own mechanism; units own files and sequencing. `ROADMAP.md` Phase 2 gate is the outer contract.
 - **Stop conditions:** stop and report if a route change would alter the underwater window view or a Phase 1 control-room check, or if a measured count exceeds its U1 cap (R10).
-- **Execution profile:** Linux for pure models, tests and Runner; Unity batchmode on the Windows build box, one editor at a time; the owner's walk-through is reported, never claimed.
+- **Execution profile:** `scripts/ci.sh` on any machine with .NET 8 for pure models, tests and Runner; Unity batchmode and Blender on the Unity host (KTD8), one editor at a time; the owner's walk-through is reported, never claimed. Until the Unity host is set up, work lands in the slices KTD9 defines.
 - **Finishing:** the owner merges PRs and does the walk-through; agents implement, verify and open PRs.
 
 ---
@@ -78,6 +80,7 @@ The control room is walkable but sealed: its only door is decorative and opens o
 - A stairwell alternative to the lift, and a moving lift car.
 - A reach pose for control use, and a separate reduced-camera-motion setting.
 - The body visible in reflective surfaces.
+- Choosing the capture runner for engine slices (KTD8): a Windows machine running the built player, or a Mac-native capture path re-baselined on the Unity host.
 
 ---
 
@@ -91,7 +94,9 @@ The control room is walkable but sealed: its only door is decorative and opens o
 - KTD4. **One wing layer, one root per space.** `Wing_Corridor`, `Wing_Lift`, `Wing_Deck` and `Wing_TurbineHall` are added to `ControlRoomSceneBuilder`'s delete-and-rebuild list, all on one new Wing layer. The control-room lights' culling masks change from `~(1 << HallLayer)` to exclude the Wing layer too, and wing lights light only the Wing layer, so the room look and light count are unchanged. New Blender generators follow `make_*.py` plus `export_unity.py` and the sync scripts. Serves R1, R9, R10.
 - KTD5. **Equipment binds through a pure model and its own binder.** A new `TurbineHallModel` takes rotor speed only from the snapshot (`PlantWallMapModel.RotorSpeed(true, s)`), adds no decay of its own, and builds plate text with the `ComponentReadout` rules; a `TurbineHallBinder` applies it. `ReactorAssetMotion` is not reused, because it requires exactly four rod banks. A new true-scale turbine-hall asset is authored; the legacy `PlantEquipment` boxes are a layout reference only. Serves R6, R7.
 - KTD6. **The body is a static rig with two poses and a blob shadow.** A low-poly body and hands with standing and seated poses chosen by a pure `OperatorPoseModel`; the shadow is a soft projected quad parented to the body, because every room light is built without shadows and a shadow-casting light would break the light budget. Serves R4.
-- KTD7. **The lift is a prompted interaction with a locked fade.** Facing the lift call point shows a prompt in the existing hint box; one activation key starts a short fade; movement and look are locked during the fade; the operator arrives on the other landing facing out of the car; activation is ignored while a transition runs. Serves R2, R3.
+- KTD7. **The lift is a prompted interaction with a locked fade.** Facing the lift call point shows a prompt in the existing hint box; one activation key starts a short fade; movement and look are locked during the fade; the operator arrives on the other landing facing out of the car; activation is ignored while a transition runs. The sequencing (idle, fading out, moving, fading in) lives in a pure `LiftTransitionModel` so the re-trigger and lock rules are unit-tested; `LiftInteraction` only drives it. Serves R2, R3.
+- KTD8. **The Unity host moves from the Windows build box to a Mac** (session-settled: user-directed — chosen over keeping the Windows build box: it kept going offline). Unity 6000.6.7f1 with Windows Build Support (Mono) builds the Windows player there. Running that player still needs Windows: the `.exe` smoke test and `scripts/capture-playtest.sh`, which runs the player's `-capture` mode. Before the first engine slice, either a Windows machine stays the capture runner or a Mac-native capture path is added; this is open (see Deferred to Follow-Up Work). The editor and Blender's first launch on that Mac are pending owner setup. Repo files never name the host (session-settled: user-approved — chosen over naming the build box: the personal-data rule, after a clean-room CI failure).
+- KTD9. **Verified-first slices while no Unity host runs.** Each unit splits into a CI slice and an engine slice. The CI slice is purely additive: new UnityEngine-free files under `Assets/` (each with a hand-written `.meta`, as U1's `RouteGraph.cs.meta`), their links in the test project and their xUnit tests. It edits no existing MonoBehaviour, adds no serialized field and changes no runtime behavior, so the committed scenes, the scene drift guard and the U1 baseline are untouched. The engine slice is every MonoBehaviour and editor change, scene builders, Blender generators, capture poses and anything needing the player to judge. CI-slice PRs open now and merge after one Unity CI run on the Unity host confirms the new files import and compile; engine slices start after the U1 baseline. Capture poses stay with their geometry, because a required pose that `CaptureMode` cannot yet produce would fail `check-captures.sh`. Every PR states which checks ran and which are owner-run. Serves R3-R7, R10.
 
 ### High-Level Technical Design
 
@@ -103,7 +108,8 @@ flowchart TB
   BL[Blender make_wing_*.py, make_turbine_hall.py] --> EX[export_unity.py + sync] --> WB
   OC[OperatorController] --> PM[OperatorPoseModel] --> Body[Operator body + blob shadow]
   OC --> Cam[camera: near clip, floor cast, shake intensity]
-  OC --> Lift[Lift interaction: prompt, locked fade]
+  OC --> Lift[Lift interaction: prompt, locked fade] --> LTM[LiftTransitionModel pure]
+  RG --> WC[WingCheck: measure, then RouteGraph cap evaluation]
   Snap[PlantSnapshot] --> TH[TurbineHallModel] --> TB[TurbineHallBinder] --> WB
   Snap --> Mix[ReactorSoundMix] --> Amb[wing ambience]
 ```
@@ -112,10 +118,13 @@ flowchart TB
 
 U1 (contract, caps and baseline) first. U2 (camera and body) and U3 (wing shell, lift, deck) next; U3 needs U1's contract and benefits from U2's camera fixes. U4 (turbine hall equipment) after U3's turbine-hall shell. U5 (budgets and the walk check in CI) last.
 
+Under KTD9 the U1 contract and the CI slices of U2-U5 have no geometry dependency and share one PR. On the Unity host, the U1 baseline is recorded first, from a head with no engine-slice change. The engine slices then follow the order above.
+
 ### Assumptions
 
 - The lift's two landings are at the corridor floor and the existing deck height.
 - The deck walkway at the pool rim is above the window's framed band, so it cannot appear in the window view.
+- New pure files compile under Unity's C# compiler as they do under .NET 8, provided they avoid language features newer than C# 9 (Unity 6 supports C# 9). The one Unity CI run before merge confirms this (KTD9).
 
 ---
 
@@ -132,25 +141,31 @@ U1 (contract, caps and baseline) first. U2 (camera and body) and U3 (wing shell,
   - No wing geometry crosses the window's framed band from the stand and seat poses (reuse `HallSightline`); the lift opening in the hall shell is on a non-window wall.
   - Lift landing heights match the room floor and the existing deck height from `HallDimensions`.
   - Every room, doorway, lift landing and name plate has a unique stable ID; every space has all four caps.
-- **Verification:** `bash scripts/ci.sh` passes; baseline captures recorded on the box.
+- **Execution note (KTD9):** CI slice: `RouteGraph`, its tests, `layout.json` and the design docs (built). Engine slice: on the Unity host, run the Phase 1 gates and captures first and record them in `docs/PLAYTEST.md` as the baseline; any difference from the earlier Windows-host results is reported, never absorbed into thresholds.
+- **Verification:** `bash scripts/ci.sh` passes; baseline captures recorded on the Unity host.
 
 ### U2. Camera fixes and operator body
 
 - **Goal:** a visible simple body with a blob shadow and a camera that works in corridors (R3-R5).
 - **Files:** `ReactorSim.Unity/Assets/Scripts/View3D/OperatorController.cs`, `CameraShake.cs`, `OperatorMath.cs`; new `Scripts/View3D/OperatorPoseModel.cs` (pure, linked); `Scripts/UI/UserSettings.cs`, `UI/PauseMenu.cs`; new `Blender/scripts/make_operator_body.py` and its export; tests `ReactorSim.Core.Tests/OperatorMathTests.cs`, new `OperatorPoseModelTests.cs`.
-- **Approach:** KTD3, KTD6.
+- **Approach:** KTD3, KTD6. Shake intensity, near clip and floor following are pure `OperatorMath` functions in the existing clamp style (`ClampFov`, `FromSlider`); `UserSettings` stores the shake key like the other float settings.
+- **Execution note (KTD9):** CI slice: new pure functions and constants in `OperatorMath` (shake-intensity clamp and scale, near-clip constant, floor-follow step, entry yaw from a `RouteGraph` doorway heading) and the new `OperatorPoseModel`, with tests. Engine slice: every edit to `CameraShake`, `UserSettings`, `PauseMenu` and `OperatorController`. That includes setting `nearClipPlane` from the constant in `Awake`, because the 0.3 m value is serialized in the committed scenes. It also covers the floor cast with its layer mask and origin, the entry facing, the shake key and slider, plus `make_operator_body.py`, its export and the body and blob-shadow rig. The seat and stand captures must match the U1 baseline after it.
 - **Test scenarios:**
-  - Shake intensity 0 gives zero offset and roll; values outside 0-1 clamp; a missing settings key reads the default (1).
+  - Shake intensity 0 gives zero offset and roll; values outside 0-1 and NaN clamp to the default (1); the slider maps 0-1 both ways. The missing-settings-key path is checked on the Unity host.
   - Pose model: seated when seated, standing otherwise.
-  - Floor height follows a step up to `StepOffset` and a lift floor change without the eye jumping.
+  - Floor following steps up to `StepOffset` and follows a lift floor change without the eye jumping; with no floor hit it keeps the last height.
+  - Near clip is 0.05 m and smaller than the controller radius plus skin width.
+  - Entry yaw for each `RouteGraph` doorway faces into the room being entered.
 - **Verification:** CI and Unity CI pass; captures of the seated and standing body and its shadow, looking down.
 
 ### U3. Wing shell, lift and reactor deck
 
 - **Goal:** the walkable wing: corridor, lift lobby, lift, turbine-hall shell (floor, walls, entrance) and the deck additions (R1-R3, R8, R9, R11).
-- **Files:** `ReactorSim.Unity/Assets/Editor/ControlRoomSceneBuilder.cs` (east doorway cut, `COL_Wall_East` split, new roots in the rebuild list, room-light culling masks); new `Editor/WingBuilder.cs`; new `Scripts/View3D/LiftInteraction.cs`; new `Blender/scripts/make_wing_corridor.py`, `make_wing_turbine_hall.py` (shell and lift lobby), `make_wing_deck_additions.py` (railings and lift landing only), plus entries in `export_unity.py` and the sync scripts; `Editor/AssetManifestCheck.cs`; new `Editor/WalkRouteCheck.cs` (modelled on `ReactorAssetPlayCheck`); `scripts/ci.sh`.
+- **Files:** `ReactorSim.Unity/Assets/Editor/ControlRoomSceneBuilder.cs` (east doorway cut, `COL_Wall_East` split, new roots in the rebuild list, room-light culling masks); new `Editor/WingBuilder.cs`; new `Scripts/View3D/LiftInteraction.cs` and pure `Scripts/View3D/LiftTransitionModel.cs` (linked) with new `ReactorSim.Core.Tests/LiftTransitionModelTests.cs`; new `Blender/scripts/make_wing_corridor.py`, `make_wing_turbine_hall.py` (shell and lift lobby), `make_wing_deck_additions.py` (railings and lift landing only), plus entries in `export_unity.py` and the sync scripts; `Editor/AssetManifestCheck.cs`; new `Editor/WalkRouteCheck.cs` (modelled on `ReactorAssetPlayCheck`); `scripts/ci.sh`.
 - **Approach:** KTD2, KTD4, KTD7. Name plates reuse the existing plate style.
+- **Execution note (KTD9):** CI slice: new pure `Scripts/View3D/LiftTransitionModel.cs` (linked) and new `ReactorSim.Core.Tests/LiftTransitionModelTests.cs`; landings, their floor heights and arrival facing come from `RouteGraph.Landings`, and fade durations are parameters. Engine slice: everything else in this unit.
 - **Test scenarios:**
+  - `LiftTransitionModel`: an activation from idle starts one transition; a second activation while it runs is ignored; movement and look stay locked from start to arrival; arrival lands on the other landing facing out of the car; a zero or negative time step never advances or skips a phase.
   - `WalkRouteCheck` drives the real `OperatorController` along every `RouteGraph` edge both ways and fails on a stall longer than 1 s or a camera inside a collider.
   - Triggering the lift twice in quick succession gives one clean transfer, arriving facing out of the car.
   - `LayoutCheck` still passes: every control readable and reachable.
@@ -162,20 +177,24 @@ U1 (contract, caps and baseline) first. U2 (camera and body) and U3 (wing shell,
 ### U4. Turbine hall equipment
 
 - **Goal:** recognizable equipment that reads from the live plant (R6, R7).
-- **Files:** new `Blender/scripts/make_turbine_hall.py` (turbine with `ROTOR_Turbine_PIV` and rotor-axis marker, generator, condenser, feed-pump group, pipes); new pure `ReactorSim.Unity/Assets/Scripts/View3D/TurbineHallModel.cs` (linked); new `Scripts/View3D/TurbineHallBinder.cs`; wing ambience source in `Scripts/Audio/ReactorSoundscape.cs` or a new script; tests new `ReactorSim.Core.Tests/TurbineHallModelTests.cs`, extend `PresentationParityTests.cs`; `docs/design/plant-counterparts-inventory.md` (new rows).
+- **Files:** new `Blender/scripts/make_turbine_hall.py` (turbine with `ROTOR_Turbine_PIV` and rotor-axis marker, generator, condenser, feed-pump group, pipes); new pure `ReactorSim.Unity/Assets/Scripts/View3D/TurbineHallModel.cs` (linked); new `Scripts/View3D/TurbineHallBinder.cs`; wing ambience source in `Scripts/Audio/ReactorSoundscape.cs` or a new script; tests new `ReactorSim.Core.Tests/TurbineHallModelTests.cs`, extend `PresentationParityTests.cs`; `docs/design/plant-counterparts-inventory.md` (new rows); `docs/design/plant-and-assets.md` (equipment IDs).
 - **Approach:** KTD5.
+- **Execution note (KTD9):** CI slice: `TurbineHallModel` with stable equipment IDs, its tests, the `PresentationParityTests` extension, the inventory rows and the equipment IDs in `docs/design/plant-and-assets.md`. Engine slice: `TurbineHallBinder`, which fails loudly when its pivot or a plate is missing; `make_turbine_hall.py`, its export and placement; and the wing ambience.
 - **Test scenarios:**
   - Rotor speed equals `PlantWallMapModel.RotorSpeed(true, s)` for every snapshot; NaN gives 0; in a tripped scenario the rotor follows the snapshot rpm frame by frame to 0 with no added lag, and the plate rpm matches.
   - Plates use the Phase 1 rules: feed delivered `% rated`, pump demand `% command`, steam `kW heat`; no plate is bound to a single pump.
   - Parity: for every Phase 1 scenario, the turbine-hall model agrees with the wall and the sound mix on trip and steam state.
+  - The turbine, generator, condenser and feed-pump group each have a unique stable ID that does not collide with any `RouteGraph` ID, and each is listed in `docs/design/plant-and-assets.md`.
 - **Verification:** CI and Unity CI pass; renders of the turbine hall running and tripped.
 
 ### U5. Caps and the walk check in CI
 
 - **Goal:** caps enforced per space and the route checked on every run (R10).
-- **Files:** `Scripts/Capture/CaptureMode.cs` (corridor, lift lobby, deck, turbine-hall and name-plate approach poses); `scripts/check-captures.sh` (`REQUIRED_POSES`, `ROOM_POSES`); `scripts/test-check-captures.sh`; new `Editor/WingCheck.cs` (per-space triangle, renderer, light and collider counts against the U1 caps); `ControlRoomSceneBuilder.MarkStaticBatching` (include the wing, exclude moving parts); `docs/PLAYTEST.md`.
-- **Approach:** grade the new poses with the existing thresholds and `--baseline --room-budget` against the U1 baseline.
+- **Files:** `Scripts/Capture/CaptureMode.cs` (corridor, lift lobby, deck, turbine-hall and name-plate approach poses); `scripts/check-captures.sh` (`REQUIRED_POSES`, `ROOM_POSES`); `scripts/test-check-captures.sh`; new `Editor/WingCheck.cs` (per-space triangle, renderer, light and collider counts against the U1 caps); `Scripts/View3D/RouteGraph.cs` and `ReactorSim.Core.Tests/RouteGraphTests.cs` (cap evaluation); `ControlRoomSceneBuilder.MarkStaticBatching` (include the wing, exclude moving parts); `docs/PLAYTEST.md`.
+- **Approach:** grade the new poses with the existing thresholds and `--baseline --room-budget` against the U1 baseline. The cap comparison is one new pure `RouteGraph` method that evaluates measured counts for every new (`Existing == false`) space through the existing `OverCap`. It names each breach by space and metric, and `WingCheck` only measures and calls it.
+- **Execution note (KTD9):** CI slice: that `RouteGraph` method and its cases in `RouteGraphTests`. Engine slice: `WingCheck`, the capture poses, `check-captures.sh` and its test, and `MarkStaticBatching`.
 - **Test scenarios:**
+  - Cap evaluation: counts at the cap pass; one over any cap fails and names the space and metric; a new space with no measurement fails rather than passing silently; an unknown space ID fails; existing spaces (control room, reactor hall) are not evaluated against wing caps.
   - New poses are required and graded at both sizes; a missing pose fails.
   - `WingCheck` fails when any measured count exceeds its cap (negative control with a deliberately low cap).
 - **Verification:** CI and Unity CI pass; `check-captures.sh --baseline --room-budget` passes or the regression is reported with numbers.
@@ -188,10 +207,12 @@ U1 (contract, caps and baseline) first. U2 (camera and body) and U3 (wing shell,
 |---|---|---|
 | Linux CI | `bash scripts/ci.sh` | every unit |
 | Core sync | `bash scripts/sync-core-to-unity.sh` after any `ReactorSim.Core` change | as needed |
-| Unity CI | `UNITY_EXE=... bash scripts/ci.sh` on the Windows build box: scene drift guard, `LayoutCheck`, `InstrumentCheck`, `HallCheck`, `ReactorAssetCheck`, `RoundTripCheck`, `ControlMapCheck`, plus `WalkRouteCheck` and `WingCheck` once they land | U2-U5 |
+| Unity CI | `UNITY_EXE=... bash scripts/ci.sh` on the Unity host (KTD8; owner-run until it is set up): scene drift guard, `LayoutCheck`, `InstrumentCheck`, `HallCheck`, `ReactorAssetCheck`, `RoundTripCheck`, `ControlMapCheck`, plus `WalkRouteCheck` and `WingCheck` once they land | U2-U5 |
 | Play-mode checks | `ROOM_RENDER=1 UNITY_EXE=... bash scripts/ci.sh`; `PlantFeedbackPlayCapture.Run` | U3-U5 |
 | Captures | `scripts/capture-playtest.sh` then `scripts/check-captures.sh` at 1600x900 and 1920x1080; `--baseline --room-budget` against the U1 baseline | U1-U5 |
 | Owner walk-through | the AE1 route, recorded in `docs/PLAYTEST.md` | end of phase |
+
+A CI-slice PR (KTD9) is verified by Linux CI when it opens. Its description lists Unity CI as the one owner-run gate before merge; play-mode and capture gates do not apply, because the slice changes no runtime behavior.
 
 ---
 
