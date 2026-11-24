@@ -466,5 +466,80 @@ namespace ReactorSim.Core.Tests
             }
             Assert.True(ops.TryGetProperty("SPAWN_A1", out _));
         }
+
+        // ---- cap evaluation (U5): WingCheck measures, RouteGraph decides ----
+
+        private static Dictionary<string, RouteGraph.Caps> AtCaps()
+        {
+            var m = new Dictionary<string, RouteGraph.Caps>();
+            foreach (var s in RouteGraph.Spaces) if (!s.Existing) m[s.Id] = s.Caps;
+            return m;
+        }
+
+        [Fact]
+        public void CountsAtEveryCapPass()
+        {
+            Assert.Empty(RouteGraph.EvaluateCaps(AtCaps()));
+        }
+
+        [Fact]
+        public void OneOverAnyCapFailsAndNamesTheSpaceAndMetric()
+        {
+            var m = AtCaps();
+            var c = m["space.wing_deck"];
+            m["space.wing_deck"] = new RouteGraph.Caps(c.Triangles, c.Renderers, c.Lights + 1, c.Colliders);
+            var bad = RouteGraph.EvaluateCaps(m);
+            Assert.Single(bad);
+            Assert.Contains("space.wing_deck", bad[0]);
+            Assert.Contains("lights", bad[0]);
+        }
+
+        [Fact]
+        public void EveryMetricOverItsCapIsReported()
+        {
+            var m = AtCaps();
+            var c = m["space.wing_turbine_hall"];
+            m["space.wing_turbine_hall"] = new RouteGraph.Caps(c.Triangles + 1, c.Renderers + 1, c.Lights + 1, c.Colliders + 1);
+            Assert.Equal(4, RouteGraph.EvaluateCaps(m).Count);
+        }
+
+        [Fact]
+        public void ANewSpaceWithNoMeasurementFails()
+        {
+            var m = AtCaps();
+            m.Remove("space.wing_corridor");
+            var bad = RouteGraph.EvaluateCaps(m);
+            Assert.Single(bad);
+            Assert.Contains("space.wing_corridor", bad[0]);
+        }
+
+        [Fact]
+        public void AnUnknownSpaceIdFails()
+        {
+            var m = AtCaps();
+            m["space.nowhere"] = new RouteGraph.Caps(0, 0, 0, 0);
+            var bad = RouteGraph.EvaluateCaps(m);
+            Assert.Single(bad);
+            Assert.Contains("space.nowhere", bad[0]);
+        }
+
+        [Fact]
+        public void ExistingSpacesAreNotHeldToWingCaps()
+        {
+            // The control room has no wing caps and the hall's are not numeric here (they live in HallDimensions).
+            var m = AtCaps();
+            m["space.control_room"] = new RouteGraph.Caps(1000000, 1000, 100, 1000);
+            m["space.reactor_hall"] = new RouteGraph.Caps(1000000, 1000, 100, 1000);
+            Assert.Empty(RouteGraph.EvaluateCaps(m));
+        }
+
+        [Fact]
+        public void NoMeasurementsAtAllFailsForEveryNewSpace()
+        {
+            int fresh = 0;
+            foreach (var s in RouteGraph.Spaces) if (!s.Existing) fresh++;
+            Assert.Equal(fresh, RouteGraph.EvaluateCaps(new Dictionary<string, RouteGraph.Caps>()).Count);
+            Assert.Equal(fresh, RouteGraph.EvaluateCaps(null).Count);
+        }
     }
 }

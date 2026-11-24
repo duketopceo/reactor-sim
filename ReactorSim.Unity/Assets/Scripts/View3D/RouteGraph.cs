@@ -468,6 +468,29 @@ namespace ReactorSim
             return over;
         }
 
+        /// <summary>
+        /// Holds every new (not Existing) space to its four caps. measured maps a space ID to its measured counts (the Caps struct
+        /// carries counts here). Returns one line per breach naming the space and metric; a new space with no measurement and a
+        /// measurement for an unknown space ID are breaches too, so nothing passes silently. Existing spaces keep their own caps
+        /// (HallDimensions, the room budget) and are not evaluated here. Empty means within budget. WingCheck measures and calls this.
+        /// </summary>
+        public static List<string> EvaluateCaps(IDictionary<string, Caps> measured)
+        {
+            var bad = new List<string>();
+            foreach (var s in Spaces)
+            {
+                if (s.Existing) continue;
+                Caps got;
+                if (measured == null || !measured.TryGetValue(s.Id, out got)) { bad.Add(s.Id + " was not measured"); continue; }
+                foreach (var metric in OverCap(s.Caps, got.Triangles, got.Renderers, got.Lights, got.Colliders))
+                    bad.Add(s.Id + " is over its " + metric + " cap");
+            }
+            if (measured != null)
+                foreach (var id in measured.Keys)
+                    if (FindSpace(id) == null) bad.Add(id + " is not a RouteGraph space");
+            return bad;
+        }
+
         // ---- whole-contract check ----
 
         /// <summary>Everything that must hold for the route to be walkable and inside its budget. Empty means all true.</summary>
