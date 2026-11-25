@@ -76,6 +76,16 @@ namespace ReactorSim
             FrozenReason = "";
         }
 
+        // Applies pause and requested scale received from a session host. Called only by the world snapshot restore path;
+        // a non-finite scale leaves the current scale unchanged, a finite one is clamped to the dev-legal range.
+        internal void ApplyRemoteState(bool paused, double scale)
+        {
+            Paused = paused;
+            if (paused) CancelSkip("paused");
+            if (!double.IsNaN(scale) && !double.IsInfinity(scale))
+                Scale = Clamp(scale, Tuning.MinScale, Tuning.DevMaxScale);
+        }
+
         internal void CancelSkip(string reason)
         {
             if (!Skipping) return;
