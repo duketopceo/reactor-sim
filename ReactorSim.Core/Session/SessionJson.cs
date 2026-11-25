@@ -65,6 +65,34 @@ namespace ReactorSim.Session
 
     public static class SessionJson
     {
+        internal static bool HasUnpairedSurrogate(string s)
+        {
+            for (int i = 0; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (char.IsHighSurrogate(c) && i + 1 < s.Length && char.IsLowSurrogate(s[i + 1]))
+                {
+                    i++;
+                    continue;
+                }
+                if (char.IsSurrogate(c))
+                    return true;
+            }
+            return false;
+        }
+
+        internal static bool TryWholeNumber(JsonValue v, out long result)
+        {
+            result = 0;
+            if (v == null || v.Kind != JsonKind.Number)
+                return false;
+            double d = v.Number;
+            if (d != Math.Floor(d) || Math.Abs(d) > SessionProtocol.MaxWireInteger)
+                return false;
+            result = (long)d;
+            return true;
+        }
+
         public static JsonParseResult Parse(string text)
         {
             if (text == null)
@@ -374,19 +402,10 @@ namespace ReactorSim.Session
                     }
                 }
                 string result = sb.ToString();
-                for (int i = 0; i < result.Length; i++)
+                if (HasUnpairedSurrogate(result))
                 {
-                    char ch = result[i];
-                    if (char.IsHighSurrogate(ch) && i + 1 < result.Length && char.IsLowSurrogate(result[i + 1]))
-                    {
-                        i++;
-                        continue;
-                    }
-                    if (char.IsSurrogate(ch))
-                    {
-                        Fail("unpaired surrogate");
-                        return null;
-                    }
+                    Fail("unpaired surrogate");
+                    return null;
                 }
                 return result;
             }

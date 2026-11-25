@@ -14,6 +14,26 @@ namespace ReactorSim.Session
         Seated = 1
     }
 
+    internal static class CrewPoseNames
+    {
+        internal static string ToWire(CrewPose pose)
+        {
+            return pose == CrewPose.Seated ? "seated" : "standing";
+        }
+
+        internal static bool TryParse(string text, out CrewPose pose)
+        {
+            pose = CrewPose.Standing;
+            if (text == "standing") return true;
+            if (text == "seated")
+            {
+                pose = CrewPose.Seated;
+                return true;
+            }
+            return false;
+        }
+    }
+
     public sealed class CrewMember
     {
         public string PeerId = "";
@@ -116,7 +136,7 @@ namespace ReactorSim.Session
             sb.Append(",\"yaw\":");
             SessionJson.AppendNumber(sb, m.YawDeg);
             sb.Append(",\"pose\":");
-            SessionJson.AppendString(sb, m.Pose == CrewPose.Seated ? "seated" : "standing");
+            SessionJson.AppendString(sb, CrewPoseNames.ToWire(m.Pose));
             sb.Append('}');
         }
 
@@ -129,13 +149,13 @@ namespace ReactorSim.Session
                 return Fail(SessionErrorCode.ProtocolViolation);
 
             long schema;
-            if (!TryInteger(body.Get("schema"), out schema) || schema < 1 || schema > int.MaxValue)
+            if (!TryWholeNumberNonNegative(body.Get("schema"), out schema) || schema < 1 || schema > int.MaxValue)
                 return Fail(SessionErrorCode.ProtocolViolation);
             if (schema > clientSchema)
                 return Fail(SessionErrorCode.UnsupportedSchema);
 
             long tick, seq;
-            if (!TryInteger(body.Get("sessionTick"), out tick) || !TryInteger(body.Get("snapshotSeq"), out seq))
+            if (!TryWholeNumberNonNegative(body.Get("sessionTick"), out tick) || !TryWholeNumberNonNegative(body.Get("snapshotSeq"), out seq))
                 return Fail(SessionErrorCode.ProtocolViolation);
 
             JsonValue paused = body.Get("clockPaused");
@@ -195,7 +215,7 @@ namespace ReactorSim.Session
         {
             if (m == null)
                 return SessionErrorCode.InvalidCrewState;
-            if (!IsFinite(m.X) || !IsFinite(m.Y) || !IsFinite(m.Z) || !IsFinite(m.YawDeg))
+            if (!Physics.IsFinite(m.X) || !Physics.IsFinite(m.Y) || !Physics.IsFinite(m.Z) || !Physics.IsFinite(m.YawDeg))
                 return SessionErrorCode.InvalidCrewState;
             if (m.Pose != CrewPose.Standing && m.Pose != CrewPose.Seated)
                 return SessionErrorCode.InvalidCrewState;
@@ -237,45 +257,42 @@ namespace ReactorSim.Session
                 return false;
             for (int i = 0; i < t.Length; i++)
             {
-                char c = t[i];
-                if (char.IsControl(c))
-                    return false;
-                if (char.IsHighSurrogate(c) && i + 1 < t.Length && char.IsLowSurrogate(t[i + 1]))
-                {
-                    i++;
-                    continue;
-                }
-                if (char.IsSurrogate(c))
+                if (char.IsControl(t[i]))
                     return false;
             }
-            return true;
+            return !SessionJson.HasUnpairedSurrogate(t);
         }
 
         private static CrewMember DecodeCrew(JsonValue v)
         {
             if (v == null || v.Kind != JsonKind.Object)
                 return null;
-            JsonValue peer = v.Get("peerId"), name = v.Get("name"), loc = v.Get("loc"), pose = v.Get("pose");
-            JsonValue x = v.Get("x"), y = v.Get("y"), z = v.Get("z"), yaw = v.Get("yaw");
-            if (!IsKind(peer, JsonKind.String) || !IsKind(name, JsonKind.String) || !IsKind(loc, JsonKind.String) || !IsKind(pose, JsonKind.String))
+            JsonValue peer = v.Get("peerId"), name = v.Get("name");
+            if (!IsKind(peer, JsonKind.String) || !IsKind(name, JsonKind.String))
                 return null;
+            var member = new CrewMember { PeerId = peer.Text, DisplayName = name.Text };
+            return TryReadCrewFields(v, member) ? member : null;
+        }
+
+        // Reads loc, pose, x, y, z and yaw from a crew object into the member; false when any is missing, mistyped or an unknown pose.
+        internal static bool TryReadCrewFields(JsonValue obj, CrewMember into)
+        {
+            JsonValue loc = obj.Get("loc"), pose = obj.Get("pose");
+            JsonValue x = obj.Get("x"), y = obj.Get("y"), z = obj.Get("z"), yaw = obj.Get("yaw");
+            if (!IsKind(loc, JsonKind.String) || !IsKind(pose, JsonKind.String))
+                return false;
             if (!IsKind(x, JsonKind.Number) || !IsKind(y, JsonKind.Number) || !IsKind(z, JsonKind.Number) || !IsKind(yaw, JsonKind.Number))
-                return null;
+                return false;
             CrewPose p;
-            if (pose.Text == "standing") p = CrewPose.Standing;
-            else if (pose.Text == "seated") p = CrewPose.Seated;
-            else return null;
-            return new CrewMember
-            {
-                PeerId = peer.Text,
-                DisplayName = name.Text,
-                LocationId = loc.Text,
-                X = x.Number,
-                Y = y.Number,
-                Z = z.Number,
-                YawDeg = yaw.Number,
-                Pose = p
-            };
+            if (!CrewPoseNames.TryParse(pose.Text, out p))
+                return false;
+            into.LocationId = loc.Text;
+            into.X = x.Number;
+            into.Y = y.Number;
+            into.Z = z.Number;
+            into.YawDeg = yaw.Number;
+            into.Pose = p;
+            return true;
         }
 
         private static bool IsKind(JsonValue v, JsonKind kind)
@@ -284,21 +301,14 @@ namespace ReactorSim.Session
         }
 
         // A JSON number that is a whole value in 0..MaxWireInteger.
-        private static bool TryInteger(JsonValue v, out long result)
+        private static bool TryWholeNumberNonNegative(JsonValue v, out long result)
         {
-            result = 0;
-            if (v == null || v.Kind != JsonKind.Number)
+            if (!SessionJson.TryWholeNumber(v, out result) || result < 0)
+            {
+                result = 0;
                 return false;
-            double d = v.Number;
-            if (d < 0.0 || d > SessionProtocol.MaxWireInteger || d != Math.Floor(d))
-                return false;
-            result = (long)d;
+            }
             return true;
-        }
-
-        private static bool IsFinite(double d)
-        {
-            return !double.IsNaN(d) && !double.IsInfinity(d);
         }
 
         private static WorldSnapshotDecodeResult Fail(SessionErrorCode code)

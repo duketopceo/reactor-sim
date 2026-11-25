@@ -41,6 +41,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 
 namespace ReactorSim.Session
@@ -110,6 +111,7 @@ namespace ReactorSim.Session
         // Original design choice: closed-peer records kept so their tokens answer TokenExpired; older ones answer TokenInvalid.
         private const int MaxClosedPeerRecords = 64;
         private const double TimerEpsilon = 1e-9;
+        private const double FrameWindowSeconds = 1.0;
 
         private sealed class Conn
         {
@@ -143,7 +145,7 @@ namespace ReactorSim.Session
             _sim = sim;
             _locationValidator = locationValidator;
             _peersView = _peers.AsReadOnly();
-            Entropy = entropy;
+            _entropy = entropy;
 
             var hostId = new byte[8];
             var sid = new byte[16];
@@ -156,7 +158,7 @@ namespace ReactorSim.Session
             JoinCode = SessionIds.JoinCodeFrom(code);
         }
 
-        private ISessionEntropy Entropy { get; }
+        private readonly ISessionEntropy _entropy;
 
         public string HostId { get; private set; }
         public string SessionId { get; private set; }
@@ -262,8 +264,7 @@ namespace ReactorSim.Session
                     Conn c = Find(peer.ConnectionId);
                     if (c != null)
                     {
-                        _conns.Remove(c);
-                        Queue(c.Id, null, true, false);
+                        CloseSilently(c);
                     }
                     MarkStale(peer);
                 }
@@ -285,7 +286,7 @@ namespace ReactorSim.Session
         // A value earlier than the last one counts as no time passing (KTD2); a non-finite value is ignored.
         private void Advance(double now)
         {
-            if (double.IsNaN(now) || double.IsInfinity(now))
+            if (!Physics.IsFinite(now))
                 return;
             if (!_started || now > _now)
             {
@@ -309,7 +310,7 @@ namespace ReactorSim.Session
             peer.State = PeerState.Stale;
             peer.ConnectionId = -1;
             peer.StaleSince = _now;
-            _events.Add(new SessionEvent { Kind = SessionEventKind.PeerStale, ConnectionId = -1, PeerId = peer.Id });
+            AddEvent(SessionEventKind.PeerStale, -1, peer.Id, SessionErrorCode.None, 0);
         }
 
         // Frees the slot for good: the token now answers TokenExpired.
@@ -319,7 +320,7 @@ namespace ReactorSim.Session
                 return;
             peer.State = PeerState.Closed;
             peer.ConnectionId = -1;
-            _events.Add(new SessionEvent { Kind = SessionEventKind.PeerLeft, ConnectionId = -1, PeerId = peer.Id, Code = reason });
+            AddEvent(SessionEventKind.PeerLeft, -1, peer.Id, reason, 0);
             TrimClosedPeers();
         }
 
@@ -352,7 +353,7 @@ namespace ReactorSim.Session
                 return;
             }
 
-            if (_now - c.WindowStart >= 1.0)
+            if (_now - c.WindowStart >= FrameWindowSeconds)
             {
                 c.WindowStart = _now;
                 c.WindowCount = 0;
@@ -386,17 +387,16 @@ namespace ReactorSim.Session
                     return;
                 case SessionProtocol.TypeIntent:
                     QueueIntentResult(c.Id, env.Seq, SessionErrorCode.NotJoined);
-                    _events.Add(new SessionEvent { Kind = SessionEventKind.IntentRefused, ConnectionId = c.Id, Code = SessionErrorCode.NotJoined, Seq = env.Seq });
+                    AddEvent(SessionEventKind.IntentRefused, c.Id, null, SessionErrorCode.NotJoined, env.Seq);
                     return;
                 case SessionProtocol.TypeCrewUpdate:
                     QueueReject(c.Id, SessionErrorCode.NotJoined, env.Seq, false);
-                    _events.Add(new SessionEvent { Kind = SessionEventKind.CrewRefused, ConnectionId = c.Id, Code = SessionErrorCode.NotJoined, Seq = env.Seq });
+                    AddEvent(SessionEventKind.CrewRefused, c.Id, null, SessionErrorCode.NotJoined, env.Seq);
                     return;
                 case SessionProtocol.TypeHeartbeat:
                     return;
                 case SessionProtocol.TypeGoodbye:
-                    _conns.Remove(c);
-                    Queue(c.Id, null, true, false);
+                    CloseSilently(c);
                     return;
                 default:
                     Refuse(c, SessionErrorCode.ProtocolViolation, env.Seq);
@@ -422,8 +422,7 @@ namespace ReactorSim.Session
 
             if (env.T == SessionProtocol.TypeGoodbye)
             {
-                _conns.Remove(c);
-                Queue(c.Id, null, true, false);
+                CloseSilently(c);
                 ClosePeer(peer, SessionErrorCode.None);
                 return;
             }
@@ -462,7 +461,7 @@ namespace ReactorSim.Session
         {
             JsonValue body = env.Body;
             long clientSchema;
-            if (!TryWholeNumber(body.Get("schema"), out clientSchema))
+            if (!SessionJson.TryWholeNumber(body.Get("schema"), out clientSchema))
             {
                 Refuse(c, SessionErrorCode.ProtocolViolation, env.Seq);
                 return;
@@ -514,7 +513,7 @@ namespace ReactorSim.Session
 
             var crew = new CrewMember
             {
-                PeerId = "p" + (_peerCounter + 1).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                PeerId = "p" + (_peerCounter + 1).ToString(CultureInfo.InvariantCulture),
                 DisplayName = nameValue.Text.Trim(),
                 LocationId = InitialLocationId,
                 Pose = CrewPose.Standing
@@ -527,7 +526,7 @@ namespace ReactorSim.Session
 
             _peerCounter++;
             var token = new byte[SessionProtocol.TokenBytes];
-            Entropy.Fill(token);
+            _entropy.Fill(token);
             var peer = new SessionPeer
             {
                 Id = crew.PeerId,
@@ -544,7 +543,7 @@ namespace ReactorSim.Session
             _peers.Add(peer);
             Bind(c, peer);
             QueueWelcome(c, peer);
-            _events.Add(new SessionEvent { Kind = SessionEventKind.PeerJoined, ConnectionId = c.Id, PeerId = peer.Id, Seq = env.Seq });
+            AddEvent(SessionEventKind.PeerJoined, c.Id, peer.Id, SessionErrorCode.None, env.Seq);
         }
 
         private void HandleResume(Conn c, SessionEnvelope env, string tokenText)
@@ -596,7 +595,7 @@ namespace ReactorSim.Session
                 match.LastSeq = env.Seq;
             Bind(c, match);
             QueueWelcome(c, match);
-            _events.Add(new SessionEvent { Kind = SessionEventKind.PeerResumed, ConnectionId = c.Id, PeerId = match.Id, Seq = env.Seq });
+            AddEvent(SessionEventKind.PeerResumed, c.Id, match.Id, SessionErrorCode.None, env.Seq);
         }
 
         private bool HasSlotTaken()
@@ -619,14 +618,7 @@ namespace ReactorSim.Session
         {
             SessionErrorCode code = Admit(peer, env, fresh);
             QueueIntentResult(c.Id, env.Seq, code);
-            _events.Add(new SessionEvent
-            {
-                Kind = code == SessionErrorCode.None ? SessionEventKind.IntentQueued : SessionEventKind.IntentRefused,
-                ConnectionId = c.Id,
-                PeerId = peer.Id,
-                Code = code,
-                Seq = env.Seq
-            });
+            AddEvent(code == SessionErrorCode.None ? SessionEventKind.IntentQueued : SessionEventKind.IntentRefused, c.Id, peer.Id, code, env.Seq);
         }
 
         // Steps 1 (peer Active) is guaranteed by the caller; this runs steps 2-8 in order.
@@ -695,38 +687,20 @@ namespace ReactorSim.Session
                 }
             }
             QueueReject(c.Id, code, env.Seq, false);
-            _events.Add(new SessionEvent { Kind = SessionEventKind.CrewRefused, ConnectionId = c.Id, PeerId = peer.Id, Code = code, Seq = env.Seq });
+            AddEvent(SessionEventKind.CrewRefused, c.Id, peer.Id, code, env.Seq);
         }
 
         // Null when a field is missing or has the wrong type; value rules are checked by ValidateCrewMember.
         private static CrewMember BuildCandidate(CrewMember current, JsonValue body)
         {
-            JsonValue loc = body.Get("loc"), pose = body.Get("pose"), name = body.Get("name");
-            JsonValue x = body.Get("x"), y = body.Get("y"), z = body.Get("z"), yaw = body.Get("yaw");
-            if (loc == null || loc.Kind != JsonKind.String || pose == null || pose.Kind != JsonKind.String)
-                return null;
-            if (x == null || x.Kind != JsonKind.Number || y == null || y.Kind != JsonKind.Number
-                || z == null || z.Kind != JsonKind.Number || yaw == null || yaw.Kind != JsonKind.Number)
+            JsonValue name = body.Get("name");
+            var candidate = new CrewMember { PeerId = current.PeerId };
+            if (!WorldSnapshot.TryReadCrewFields(body, candidate))
                 return null;
             if (name != null && name.Kind != JsonKind.String)
                 return null;
-
-            CrewPose parsedPose;
-            if (pose.Text == "standing") parsedPose = CrewPose.Standing;
-            else if (pose.Text == "seated") parsedPose = CrewPose.Seated;
-            else return null;
-
-            return new CrewMember
-            {
-                PeerId = current.PeerId,
-                DisplayName = name != null ? name.Text : current.DisplayName,
-                LocationId = loc.Text,
-                X = x.Number,
-                Y = y.Number,
-                Z = z.Number,
-                YawDeg = yaw.Number,
-                Pose = parsedPose
-            };
+            candidate.DisplayName = name != null ? name.Text : current.DisplayName;
+            return candidate;
         }
 
         // ---- output ----
@@ -744,6 +718,17 @@ namespace ReactorSim.Session
             for (int i = 0; i < _conns.Count; i++)
                 if (_conns[i].Handshaking) n++;
             return n;
+        }
+
+        private void CloseSilently(Conn c)
+        {
+            _conns.Remove(c);
+            Queue(c.Id, null, true, false);
+        }
+
+        private void AddEvent(SessionEventKind kind, int connectionId, string peerId, SessionErrorCode code, long seq)
+        {
+            _events.Add(new SessionEvent { Kind = kind, ConnectionId = connectionId, PeerId = peerId, Code = code, Seq = seq });
         }
 
         private void Queue(int connectionId, string frame, bool closeAfter, bool isWorld)
@@ -833,19 +818,7 @@ namespace ReactorSim.Session
 
         private void RaiseRefused(int connectionId, SessionErrorCode code)
         {
-            _events.Add(new SessionEvent { Kind = SessionEventKind.ConnectionRefused, ConnectionId = connectionId, Code = code });
-        }
-
-        private static bool TryWholeNumber(JsonValue v, out long result)
-        {
-            result = 0;
-            if (v == null || v.Kind != JsonKind.Number)
-                return false;
-            double d = v.Number;
-            if (d != Math.Floor(d) || Math.Abs(d) > SessionProtocol.MaxWireInteger)
-                return false;
-            result = (long)d;
-            return true;
+            AddEvent(SessionEventKind.ConnectionRefused, connectionId, null, code, 0);
         }
     }
 }

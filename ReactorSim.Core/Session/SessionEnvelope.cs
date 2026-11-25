@@ -72,7 +72,7 @@ namespace ReactorSim.Session
             JsonValue root = parsed.Value;
 
             long v;
-            if (!TryWireInteger(root.Get("v"), out v))
+            if (!SessionJson.TryWholeNumber(root.Get("v"), out v))
                 return Fail(SessionErrorCode.ProtocolViolation);
 
             JsonValue t = root.Get("t");
@@ -80,7 +80,7 @@ namespace ReactorSim.Session
                 return Fail(SessionErrorCode.ProtocolViolation);
 
             long seq;
-            if (!TryWireInteger(root.Get("seq"), out seq) || seq < 1)
+            if (!SessionJson.TryWholeNumber(root.Get("seq"), out seq) || seq < 1)
                 return Fail(SessionErrorCode.ProtocolViolation);
 
             string sid = null;
@@ -120,26 +120,7 @@ namespace ReactorSim.Session
             return new SessionEnvelopeResult { Ok = false, Envelope = null, Error = code };
         }
 
-        private static bool TryWireInteger(JsonValue value, out long result)
-        {
-            result = 0;
-            if (value == null || value.Kind != JsonKind.Number)
-                return false;
-            double d = value.Number;
-            if (d != Math.Floor(d) || Math.Abs(d) > SessionProtocol.MaxWireInteger)
-                return false;
-            result = (long)d;
-            return true;
-        }
-
-        private static HashSet<string> _kindNames;
-
-        private static HashSet<string> KindNames()
-        {
-            if (_kindNames == null)
-                _kindNames = new HashSet<string>(Enum.GetNames(typeof(IntentKind)), StringComparer.Ordinal);
-            return _kindNames;
-        }
+        private static readonly HashSet<string> KindNames = new HashSet<string>(Enum.GetNames(typeof(IntentKind)), StringComparer.Ordinal);
 
         // Decodes an intent body from a strict value tree. kind is an exact, case-sensitive IntentKind name; numbers,
         // lists and unknown names are refused. Any claimed issuer is ignored: Issuer is a placeholder the host overwrites.
@@ -151,11 +132,9 @@ namespace ReactorSim.Session
                 return BadIntent();
 
             JsonValue kindValue = body.Get("kind");
-            if (kindValue == null || kindValue.Kind != JsonKind.String || !KindNames().Contains(kindValue.Text))
+            if (kindValue == null || kindValue.Kind != JsonKind.String || !KindNames.Contains(kindValue.Text))
                 return BadIntent();
             var kind = (IntentKind)Enum.Parse(typeof(IntentKind), kindValue.Text, false);
-            if (!Enum.IsDefined(typeof(IntentKind), kind))
-                return BadIntent();
 
             string target = "";
             JsonValue targetValue = body.Get("target");

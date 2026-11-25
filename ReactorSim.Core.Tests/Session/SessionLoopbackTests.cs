@@ -391,13 +391,6 @@ namespace ReactorSim.Tests
 
     public class SessionLoopbackTests
     {
-        private static string BaselineJson(Simulation host)
-        {
-            var baseline = new Simulation();
-            baseline.RestoreSnapshot(PlantSnapshot.FromJson(host.CaptureSnapshot().ToJson()));
-            return baseline.CaptureSnapshot().ToJson();
-        }
-
         private static LoopbackHarness Joined(Simulation hostSim = null)
         {
             var h = new LoopbackHarness(hostSim);
@@ -419,7 +412,7 @@ namespace ReactorSim.Tests
             // Raw ToJson equality across a restore is not available: Plant.RestoreState recomputes derived values, so a
             // restored plant differs from its source in a few trailing digits. The oracle is the same solo path
             // WorldSnapshotTests uses: ToJson, FromJson, RestoreSnapshot on a fresh Simulation.
-            Assert.Equal(BaselineJson(hostSim), h.ClientSim.CaptureSnapshot().ToJson());
+            Assert.Equal(SessionTestSupport.BaselineJson(hostSim), h.ClientSim.CaptureSnapshot().ToJson());
             Assert.Equal(hostSim.SessionTick, h.ClientSim.SessionTick);
             Assert.Equal(hostSim.Clock.Paused, h.ClientSim.Clock.Paused);
             Assert.Equal(hostSim.Clock.Scale, h.ClientSim.Clock.Scale);

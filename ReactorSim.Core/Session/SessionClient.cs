@@ -207,7 +207,7 @@ namespace ReactorSim.Session
             if (!Enum.IsDefined(typeof(IntentKind), intent.Kind)
                 || (intent.Target != null && intent.Target.Length > SessionProtocol.IntentStringMaxChars))
                 return RefuseLocally(SessionErrorCode.InvalidIntent);
-            if (!IsFinite(intent.Value) || !IsFinite(intent.AtMinute))
+            if (!Physics.IsFinite(intent.Value) || !Physics.IsFinite(intent.AtMinute))
                 return RefuseLocally(SessionErrorCode.NonFiniteValue);
 
             var sb = new StringBuilder(96);
@@ -235,7 +235,7 @@ namespace ReactorSim.Session
             if (update == null) throw new ArgumentNullException(nameof(update));
             if (_state != ClientState.Active)
                 return RefuseLocally(SessionErrorCode.NotJoined);
-            if (update.LocationId == null || !IsFinite(update.X) || !IsFinite(update.Y) || !IsFinite(update.Z) || !IsFinite(update.YawDeg))
+            if (update.LocationId == null || !Physics.IsFinite(update.X) || !Physics.IsFinite(update.Y) || !Physics.IsFinite(update.Z) || !Physics.IsFinite(update.YawDeg))
                 return RefuseLocally(SessionErrorCode.InvalidCrewState);
 
             var sb = new StringBuilder(128);
@@ -250,7 +250,7 @@ namespace ReactorSim.Session
             sb.Append(",\"yaw\":");
             SessionJson.AppendNumber(sb, update.YawDeg);
             sb.Append(",\"pose\":");
-            SessionJson.AppendString(sb, update.Pose == CrewPose.Seated ? "seated" : "standing");
+            SessionJson.AppendString(sb, CrewPoseNames.ToWire(update.Pose));
             if (!string.IsNullOrEmpty(update.DisplayName))
             {
                 sb.Append(",\"name\":");
@@ -494,7 +494,7 @@ namespace ReactorSim.Session
             PeerId = peer.Text;
             SessionId = env.Sid;
             Token = token.Text;
-            GraceSeconds = grace != null && grace.Kind == JsonKind.Number && IsFinite(grace.Number) && grace.Number > 0
+            GraceSeconds = grace != null && grace.Kind == JsonKind.Number && Physics.IsFinite(grace.Number) && grace.Number > 0
                 ? grace.Number
                 : SessionProtocol.GraceSeconds;
             _state = ClientState.Active;
@@ -539,10 +539,10 @@ namespace ReactorSim.Session
             SessionErrorCode code = SessionErrorCode.ProtocolViolation;
             long refSeq = 0;
             long raw;
-            if (TryWholeNumber(env.Body.Get("code"), out raw) && raw >= 0 && raw <= int.MaxValue
+            if (SessionJson.TryWholeNumber(env.Body.Get("code"), out raw) && raw >= 0 && raw <= int.MaxValue
                 && Enum.IsDefined(typeof(SessionErrorCode), (int)raw))
                 code = (SessionErrorCode)(int)raw;
-            if (TryWholeNumber(env.Body.Get("seq"), out raw))
+            if (SessionJson.TryWholeNumber(env.Body.Get("seq"), out raw))
                 refSeq = raw;
 
             switch (_state)
@@ -591,7 +591,7 @@ namespace ReactorSim.Session
             if (_state != ClientState.Active)
                 return;
             long seq, rawCode;
-            if (!TryWholeNumber(env.Body.Get("seq"), out seq) || !TryWholeNumber(env.Body.Get("code"), out rawCode)
+            if (!SessionJson.TryWholeNumber(env.Body.Get("seq"), out seq) || !SessionJson.TryWholeNumber(env.Body.Get("code"), out rawCode)
                 || rawCode < 0 || rawCode > int.MaxValue || !Enum.IsDefined(typeof(SessionErrorCode), (int)rawCode))
                 return;
             // Only the first result for a sequence number this client sent counts; a later Duplicate finds it not pending.
@@ -709,30 +709,13 @@ namespace ReactorSim.Session
 
         private void Advance(double now)
         {
-            if (double.IsNaN(now) || double.IsInfinity(now))
+            if (!Physics.IsFinite(now))
                 return;
             if (!_started || now > _now)
             {
                 _now = now;
                 _started = true;
             }
-        }
-
-        private static bool IsFinite(double v)
-        {
-            return !double.IsNaN(v) && !double.IsInfinity(v);
-        }
-
-        private static bool TryWholeNumber(JsonValue v, out long result)
-        {
-            result = 0;
-            if (v == null || v.Kind != JsonKind.Number)
-                return false;
-            double d = v.Number;
-            if (d != Math.Floor(d) || Math.Abs(d) > SessionProtocol.MaxWireInteger)
-                return false;
-            result = (long)d;
-            return true;
         }
     }
 }

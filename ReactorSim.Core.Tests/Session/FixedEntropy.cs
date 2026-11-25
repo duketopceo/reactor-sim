@@ -26,6 +26,16 @@ namespace ReactorSim.Tests
         }
     }
 
+    internal static class SessionTestSupport
+    {
+        internal static string BaselineJson(Simulation host)
+        {
+            var baseline = new Simulation();
+            baseline.RestoreSnapshot(PlantSnapshot.FromJson(host.CaptureSnapshot().ToJson()));
+            return baseline.CaptureSnapshot().ToJson();
+        }
+    }
+
     public sealed class OutFrame
     {
         public int ConnectionId;

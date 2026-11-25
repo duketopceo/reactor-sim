@@ -99,13 +99,6 @@ namespace ReactorSim.Tests
             return c;
         }
 
-        private static string BaselineJson(Simulation host)
-        {
-            var baseline = new Simulation();
-            baseline.RestoreSnapshot(PlantSnapshot.FromJson(host.CaptureSnapshot().ToJson()));
-            return baseline.CaptureSnapshot().ToJson();
-        }
-
         [Fact]
         public void ConnectStartsJoiningAndHelloFollowsOnConnected()
         {
@@ -151,7 +144,7 @@ namespace ReactorSim.Tests
             Assert.Equal(30, c.GraceSeconds);
             Assert.Equal(5, c.LastSnapshotSeq);
             Assert.Single(c.Crew);
-            Assert.Equal(BaselineJson(host.Sim), sim.CaptureSnapshot().ToJson());
+            Assert.Equal(SessionTestSupport.BaselineJson(host.Sim), sim.CaptureSnapshot().ToJson());
             List<ClientEvent> events = c.DrainEvents();
             Assert.Contains(events, e => e.Kind == ClientEventKind.Joined && e.PeerId == "p1");
             Assert.Contains(events, e => e.Kind == ClientEventKind.WorldApplied && e.SnapshotSeq == 5);
@@ -441,7 +434,7 @@ namespace ReactorSim.Tests
             Assert.Equal(ClientState.Active, c.State);
             Assert.Equal("p1", c.PeerId);
             Assert.Equal(8, c.LastSnapshotSeq);
-            Assert.Equal(BaselineJson(host.Sim), sim.CaptureSnapshot().ToJson());
+            Assert.Equal(SessionTestSupport.BaselineJson(host.Sim), sim.CaptureSnapshot().ToJson());
             List<ClientEvent> events = c.DrainEvents();
             Assert.Contains(events, e => e.Kind == ClientEventKind.Resumed && e.PeerId == "p1");
             Assert.DoesNotContain(events, e => e.Kind == ClientEventKind.Joined);
