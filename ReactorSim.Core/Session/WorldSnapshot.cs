@@ -142,7 +142,7 @@ namespace ReactorSim.Session
 
         // Strict on the envelope fields, tolerant on the plant: the plant object is re-serialized with the SessionJson writer
         // (numbers round-trip at G17) and restored through the existing PlantSnapshot.FromJson, whose defaults cover missing
-        // fields (KTD14). Unknown fields are ignored. Crew entries are checked with the default location validator.
+        // fields (KTD14). Unknown fields are ignored. Crew location IDs are host-authoritative, so the client checks them structurally only (IsStructuralLocationId); every other crew rule applies.
         public static WorldSnapshotDecodeResult Decode(JsonValue body, int clientSchema)
         {
             if (body == null || body.Kind != JsonKind.Object)
@@ -177,7 +177,7 @@ namespace ReactorSim.Session
             for (int i = 0; i < crewValue.Items.Count; i++)
             {
                 CrewMember m = DecodeCrew(crewValue.Items[i]);
-                if (m == null || ValidateCrewMember(m, null) != SessionErrorCode.None)
+                if (m == null || ValidateCrewMember(m, IsStructuralLocationId) != SessionErrorCode.None)
                     return Fail(SessionErrorCode.ProtocolViolation);
                 crew.Add(m);
             }
@@ -232,6 +232,19 @@ namespace ReactorSim.Session
             {
                 return SessionErrorCode.InvalidCrewState;
             }
+        }
+
+        // Client-side location check: non-empty, within the published bound, no control characters. The host's validator owns the rest.
+        public static bool IsStructuralLocationId(string id)
+        {
+            if (id == null || id.Length < 1 || id.Length > SessionProtocol.LocationIdMaxChars)
+                return false;
+            for (int i = 0; i < id.Length; i++)
+            {
+                if (char.IsControl(id[i]))
+                    return false;
+            }
+            return true;
         }
 
         public static bool IsDefaultLocationId(string id)

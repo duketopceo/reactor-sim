@@ -23,6 +23,8 @@ namespace ReactorSim.Session
         public JsonKind Kind;
         public bool Bool;
         public double Number;
+        // Set by the parser when the number token carried a fraction or exponent; such a token is never a wire integer, even if it rounds to one.
+        public bool NotIntegerLiteral;
         public string Text;
         public List<JsonValue> Items;
         public List<KeyValuePair<string, JsonValue>> Members;
@@ -84,7 +86,7 @@ namespace ReactorSim.Session
         internal static bool TryWholeNumber(JsonValue v, out long result)
         {
             result = 0;
-            if (v == null || v.Kind != JsonKind.Number)
+            if (v == null || v.Kind != JsonKind.Number || v.NotIntegerLiteral)
                 return false;
             double d = v.Number;
             if (d != Math.Floor(d) || Math.Abs(d) > SessionProtocol.MaxWireInteger)
@@ -422,6 +424,7 @@ namespace ReactorSim.Session
             private JsonValue ParseNumber()
             {
                 int start = _pos;
+                bool integerLiteral = true;
                 if (_s[_pos] == '-') _pos++;
                 if (_pos >= _s.Length)
                     return Fail("bad number");
@@ -442,12 +445,14 @@ namespace ReactorSim.Session
                 if (_pos < _s.Length && _s[_pos] == '.')
                 {
                     _pos++;
+                    integerLiteral = false;
                     if (!SkipDigits())
                         return Fail("bad fraction");
                 }
                 if (_pos < _s.Length && (_s[_pos] == 'e' || _s[_pos] == 'E'))
                 {
                     _pos++;
+                    integerLiteral = false;
                     if (_pos < _s.Length && (_s[_pos] == '+' || _s[_pos] == '-')) _pos++;
                     if (!SkipDigits())
                         return Fail("bad exponent");
@@ -456,7 +461,9 @@ namespace ReactorSim.Session
                 if (!double.TryParse(_s.Substring(start, _pos - start), NumberStyles.Float, CultureInfo.InvariantCulture, out d)
                     || double.IsNaN(d) || double.IsInfinity(d))
                     return Fail("number out of range");
-                return JsonValue.NewNumber(d);
+                JsonValue number = JsonValue.NewNumber(d);
+                number.NotIntegerLiteral = !integerLiteral;
+                return number;
             }
 
             private bool SkipDigits()

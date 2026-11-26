@@ -682,7 +682,8 @@ namespace ReactorSim.Tests
             h.LinkDown(true);
             h.RunFor(6.0);
             h.RestoreLink();
-            h.RunUntil(() => h.Client.State == ClientState.Active, 30.0);
+            Assert.True(h.RunUntil(() => h.Client.State == ClientState.Active, 30.0));
+            Assert.Equal("p1", h.Client.PeerId);
             h.RunFor(2.0);
             finalHostJson = h.HostSim.CaptureSnapshot().ToJson() + "|" + h.ClientSim.CaptureSnapshot().ToJson();
             return string.Join("\n", h.Trace);

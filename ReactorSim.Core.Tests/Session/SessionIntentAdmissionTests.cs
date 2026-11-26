@@ -144,17 +144,16 @@ namespace ReactorSim.Tests
         }
 
         [Fact]
-        public void SequenceAtTheWireMaximumAcceptsOnceThenNextFrameIsProtocolViolation()
+        public void SequenceAtTheWireMaximumAcceptsOnceThenRepeatIsDuplicateAndConnectionStaysOpen()
         {
             JoinInfo p1;
             var h = JoinedHost(out p1);
             h.Feed(1, h.IntentFrame(SessionProtocol.MaxWireInteger, "RodBankTarget"));
             OnlyResult(h, SessionProtocol.MaxWireInteger, SessionErrorCode.None);
             h.Feed(1, h.IntentFrame(SessionProtocol.MaxWireInteger, "RodBankTarget"));
-            OutFrame f = Assert.Single(h.Drain());
-            Assert.Equal("reject", f.Type);
-            Assert.Equal((int)SessionErrorCode.ProtocolViolation, f.Code);
-            Assert.True(f.CloseAfter);
+            OnlyResult(h, SessionProtocol.MaxWireInteger, SessionErrorCode.Duplicate);
+            Assert.Equal(PeerState.Active, h.Host.Peers[0].State);
+            Assert.Equal(1, h.Host.ConnectionCount);
         }
 
         [Theory]

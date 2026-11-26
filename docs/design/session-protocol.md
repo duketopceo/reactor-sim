@@ -29,7 +29,8 @@ The transport must:
 2. Report connection open and close, and call `Tick` regularly with a monotonic seconds value. Feed all pending bytes before calling `Tick`, so a host stall does not mark a live peer stale.
 3. Send every outbox frame followed by `\n`, and close the connection after any entry marked close-after. An entry with no frame means close only.
 4. Supply a cryptographic random source through `ISessionEntropy`. Tests use a fixed source in the test project; production must never use it.
-5. Run the machines on one thread. They are not thread-safe.
+5. Keep connection ids unique for the host lifetime. `OnDisconnected` drops undrained output for that id, but a reused id could still receive output queued for its predecessor.
+6. Run the machines on one thread. They are not thread-safe.
 
 ## Frames and envelope
 
@@ -147,7 +148,7 @@ All values are original design choices for a two-player LAN game (KTD4, KTD6, KT
 
 - **Plant state** lives on `Plant` and below and travels as the `plant` member of the world snapshot. The host is the only authority.
 - **Crew state** is session state. It holds one entry per remote peer: peer ID, display name, location ID, position, yaw and pose. It lives in the world snapshot, not on `Plant`, and is the sync and save boundary for player state (KTD11).
-- **Location IDs** are opaque strings. The host checks them with an injected validator, so the session does not depend on a particular route layout.
+- **Location IDs** are opaque strings. The host checks them with an injected validator, so the session does not depend on a particular route layout. A client decoding a world snapshot checks only the structural bound (1-64 characters, no control characters).
 - **The client is a mirror.** It does not tick its simulation between worlds, so tick-derived displays such as trend history are not reproduced on the client yet (KTD14).
 - **Clock state** (pause, scale) and the session tick travel in the world snapshot and are restored on the client.
 

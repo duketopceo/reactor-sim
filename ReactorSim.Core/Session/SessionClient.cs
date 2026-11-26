@@ -121,7 +121,10 @@ namespace ReactorSim.Session
         private double _handshakeDeadline;
         private double _reconnectStart;
         private int _attemptsMade;
+        // The last BadJoinCode received while Joining; decides how a close is reported. Never cleared by a retry.
         private SessionErrorCode _lastJoinReject;
+        // True from a received BadJoinCode until RetryJoin spends it, so one refusal allows exactly one new hello.
+        private bool _retryPermitted;
 
         public SessionClient(Simulation sim, string displayName, string joinCode)
         {
@@ -179,20 +182,22 @@ namespace ReactorSim.Session
             _lastSnapshotSeq = -1;
             _crew = new List<CrewMember>();
             _lastJoinReject = SessionErrorCode.None;
+            _retryPermitted = false;
             _handshakeDeadline = _now + SessionProtocol.HandshakeTimeoutSeconds;
             RequestConnection();
             return true;
         }
 
-        // While Joining, replaces the join code (after a BadJoinCode) and sends a fresh hello on the open connection.
+        // While Joining, replaces the join code and sends a fresh hello on the open connection. Each BadJoinCode refusal
+        // allows one retry; a call with no refusal outstanding is ignored.
         public void RetryJoin(string joinCode, double nowSeconds)
         {
             if (joinCode == null) throw new ArgumentNullException(nameof(joinCode));
             Advance(nowSeconds);
-            if (_state != ClientState.Joining)
+            if (_state != ClientState.Joining || !_retryPermitted)
                 return;
+            _retryPermitted = false;
             _joinCode = joinCode;
-            _lastJoinReject = SessionErrorCode.None;
             _handshakeDeadline = _now + SessionProtocol.HandshakeTimeoutSeconds;
             if (_connected)
                 SendHello(false);
@@ -221,6 +226,9 @@ namespace ReactorSim.Session
             SessionJson.AppendNumber(sb, intent.AtMinute);
             sb.Append('}');
 
+            if (ExceedsControlLimit(SessionProtocol.TypeIntent, sb.ToString()))
+                return RefuseLocally(SessionErrorCode.FrameTooLarge);
+
             long seq = _nextSeq++;
             _pendingIntents.Add(seq);
             SendFrame(SessionProtocol.TypeIntent, seq, SessionId, sb.ToString(), false);
@@ -229,13 +237,15 @@ namespace ReactorSim.Session
         }
 
         // Returns the sequence number used, or 0 when refused locally. The host validates the location rule; the client
-        // only refuses what it cannot encode.
+        // refuses what it cannot encode (a non-finite value, an undefined pose) or cannot send within the 4096-byte control
+        // frame limit (FrameTooLarge), because the host would close the connection on an oversize frame.
         public long SendCrewUpdate(CrewMember update)
         {
             if (update == null) throw new ArgumentNullException(nameof(update));
             if (_state != ClientState.Active)
                 return RefuseLocally(SessionErrorCode.NotJoined);
-            if (update.LocationId == null || !Physics.IsFinite(update.X) || !Physics.IsFinite(update.Y) || !Physics.IsFinite(update.Z) || !Physics.IsFinite(update.YawDeg))
+            if (update.LocationId == null || !Physics.IsFinite(update.X) || !Physics.IsFinite(update.Y) || !Physics.IsFinite(update.Z) || !Physics.IsFinite(update.YawDeg)
+                || !Enum.IsDefined(typeof(CrewPose), update.Pose))
                 return RefuseLocally(SessionErrorCode.InvalidCrewState);
 
             var sb = new StringBuilder(128);
@@ -257,6 +267,9 @@ namespace ReactorSim.Session
                 SessionJson.AppendString(sb, update.DisplayName);
             }
             sb.Append('}');
+
+            if (ExceedsControlLimit(SessionProtocol.TypeCrewUpdate, sb.ToString()))
+                return RefuseLocally(SessionErrorCode.FrameTooLarge);
 
             long seq = _nextSeq++;
             SendFrame(SessionProtocol.TypeCrewUpdate, seq, SessionId, sb.ToString(), false);
@@ -428,6 +441,13 @@ namespace ReactorSim.Session
                 return;
             }
             SessionEnvelope env = decoded.Envelope;
+            // The reader only bounds frames at the state limit; every type except Welcome and World keeps the control limit.
+            if (env.T != SessionProtocol.TypeWelcome && env.T != SessionProtocol.TypeWorld
+                && frame.ByteLength > SessionProtocol.ControlFrameMaxBytes)
+            {
+                Fail(ClientFailure.ProtocolError, SessionErrorCode.FrameTooLarge, true);
+                return;
+            }
             _lastRx = _now;
 
             if (_state == ClientState.Active)
@@ -554,6 +574,7 @@ namespace ReactorSim.Session
                     if (code == SessionErrorCode.BadJoinCode)
                     {
                         _lastJoinReject = code;
+                        _retryPermitted = true;
                         _events.Add(new ClientEvent { Kind = ClientEventKind.Refused, Code = code, Seq = refSeq });
                     }
                     else
@@ -711,6 +732,13 @@ namespace ReactorSim.Session
                 Frame = SessionEnvelope.Encode(type, seq, sid, bodyJson),
                 CloseAfter = closeAfter
             });
+        }
+
+        // The frame as it would go out next (the next sequence number has the same width it will be sent with).
+        private bool ExceedsControlLimit(string type, string bodyJson)
+        {
+            string frame = SessionEnvelope.Encode(type, _nextSeq, SessionId, bodyJson);
+            return Encoding.UTF8.GetByteCount(frame) > SessionProtocol.ControlFrameMaxBytes;
         }
 
         private long RefuseLocally(SessionErrorCode code)

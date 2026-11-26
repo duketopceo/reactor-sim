@@ -115,11 +115,11 @@ namespace ReactorSim.Tests
         {
             var sb = new StringBuilder();
             sb.Append("{\"v\":").Append(v).Append(",\"t\":\"hello\",\"seq\":").Append(seq);
-            if (sid != null) sb.Append(",\"sid\":\"").Append(sid).Append('"');
+            if (sid != null) { sb.Append(",\"sid\":"); SessionJson.AppendString(sb, sid); }
             sb.Append(",\"body\":{\"schema\":").Append(schema);
-            sb.Append(",\"joinCode\":\"").Append(code ?? Host.JoinCode).Append('"');
-            sb.Append(",\"name\":\"").Append(name).Append('"');
-            if (token != null) sb.Append(",\"token\":\"").Append(token).Append('"');
+            sb.Append(",\"joinCode\":"); SessionJson.AppendString(sb, code ?? Host.JoinCode);
+            sb.Append(",\"name\":"); SessionJson.AppendString(sb, name);
+            if (token != null) { sb.Append(",\"token\":"); SessionJson.AppendString(sb, token); }
             sb.Append("}}");
             return sb.ToString();
         }
@@ -131,13 +131,23 @@ namespace ReactorSim.Tests
 
         public string IntentFrame(long seq, string kind, string value = "0.5", string issuerClaim = "host")
         {
-            return Frame("intent", seq, "{\"kind\":\"" + kind + "\",\"target\":\"\",\"value\":" + value + ",\"issuer\":\"" + issuerClaim + "\"}");
+            var sb = new StringBuilder();
+            sb.Append("{\"kind\":"); SessionJson.AppendString(sb, kind);
+            sb.Append(",\"target\":\"\",\"value\":").Append(value);
+            sb.Append(",\"issuer\":"); SessionJson.AppendString(sb, issuerClaim);
+            sb.Append('}');
+            return Frame("intent", seq, sb.ToString());
         }
 
         public string CrewFrame(long seq, string loc, string pose = "standing", string x = "1.5", string name = null)
         {
-            string n = name == null ? "" : ",\"name\":\"" + name + "\"";
-            return Frame("crew_update", seq, "{\"loc\":\"" + loc + "\",\"x\":" + x + ",\"y\":0,\"z\":2,\"yaw\":90,\"pose\":\"" + pose + "\"" + n + "}");
+            var sb = new StringBuilder();
+            sb.Append("{\"loc\":"); SessionJson.AppendString(sb, loc);
+            sb.Append(",\"x\":").Append(x).Append(",\"y\":0,\"z\":2,\"yaw\":90,\"pose\":");
+            SessionJson.AppendString(sb, pose);
+            if (name != null) { sb.Append(",\"name\":"); SessionJson.AppendString(sb, name); }
+            sb.Append('}');
+            return Frame("crew_update", seq, sb.ToString());
         }
 
         // Opens the connection, sends a valid Hello (seq 1), drains, and returns the identity from the Welcome.

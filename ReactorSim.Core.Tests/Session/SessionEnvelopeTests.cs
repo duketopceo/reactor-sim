@@ -159,6 +159,8 @@ namespace ReactorSim.Tests
         [InlineData("{\"v\":1,\"t\":\"heartbeat\",\"seq\":-3,\"sid\":\"s\",\"body\":{}}")]
         [InlineData("{\"v\":1,\"t\":\"heartbeat\",\"seq\":1.5,\"sid\":\"s\",\"body\":{}}")]
         [InlineData("{\"v\":1,\"t\":\"heartbeat\",\"seq\":\"2\",\"sid\":\"s\",\"body\":{}}")]
+        [InlineData("{\"v\":1,\"t\":\"heartbeat\",\"seq\":1.0000000000000001,\"sid\":\"s\",\"body\":{}}")]
+        [InlineData("{\"v\":1.0000000000000001,\"t\":\"heartbeat\",\"seq\":1,\"sid\":\"s\",\"body\":{}}")]
         [InlineData("{\"v\":1,\"t\":\"heartbeat\",\"seq\":1e300,\"sid\":\"s\",\"body\":{}}")]
         [InlineData("{\"v\":1,\"t\":\"heartbeat\",\"seq\":9223372036854775807,\"sid\":\"s\",\"body\":{}}")]
         public void MissingOrWrongTypedEnvelopeFieldsAreProtocolViolation(string line)

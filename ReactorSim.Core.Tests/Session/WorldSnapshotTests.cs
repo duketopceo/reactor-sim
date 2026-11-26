@@ -260,6 +260,27 @@ namespace ReactorSim.Tests
         }
 
         [Fact]
+        public void Decode_AcceptsHostCustomLocationId()
+        {
+            string body;
+            WorldSnapshot d = RoundTrip(WorldSnapshot.Capture(new Simulation(), 2, new List<CrewMember> { Crew("p1", loc: "Room:A") }), out body);
+            Assert.Equal("Room:A", d.Crew[0].LocationId);
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("tab\tx")]
+        [InlineData("65")]
+        public void Decode_RejectsStructurallyBadLocationId(string loc)
+        {
+            string id = loc == "65" ? new string('a', 65) : loc;
+            string body = WorldSnapshot.Capture(new Simulation(), 2, new List<CrewMember> { Crew("p1", loc: id) }).Encode();
+            var d = WorldSnapshot.Decode(SessionJson.Parse(body).Value, SessionProtocol.WorldSchemaVersion);
+            Assert.False(d.Ok);
+            Assert.Equal(SessionErrorCode.ProtocolViolation, d.Error);
+        }
+
+        [Fact]
         public void InjectedValidator_RejectingRoomX_Refuses()
         {
             Func<string, bool> v = id => id != "room.x";

@@ -2,7 +2,11 @@
 // A pure state machine: no sockets, threads, clocks or entropy of its own. The transport calls the four inputs below
 // with its monotonic seconds, sends what DrainOutbox returns, and reads DrainEvents for diagnostics.
 //
-// WIRE SHAPES. Every frame is one UTF-8 JSON line (transport adds and strips the "\n"):
+// TRANSPORT. Feed OnBytes the raw received bytes, newlines included (the frame reader splits lines itself); append "\n"
+// only when sending an outbox frame. Connection ids must stay unique for the host lifetime: do not reuse an id while
+// output for it may still be pending (OnDisconnected drops undrained output for that id).
+//
+// WIRE SHAPES. Every frame is one UTF-8 JSON line:
 //   {"v":1,"t":<type>,"seq":<int>,"sid":<session id>,"body":{...}}
 // "sid" may be absent only on hello. Every host frame carries the session id. Host frames use one host-wide strictly
 // increasing "seq"; clients number their own frames from 1, strictly increasing, and the host keeps the last value per
@@ -235,6 +239,12 @@ namespace ReactorSim.Session
             if (c == null)
                 return;
 
+            if (c.Handshaking && _now - c.OpenedAt >= SessionProtocol.HandshakeTimeoutSeconds - TimerEpsilon)
+            {
+                Refuse(c, SessionErrorCode.HandshakeTimeout, 0);
+                return;
+            }
+
             List<SessionFrame> frames = c.Reader.Feed(data, offset, count);
             for (int i = 0; i < frames.Count; i++)
             {
@@ -252,6 +262,7 @@ namespace ReactorSim.Session
             if (c == null)
                 return;
             _conns.Remove(c);
+            _outbox.RemoveAll(o => o.ConnectionId == connectionId);
             SessionPeer peer = c.Peer;
             if (peer != null && peer.State == PeerState.Active && peer.ConnectionId == c.Id)
                 MarkStale(peer);
@@ -431,8 +442,12 @@ namespace ReactorSim.Session
                 return;
             }
 
+            bool fresh = env.Seq > peer.LastSeq;
+
             if (env.T == SessionProtocol.TypeGoodbye)
             {
+                if (!fresh)
+                    return;
                 CloseSilently(c);
                 ClosePeer(peer, SessionErrorCode.None);
                 return;
@@ -443,12 +458,6 @@ namespace ReactorSim.Session
                 return;
             }
 
-            if (peer.LastSeq >= SessionProtocol.MaxWireInteger)
-            {
-                Refuse(c, SessionErrorCode.ProtocolViolation, env.Seq);
-                return;
-            }
-            bool fresh = env.Seq > peer.LastSeq;
             if (fresh)
                 peer.LastSeq = env.Seq;
 

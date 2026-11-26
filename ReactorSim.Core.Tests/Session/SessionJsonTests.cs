@@ -211,5 +211,50 @@ namespace ReactorSim.Tests
             Assert.True(back.Ok);
             Assert.Equal(text, SessionJson.Write(back.Value));
         }
+
+        [Theory]
+        [InlineData("1.0000000000000001")]
+        [InlineData("1.0")]
+        [InlineData("1e2")]
+        [InlineData("1E0")]
+        [InlineData("-0.0")]
+        [InlineData("9007199254740991.0")]
+        public void TryWholeNumber_RejectsFractionAndExponentTokens(string token)
+        {
+            var r = SessionJson.Parse(token);
+            Assert.True(r.Ok, r.Error);
+            long n;
+            Assert.False(SessionJson.TryWholeNumber(r.Value, out n));
+        }
+
+        [Theory]
+        [InlineData("0", 0L)]
+        [InlineData("-0", 0L)]
+        [InlineData("1", 1L)]
+        [InlineData("9007199254740991", 9007199254740991L)]
+        [InlineData("-9007199254740991", -9007199254740991L)]
+        public void TryWholeNumber_AcceptsPlainIntegerTokensWithinBound(string token, long expected)
+        {
+            var r = SessionJson.Parse(token);
+            Assert.True(r.Ok, r.Error);
+            long n;
+            Assert.True(SessionJson.TryWholeNumber(r.Value, out n));
+            Assert.Equal(expected, n);
+        }
+
+        [Fact]
+        public void TryWholeNumber_RejectsIntegerTokenBeyondBound()
+        {
+            long n;
+            Assert.False(SessionJson.TryWholeNumber(SessionJson.Parse("9007199254740993").Value, out n));
+        }
+
+        [Fact]
+        public void TryWholeNumber_AcceptsProgrammaticIntegerNumbers()
+        {
+            long n;
+            Assert.True(SessionJson.TryWholeNumber(JsonValue.NewNumber(7), out n));
+            Assert.Equal(7L, n);
+        }
     }
 }

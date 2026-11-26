@@ -274,6 +274,116 @@ namespace ReactorSim.Tests
         }
 
         [Fact]
+        public void TwoRetriesAfterOneBadJoinCodeSendOnlyOneHello()
+        {
+            var host = new ScriptedHost();
+            var c = new SessionClient(new Simulation(), "Ann", "000000");
+            StartJoin(c);
+            Feed(c, host.Reject(SessionErrorCode.BadJoinCode, 1), 0.1);
+            c.DrainEvents();
+
+            c.RetryJoin("111111", 0.2);
+            c.RetryJoin("222222", 0.3);
+            SessionEnvelope hello = Assert.Single(SentFrames(c));
+            Assert.Equal("111111", hello.Body.Get("joinCode").Text);
+        }
+
+        [Fact]
+        public void RetryJoinWithoutAnOutstandingRefusalSendsNothing()
+        {
+            var c = new SessionClient(new Simulation(), "Ann", "000000");
+            StartJoin(c);
+            c.RetryJoin("111111", 0.2);
+            Assert.Empty(c.DrainOutbox());
+        }
+
+        [Fact]
+        public void RetryAfterTheFinalBadJoinCodeStillReportsBadJoinCodeOnClose()
+        {
+            var host = new ScriptedHost();
+            var c = new SessionClient(new Simulation(), "Ann", "000000");
+            StartJoin(c);
+            Feed(c, host.Reject(SessionErrorCode.BadJoinCode, 1), 0.1);
+            c.RetryJoin("111111", 0.2);
+            c.OnDisconnected(0.3);
+            Assert.Equal(ClientState.Failed, c.State);
+            Assert.Equal(ClientFailure.Refused, c.FailureReason);
+            Assert.Equal(SessionErrorCode.BadJoinCode, c.FailureCode);
+        }
+
+        [Fact]
+        public void RejectOverTheControlLimitFailsWithFrameTooLarge()
+        {
+            var host = new ScriptedHost();
+            Simulation sim;
+            var c = JoinedClient(host, out sim);
+            Feed(c, PaddedReject(host, SessionProtocol.ControlFrameMaxBytes + 1), 1);
+            Assert.Equal(ClientState.Failed, c.State);
+            Assert.Equal(SessionErrorCode.FrameTooLarge, c.FailureCode);
+            Assert.Equal(ClientFailure.ProtocolError, c.FailureReason);
+            Assert.Contains(c.DrainOutbox(), o => o.Kind == ClientOutputKind.Close);
+        }
+
+        [Fact]
+        public void RejectExactlyAtTheControlLimitIsHandled()
+        {
+            var host = new ScriptedHost();
+            Simulation sim;
+            var c = JoinedClient(host, out sim);
+            Feed(c, PaddedReject(host, SessionProtocol.ControlFrameMaxBytes), 1);
+            Assert.Equal(ClientState.Active, c.State);
+            Assert.Contains(c.DrainEvents(), e => e.Kind == ClientEventKind.Refused && e.Code == SessionErrorCode.InvalidCrewState);
+        }
+
+        private static string PaddedReject(ScriptedHost host, int totalBytes)
+        {
+            string reject = host.Reject(SessionErrorCode.InvalidCrewState, 7);
+            int pad = totalBytes - Encoding.UTF8.GetByteCount(reject);
+            Assert.True(pad > 9);
+            string padded = reject.Substring(0, reject.Length - 1) + ",\"pad\":\"" + new string('x', pad - 9) + "\"}";
+            Assert.Equal(totalBytes, Encoding.UTF8.GetByteCount(padded));
+            return padded;
+        }
+
+        [Fact]
+        public void CrewUpdateWithAnUndefinedPoseIsRefusedLocallyWithoutConsumingASequenceNumber()
+        {
+            var host = new ScriptedHost();
+            Simulation sim;
+            var c = JoinedClient(host, out sim);
+            Assert.Equal(0, c.SendCrewUpdate(new CrewMember { LocationId = "panel.a", Pose = (CrewPose)7 }));
+            Assert.Empty(c.DrainOutbox());
+            Assert.Contains(c.DrainEvents(), e => e.Kind == ClientEventKind.IntentResult && e.Seq == 0 && e.Code == SessionErrorCode.InvalidCrewState);
+            long seq = c.SendCrewUpdate(new CrewMember { LocationId = "panel.a" });
+            Assert.Equal(2, seq);
+        }
+
+        [Fact]
+        public void CrewUpdateOverTheControlLimitIsRefusedLocallyWithoutConsumingASequenceNumber()
+        {
+            var host = new ScriptedHost();
+            Simulation sim;
+            var c = JoinedClient(host, out sim);
+            Assert.Equal(0, c.SendCrewUpdate(new CrewMember { LocationId = new string('l', SessionProtocol.ControlFrameMaxBytes) }));
+            Assert.Empty(c.DrainOutbox());
+            Assert.Contains(c.DrainEvents(), e => e.Kind == ClientEventKind.IntentResult && e.Seq == 0 && e.Code == SessionErrorCode.FrameTooLarge);
+            Assert.Equal(2, c.SendCrewUpdate(new CrewMember { LocationId = "panel.a" }));
+        }
+
+        [Fact]
+        public void LargestAllowedIntentStaysUnderTheControlLimit()
+        {
+            var host = new ScriptedHost();
+            Simulation sim;
+            var c = JoinedClient(host, out sim);
+            string target = new string('\u0001', SessionProtocol.IntentStringMaxChars);
+            long seq = c.SendIntent(new PlantIntent { Kind = IntentKind.AllRodsTarget, Target = target, Value = -1.2345678901234567e-300, AtMinute = 1e300 });
+            Assert.Equal(2, seq);
+            ClientOutput o = Assert.Single(c.DrainOutbox());
+            Assert.True(Encoding.UTF8.GetByteCount(o.Frame) <= SessionProtocol.ControlFrameMaxBytes);
+        }
+
+        [Fact]
         public void ConnectionLostWhileJoiningFailsAsHostLost()
         {
             var c = new SessionClient(new Simulation(), "Ann", "123456");
@@ -879,8 +989,10 @@ namespace ReactorSim.Tests
             Assert.True(pad > 0);
             string padded = world.Substring(0, world.Length - 1) + ",\"pad\":\"" + new string('x', pad - 9) + "\"}";
             Assert.Equal(SessionProtocol.StateFrameMaxBytes, Encoding.UTF8.GetByteCount(padded));
+            Assert.Equal(1, c.LastSnapshotSeq);
             Feed(c, padded, 1);
             Assert.Equal(ClientState.Active, c.State);
+            Assert.Equal(5, c.LastSnapshotSeq);
         }
 
         [Fact]

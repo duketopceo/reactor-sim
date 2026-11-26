@@ -261,8 +261,10 @@ namespace ReactorSim.Tests
             var h = NewHost();
             h.Join(1);
             h.Feed(1, h.Frame("goodbye", 2));
-            List<OutFrame> frames = h.Drain();
-            Assert.True(frames.All(f => f.CloseAfter));
+            OutFrame closing = Assert.Single(h.Drain());
+            Assert.Equal(1, closing.ConnectionId);
+            Assert.True(closing.CloseAfter);
+            Assert.Null(closing.Frame);
             Assert.Equal(PeerState.Closed, h.Host.Peers[0].State);
             Assert.Contains(h.Host.DrainEvents(), e => e.Kind == SessionEventKind.PeerLeft && e.PeerId == "p1");
 
@@ -417,8 +419,67 @@ namespace ReactorSim.Tests
             var h = NewHost();
             h.Open(1);
             h.Feed(1, h.Frame("goodbye", 1));
-            Assert.True(h.Drain().All(f => f.CloseAfter));
+            OutFrame closing = Assert.Single(h.Drain());
+            Assert.Equal(1, closing.ConnectionId);
+            Assert.True(closing.CloseAfter);
+            Assert.Null(closing.Frame);
             Assert.Equal(0, h.Host.ConnectionCount);
+        }
+
+        [Fact]
+        public void HelloArrivingAfterTheHandshakeDeadlineIsRefusedEvenIfNoTickRanBetween()
+        {
+            var h = NewHost();
+            h.Open(1);
+            h.Tick(4.9);
+            h.Drain();
+            h.Now = 5.1;
+            h.Feed(1, h.Hello(1));
+            OutFrame f = Assert.Single(h.Drain());
+            AssertRefusal(f, SessionErrorCode.HandshakeTimeout, true);
+            Assert.Equal(0, h.Host.ConnectionCount);
+            Assert.Empty(h.Host.Peers);
+        }
+
+        [Fact]
+        public void ReusedConnectionIdDoesNotReceiveTheOldUndrainedWelcome()
+        {
+            var h = NewHost();
+            h.Open(1);
+            h.Feed(1, h.Hello(1, null, "Ann"));
+            h.Host.OnDisconnected(1, h.Now);
+            h.Open(1);
+            Assert.Empty(h.Drain());
+        }
+
+        [Fact]
+        public void HelloWithQuotedNameJoinsAndKeepsTheName()
+        {
+            var h = NewHost();
+            h.Open(1);
+            h.Feed(1, h.Hello(1, null, "Ann \"AJ\" \\ Lee"));
+            List<OutFrame> frames = h.Drain();
+            Assert.Equal("welcome", frames[0].Type);
+            Assert.Equal("Ann \"AJ\" \\ Lee", h.Host.Peers[0].Crew.DisplayName);
+        }
+
+        [Fact]
+        public void GoodbyeThatIsNotFreshIsDroppedAndFreshGoodbyeCloses()
+        {
+            var h = NewHost();
+            h.Join(1);
+            h.Feed(1, h.IntentFrame(5, "RodBankTarget"));
+            h.Drain();
+            h.Feed(1, h.Frame("goodbye", 4));
+            Assert.Empty(h.Drain());
+            Assert.Equal(PeerState.Active, h.Host.Peers[0].State);
+            h.Feed(1, h.Frame("goodbye", 5));
+            Assert.Empty(h.Drain());
+            Assert.Equal(PeerState.Active, h.Host.Peers[0].State);
+            h.Feed(1, h.Frame("goodbye", 6));
+            OutFrame closing = Assert.Single(h.Drain());
+            Assert.True(closing.CloseAfter);
+            Assert.Equal(PeerState.Closed, h.Host.Peers[0].State);
         }
 
         [Fact]
@@ -814,6 +875,8 @@ namespace ReactorSim.Tests
                 h.Feed(1, h.IntentFrame(2, "RodBankTarget"));
                 h.Feed(1, h.CrewFrame(3, "control-room"));
                 h.Tick(0.5);
+                foreach (var o in h.Host.DrainOutbox())
+                    all.Add(o.ConnectionId + "|" + o.Frame + "|" + o.CloseAfter);
                 h.Host.OnDisconnected(1, 0.5);
                 h.Tick(6.0);
                 foreach (var o in h.Host.DrainOutbox())
