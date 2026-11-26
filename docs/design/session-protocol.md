@@ -63,7 +63,9 @@ The strict parser rejects duplicate keys, nesting deeper than 8, trailing data, 
 | `heartbeat` | client to host | empty; liveness only |
 | `goodbye` | client to host | empty; frees the slot at once |
 
-"Accepted" means queued by the host, not applied. An intent queued while the clock is halted waits. A rejection at apply time shows in a later `world`, not as a result (KTD10).
+"Accepted" means the host confirmed the intent queued, not applied. An intent queued while the clock is halted waits. A rejection at apply time shows in a later `world`, not as a result (KTD10).
+
+`accepted` false is a refusal for every code except `ConnectionLost` (20). `ConnectionLost` means the connection dropped with the intent in flight and the outcome is unknown: the host may have queued it. The caller reads the next `world` for the outcome. A host refusal reason for that intent is lost. The client never resends an intent on its own; a caller that wants the action again sends a new intent. The client ignores code 20 when it arrives from the wire (KTD18).
 
 ## Host handling
 
@@ -74,13 +76,17 @@ The strict parser rejects duplicate keys, nesting deeper than 8, trailing data, 
 | `hello` with the token of an active peer | `welcome`; the old connection closes with `Superseded` | `ProtocolViolation`, close |
 | `hello` with a wrong join code | `reject BadJoinCode`, stays open; the fifth closes | `ProtocolViolation`, close |
 | `hello` failing another check | `reject` with that code, close | `ProtocolViolation`, close |
+| A new connection opens while 2 are handshaking | the oldest gets `reject TooManyConnections`, close | none; active peers are never evicted |
 | `intent` | `reject NotJoined` | admission, below |
 | `crew_update` | `reject NotJoined` | validation; a refusal is a non-fatal `reject` |
 | `heartbeat` | dropped | liveness only |
 | `goodbye` | close | close, free the slot |
+| Any frame with a protocol version other than `1` | `UnsupportedProtocol`, close | `UnsupportedProtocol`, close |
 | Unknown type or bad JSON | `ProtocolViolation`, close | `ProtocolViolation`, close |
 | Over-limit frame | `FrameTooLarge`, close | `FrameTooLarge`, close |
-| More than 50 frames in one second | `RateLimited`, close | `RateLimited`, close |
+| More than 100 frames in one second | `RateLimited`, close | `RateLimited`, close |
+
+A new connection first expires handshakes past the 5 s timeout. If two connections are still handshaking, it then evicts the oldest with `TooManyConnections`. Trade-off: a LAN peer that opens more than 2 connections per 5 s can evict a newcomer before its `hello`. This sits inside the trusted-LAN boundary (R10). An evicted joining client ends in failed with `TooManyConnections` and joins again. A reconnecting client retries on its backoff.
 
 A host-initiated close of an active peer frees its slot, so its token can no longer resume. Only a transport disconnect or 5 s of silence makes a peer stale.
 
@@ -113,11 +119,11 @@ All values are original design choices for a two-player LAN game (KTD4, KTD6, KT
 | Display name | 1-24 printable characters |
 | Location ID | 1-64 characters of `[a-z0-9._-]` |
 | Remote peers | 1 |
-| Concurrent handshaking connections | 2 |
+| Concurrent handshaking connections | 2; a new one evicts the oldest (`TooManyConnections`) |
 | Bad join codes per connection | 5 |
 | Intent rate | 10 per second, burst 20 |
 | Crew update rate | 20 per second, burst 40 |
-| Frames per connection | 50 per second |
+| Frames per connection | 100 per second |
 | Unsent `world` frames per connection | 1 (a newer one replaces it) |
 
 | Timer | Value |
@@ -162,17 +168,19 @@ All values are original design choices for a two-player LAN game (KTD4, KTD6, KT
 | `ProtocolViolation` | 10 | Malformed frame, unknown type or bad sequence |
 | `FrameTooLarge` | 11 | Frame over its limit |
 | `RateLimited` | 12 | Intent, crew-update or frame rate exceeded |
-| `TooManyConnections` | 13 | Too many connections handshaking at once |
+| `TooManyConnections` | 13 | Too many connections handshaking at once; sent to the oldest handshaking connection when a new one opens |
 | `NotJoined` | 14 | Message before the join completed |
 | `Duplicate` | 15 | Repeated or lower sequence number |
 | `InvalidIntent` | 16 | Intent body is malformed or names an undefined kind |
 | `NotPermitted` | 17 | Intent class or clock rule refuses it |
 | `NonFiniteValue` | 18 | Intent value is not finite |
 | `InvalidCrewState` | 19 | Crew update breaks a crew rule |
+| `ConnectionLost` | 20 | Client-local: a connection dropped with the intent in flight; outcome unknown. Never sent by the host. |
 
 ## Known limits
 
 - Unity wiring, join UI, avatars, roles and internet transport are not built yet.
 - No two-machine playtest has been run against this contract.
 - The client does not tick its simulation between worlds, so tick-derived displays such as trends are not reproduced on the client yet.
+- A compliant client sends at most about 90 frames in one window: bursts plus refill within the window give 29 intents, 59 crew updates and 1 heartbeat.
 - The frame-rate cap uses fixed one-second windows, so a burst that spans a window boundary can briefly carry about twice the cap.

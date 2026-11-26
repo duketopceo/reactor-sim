@@ -11,7 +11,7 @@ namespace ReactorSim.Tests
     public sealed class ScriptedHost
     {
         public const string Sid = "0123456789abcdef0123456789abcdef";
-        public const string Token = "00112233445566778899aabbccddeeff";
+        public static readonly string Token = new string('a', 32);
 
         public readonly Simulation Sim = new Simulation();
         public long Seq;
@@ -31,9 +31,9 @@ namespace ReactorSim.Tests
             return WorldSnapshot.Capture(Sim, snapshotSeq, Crew()).Encode();
         }
 
-        public string Welcome(long snapshotSeq, string peer = "p1", string token = Token, string sid = Sid, long? seq = null, string worldBody = null)
+        public string Welcome(long snapshotSeq, string peer = "p1", string token = null, string sid = Sid, long? seq = null, string worldBody = null)
         {
-            string body = "{\"hostId\":\"0011223344556677\",\"sid\":\"" + sid + "\",\"peerId\":\"" + peer + "\",\"token\":\"" + token
+            string body = "{\"hostId\":\"0011223344556677\",\"sid\":\"" + sid + "\",\"peerId\":\"" + peer + "\",\"token\":\"" + (token ?? Token)
                 + "\",\"graceSeconds\":30,\"world\":" + (worldBody ?? WorldBody(snapshotSeq)) + "}";
             return SessionEnvelope.Encode("welcome", seq ?? ++Seq, sid, body);
         }

@@ -292,6 +292,70 @@ namespace ReactorSim.Tests
             Assert.Equal(PeerState.Closed, h.Host.Peers[0].State);
         }
 
+        // The session allows one remote peer, so a second stale peer cannot exist. The stale-token case uses the token
+        // read while the peer was Stale; tokens do not rotate, so after the resume it is the live peer's own token.
+        [Theory]
+        [InlineData("staleToken")]
+        [InlineData("ownToken")]
+        [InlineData("wrongJoinCode")]
+        public void HelloOnAnActivePeerGivesProtocolViolationAndClosesIt(string variant)
+        {
+            var h = NewHost();
+            JoinInfo p1 = h.Join(1);
+            h.Host.OnDisconnected(1, h.Now);
+            Assert.Equal(PeerState.Stale, h.Host.Peers[0].State);
+            string staleToken = p1.Token;
+            h.Open(2);
+            h.Feed(2, h.Hello(2, null, "Ann", token: staleToken));
+            Assert.Equal("welcome", Assert.Single(h.Drain()).Type);
+            Assert.Equal(PeerState.Active, h.Host.Peers[0].State);
+
+            string hello;
+            switch (variant)
+            {
+                case "staleToken": hello = h.Hello(3, null, "Ann", token: staleToken); break;
+                case "ownToken": hello = h.Hello(3, null, "Ann", token: p1.Token); break;
+                case "wrongJoinCode": hello = h.Hello(3, "000000" == h.Host.JoinCode ? "111111" : "000000"); break;
+                default: throw new ArgumentException(variant);
+            }
+            h.Feed(2, hello);
+            AssertRefusal(Assert.Single(h.Drain()), SessionErrorCode.ProtocolViolation, true);
+            Assert.Equal(PeerState.Closed, h.Host.Peers[0].State);
+        }
+
+        [Fact]
+        public void HelloWithAnUnsupportedProtocolOnAnActivePeerGivesUnsupportedProtocolAndClosesIt()
+        {
+            // KTD5: the envelope version check runs before any per-state handling, so every frame with a
+            // foreign protocol version is UnsupportedProtocol, including a Hello on an Active peer.
+            var h = NewHost();
+            h.Join(1);
+            h.Feed(1, h.Hello(2, null, "Ann", v: 2));
+            AssertRefusal(Assert.Single(h.Drain()), SessionErrorCode.UnsupportedProtocol, true);
+            Assert.Equal(PeerState.Closed, h.Host.Peers[0].State);
+        }
+
+        [Fact]
+        public void BadJsonOnAnActivePeerGivesProtocolViolationAndClosesIt()
+        {
+            var h = NewHost();
+            h.Join(1);
+            h.Feed(1, "{not json");
+            AssertRefusal(Assert.Single(h.Drain()), SessionErrorCode.ProtocolViolation, true);
+            Assert.Equal(PeerState.Closed, h.Host.Peers[0].State);
+        }
+
+        [Fact]
+        public void HundredAndOneFramesInOneSecondOnAHandshakingConnectionGiveRateLimited()
+        {
+            var h = NewHost();
+            h.Open(1);
+            for (int i = 1; i <= 100; i++) h.Feed(1, h.Frame("heartbeat", i));
+            Assert.Empty(h.Drain());
+            h.Feed(1, h.Frame("heartbeat", 101));
+            AssertRefusal(Assert.Single(h.Drain()), SessionErrorCode.RateLimited, true);
+        }
+
         [Fact]
         public void ActiveConnectionClosedByTransportTurnsPeerStaleAtOnce()
         {
