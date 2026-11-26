@@ -57,7 +57,9 @@ done
 [ -z "$ONLY" ] || REQUIRED_POSES="$ONLY"
 [ -z "$BASELINE" ] || [ -d "$BASELINE" ] || { echo "baseline directory not found: $BASELINE" >&2; exit 2; }
 
-mapfile -t jsons < <(find "$DIR" -maxdepth 3 -name captures.json | LC_ALL=C sort)
+# A read loop instead of mapfile, so this also runs under macOS's bash 3.2.
+jsons=()
+while IFS= read -r j; do jsons+=("$j"); done < <(find "$DIR" -maxdepth 3 -name captures.json | LC_ALL=C sort)
 [ "${#jsons[@]}" -gt 0 ] || { echo "no captures.json under $DIR" >&2; exit 2; }
 
 fail=0

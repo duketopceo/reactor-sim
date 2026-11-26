@@ -142,6 +142,93 @@ Layout rule: **one zone ≈ one glance.** Critical state (power, rod demand vs p
 * **Radiation and maintenance gameplay:** controlled-access areas outside the operating containment can carry modeled, clearly displayed radiation exposure. Maintenance and isolation are fictional game abstractions, not real-world procedures. The operating containment remains inaccessible; any later access requires a separately designed and tested plant state and route.
 * **Loading/performance boundaries:** control room + support always resident; containment cutaway is a lightweight low-poly proxy; turbine hall and exterior stream additively; LOD2 and occlusion at doors/airlocks.
 
+### 4.1 Phase 2 route contract
+
+The first connected wing is built from one pure contract, `ReactorSim.Unity/Assets/Scripts/View3D/RouteGraph.cs`, tested by
+`ReactorSim.Core.Tests/RouteGraphTests.cs`. It supersedes the adjacency sketch above for the wing: the control room opens east
+into a corridor; the corridor reaches a lift lobby and the turbine hall; a lift joins the lobby to the reactor operating deck.
+Persistence (Phase 3) keys on the IDs below.
+
+**Frame.** The room frame of `design/control-room/layout.json`: x runs west to east, y front to back (the south wall, with the
+window and the decorative door, is y 0; the interior is y 0 to 10), h is height above the control-room floor. Blender (x, y, z)
+is the same triple and the FBX import maps it to Unity (x, z, y), so Unity position is (x, h, y) and Unity yaw is the heading
+(degrees from +y toward +x, like `facing_deg`). Rooms are interior rectangles with walls outside them (0.2 m, `wall_thickness`),
+so neighbouring rooms are 0.2 m apart and a doorway sits in the middle of that gap. The window is centred at x 3.0 (the wall plate
+takes the +x side of the door at x 6.0); the hall axis is at (4.0, -12.2). `HallSightline`'s "along" runs toward the window side, so
+a viewpoint's x is 3.0 minus along (the stand is at x 6.0, the seat at x 2.5).
+
+**Rooms** (interior, m; floor heights above the control-room floor):
+
+| ID | Space and builder root | x | y | Floor h | Ceiling h | Notes |
+|---|---|---|---|---|---|---|
+| `room.control` | `space.control_room` | 0 to 12 | 0 to 10 | 0 | 3.2 | existing |
+| `room.corridor` | `space.wing_corridor`, `Wing_Corridor` | 12.2 to 28.2 | 1.0 to 3.0 | 0 | 3.2 | 16.0 m long, 2.0 m wide |
+| `room.lift_lobby` | `space.wing_lift`, `Wing_Lift` | 14.8 to 19.8 | -0.8 to 0.8 | 0 | 3.2 | opens off the corridor's south side |
+| `room.lift` | `space.wing_lift`, `Wing_Lift` | 17.1 to 19.5 | -3.0 to -1.0 | 0, travels to 16.10 | 19.30 | one car, doors north (lower) and west (deck) |
+| `room.reactor_deck` | `space.wing_deck`, `Wing_Deck` | 15.0 to 16.9 | -2.6 to -1.4 | 16.10 | 19.30 | vestibule and tunnel through the hall shell; the walkway round the pool rim is the existing `Hall_Deck` |
+| `room.turbine_hall` | `space.wing_turbine_hall`, `Wing_TurbineHall` | 28.4 to 58.4 | -8 to 12 | 0 | 10.0 | footprint 30 x 20 m, entrance centred on the corridor axis (y 2.0) |
+
+The deck is `WaterDepth + DeckAboveWater - RoomFloorAbovePoolFloor` = 22.15 - 6.05 = 16.10 m above the control-room floor
+(`RouteGraph.DeckFloorH`, from `HallDimensions`). The reactor hall itself (`space.reactor_hall`, root `ReactorHall`) keeps its caps.
+
+**Doorways** (aperture centre on the floor line, clear opening, heading of a step from the first room to the second):
+
+| ID | From to | Centre (x, y) | Floor h | Width x height | Heading |
+|---|---|---|---|---|---|
+| `door.control_east` | control to corridor | (12.1, 2.0) | 0 | 1.2 x 2.1 | 90 |
+| `door.corridor_lobby` | corridor to lift lobby | (17.3, 0.9) | 0 | 2.4 x 2.4 | 180 |
+| `door.lobby_lift` | lift lobby to lift | (18.3, -0.9) | 0 | 1.2 x 2.1 | 180 |
+| `door.lift_deck` | lift to reactor deck | (17.0, -2.0) | 16.10 | 1.2 x 2.1 | 270 |
+| `door.corridor_turbine` | corridor to turbine hall | (28.3, 2.0) | 0 | 2.0 x 2.4 | 90 |
+
+The east doorway is in the east wall near y 2 m. It clears the board (the arc of radius 5.0 m over +-87.5 degrees, plus the
+0.58 m bench and the 0.4 m console body: the doorway approach is more than 1 m from it, the nearest board point being its east end
+near (11.0, 4.7)) and the south-wall mimic plate (x 8.3 to 10.0). The decorative south door stays. Every doorway is at least
+1.0 m wide and 2.1 m high; the operator body is a 0.3 m radius capsule.
+
+**Lift.** `landing.lift_lower` is at h 0 (the control-room floor, exit heading 0, north, through `door.lobby_lift`);
+`landing.lift_upper` is at h 16.10 (the deck, exit heading 270, west, through `door.lift_deck`). Both stand points are the car's
+centre (18.3, -2.0). The single opening into the hall shell is `opening.hall_lift`: on the inside face of the hall wall at
+(15.0, -2.0), 1.2 x 2.2 m, at deck height, 47 degrees round the hall wall from the bearing that faces the window and away from the
+window chord. The car and shaft sit outside the shell (the nearest corner of the shaft envelope is 0.43 m beyond the shell's outer
+face, the lobby's 0.12 m); nothing the wing adds lies in the window's sight lines (the highest line through the opening stays under 10 m, the deck
+volume starts at 16.1 m).
+
+**Name plates** (existing plate style; text height is at least `checks.min_text_deg`, 0.9 degrees, at the stated approach):
+`plate.control_door` "EAST CORRIDOR" over the doorway on the control-room side (approach 6 m), `plate.lift_lobby` "LIFT TO DECK" a
+blade sign over the corridor at the lobby opening (approach 6 m), `plate.turbine_entrance` "TURBINE HALL" on the corridor end wall
+(approach 8 m).
+
+**Turbine hall equipment** (pure model `TurbineHallModel.cs`, tested by `TurbineHallModelTests.cs`; the IDs share no name with the
+route IDs above). The rotor turns with the simulated `TurbineRpm` and adds no lag of its own; each plate uses the Phase 1 readout
+rules (`% command`, `kW heat`, `N/M` for anything unmodeled). The plant has only aggregate feed readings, so the pumps share one
+group plate.
+
+| ID | Equipment | Plate reads |
+|---|---|---|
+| `equip.turbine` | turbine and rotor | speed, steam `kW heat`, `TRIPPED` or `NOT TRIPPED` |
+| `equip.generator` | generator | output `kW`, `SYNCED` or `BREAKER OPEN` |
+| `equip.condenser` | condenser | pressure, hotwell, vacuum pump `% command` |
+| `equip.feed_pump_group` | feed pumps (one group plate) | delivered `% rated`, pump `% command`, supply |
+
+**Caps** (per space; a measured count over a cap fails the check). Sized from the existing hall budget: triangles are a share of
+`MaxHallTriangles` (120,000), renderers one per 200 triangles, colliders a quarter of the renderers (the hall has none and the room
+has no numeric cap, so those two are an original design choice), lights inside the 4-light pixel count with touching spaces summing
+to at most 4. Wing lights light only the Wing layer.
+
+| Space | Triangles | Renderers | Lights | Colliders |
+|---|---|---|---|---|
+| `space.wing_corridor` | 12,000 | 60 | 2 | 15 |
+| `space.wing_lift` (lobby and car) | 15,600 | 78 | 2 | 19 |
+| `space.wing_deck` (additions only) | 9,600 | 48 | 1 | 12 |
+| `space.wing_turbine_hall` | 48,000 | 240 | 2 | 60 |
+| Wing total | 85,200 | 426 | 7 | 106 |
+
+**Other IDs** for Phase 3: `route.door_east`, `route.corridor_mid`, `route.lift_lobby`, `route.lift_lower`, `route.lift_upper`,
+`route.deck_rim`, `route.turbine_entrance`, `route.turbine_floor` (standing points, also in `layout.json` `route_points` under the
+upper-case key, e.g. `ROUTE_DOOR_EAST`; they sit outside `operating_points` because every board-facing check iterates that).
+Equipment IDs (turbine, generator, condenser, feed-pump group and their plates) are added with unit U4.
+
 ## 5. Blender → Unity workflow
 
 **Format choice must follow the project's actual import path.** `ReactorSim.Unity/Packages/manifest.json` lists no glTF package, and Unity does not import glTF without one *(I could not re-verify Unity docs from the sandbox)*; Unity imports **FBX** natively.

@@ -267,7 +267,8 @@ self_test() {
 if [ "$MODE" = selftest ]; then self_test; exit $?; fi
 
 if [ "$MODE" = root ]; then
-  hits="$(cd "$ROOT" && find . -type f -print0 | sed -z 's|^\./||' | run_scan "$(pwd)")"
+  # Strip the leading ./ from each NUL-separated path. perl -0 is portable; `sed -z` is GNU-only (macOS sed lacks it).
+  hits="$(cd "$ROOT" && find . -type f -print0 | perl -0pe 's|^\./||' | run_scan "$(pwd)")"
 else
   hits="$(git ls-files -z | run_scan "$(pwd)")"
 fi

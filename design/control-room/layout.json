@@ -8,6 +8,119 @@
   "wall_thickness": 0.2
  },
  "interaction_range_m": 2.0,
+ "doorways": {
+  "_doc": "Phase 2 route (ReactorSim.Unity/Assets/Scripts/View3D/RouteGraph.cs is the contract; RouteGraphTests pins this file to it). The east doorway leaves the control room through the east wall (x 12.0 to 12.2) near y 2 m: pos is the aperture centre on the floor line (x in the wall, y along it), width and height are the clear opening, heading_deg is the heading of a step out of the room. It clears the board arc (arc plus bench and console body, at least 1 m from the approach) and the south wall mimic plate (x 8.3 to 10.0). The decorative south door stays.",
+  "east": {
+   "id": "door.control_east",
+   "pos": [
+    12.1,
+    2.0
+   ],
+   "width": 1.2,
+   "height": 2.1,
+   "heading_deg": 90.0,
+   "leads_to": "room.corridor"
+  }
+ },
+ "route_points": {
+  "_doc": "Route points (Phase 2): standing positions on the walk between the control room, the east corridor, the lift, the reactor deck and the turbine hall, in the room frame above (x east, y front to back; floor_h is the height above the control-room floor; heading_deg is the heading the operator faces, from +y toward +x). They are not board stops, so they sit outside operating_points: those carry facing_deg equal to at_deg and every board-facing check iterates them.",
+  "ROUTE_DOOR_EAST": {
+   "route_id": "route.door_east",
+   "room": "room.control",
+   "pos": [
+    11.2,
+    2.0
+   ],
+   "floor_h": 0.0,
+   "eye_height": 1.65,
+   "heading_deg": 90.0,
+   "note": "inside the east doorway, facing it: the way out of the control room"
+  },
+  "ROUTE_CORRIDOR_MID": {
+   "route_id": "route.corridor_mid",
+   "room": "room.corridor",
+   "pos": [
+    20.2,
+    2.0
+   ],
+   "floor_h": 0.0,
+   "eye_height": 1.65,
+   "heading_deg": 90.0,
+   "note": "mid corridor, facing the turbine hall"
+  },
+  "ROUTE_LIFT_LOBBY": {
+   "route_id": "route.lift_lobby",
+   "room": "room.lift_lobby",
+   "pos": [
+    18.3,
+    0.0
+   ],
+   "floor_h": 0.0,
+   "eye_height": 1.65,
+   "heading_deg": 180.0,
+   "note": "the lift call point, facing the lift door"
+  },
+  "ROUTE_LIFT_LOWER": {
+   "route_id": "route.lift_lower",
+   "room": "room.lift",
+   "pos": [
+    18.3,
+    -2.0
+   ],
+   "floor_h": 0.0,
+   "eye_height": 1.65,
+   "heading_deg": 0.0,
+   "note": "in the car at the lower landing, facing out of the car (north)"
+  },
+  "ROUTE_LIFT_UPPER": {
+   "route_id": "route.lift_upper",
+   "room": "room.lift",
+   "pos": [
+    18.3,
+    -2.0
+   ],
+   "floor_h": 16.1,
+   "eye_height": 1.65,
+   "heading_deg": 270.0,
+   "note": "in the car at the deck landing, facing out of the car (west)"
+  },
+  "ROUTE_DECK_RIM": {
+   "route_id": "route.deck_rim",
+   "room": "room.reactor_deck",
+   "pos": [
+    14.265,
+    -2.68
+   ],
+   "floor_h": 16.1,
+   "eye_height": 1.65,
+   "heading_deg": 227.156,
+   "note": "on the pool rim walkway at the lift opening's bearing, facing the pool"
+  },
+  "ROUTE_TURBINE_ENTRANCE": {
+   "route_id": "route.turbine_entrance",
+   "room": "room.turbine_hall",
+   "pos": [
+    29.4,
+    2.0
+   ],
+   "floor_h": 0.0,
+   "eye_height": 1.65,
+   "heading_deg": 90.0,
+   "note": "just inside the turbine hall, facing along it"
+  },
+  "ROUTE_TURBINE_FLOOR": {
+   "route_id": "route.turbine_floor",
+   "room": "room.turbine_hall",
+   "pos": [
+    36.4,
+    2.0
+   ],
+   "floor_h": 0.0,
+   "eye_height": 1.65,
+   "heading_deg": 90.0,
+   "note": "on the turbine hall floor, facing along it"
+  }
+ },
  "arc": {
   "center": [
    6.0,
