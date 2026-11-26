@@ -601,15 +601,7 @@ namespace ReactorSim.Session
             // Only the first result for a sequence number this client sent counts; a later Duplicate finds it not pending.
             if (!_pendingIntents.Remove(seq))
                 return;
-            var code = (SessionErrorCode)(int)rawCode;
-            _results[seq] = code;
-            _events.Add(new ClientEvent
-            {
-                Kind = ClientEventKind.IntentResult,
-                Seq = seq,
-                Code = code,
-                Accepted = code == SessionErrorCode.None
-            });
+            RecordIntentResult(seq, (SessionErrorCode)(int)rawCode);
         }
 
         // ---- helpers ----
@@ -624,17 +616,21 @@ namespace ReactorSim.Session
             seqs.Sort();
             _pendingIntents.Clear();
             for (int i = 0; i < seqs.Count; i++)
+                RecordIntentResult(seqs[i], SessionErrorCode.ConnectionLost);
+        }
+
+        // Stores the first result for a sequence number and raises its IntentResult event.
+        private void RecordIntentResult(long seq, SessionErrorCode code)
+        {
+            if (!_results.ContainsKey(seq))
+                _results[seq] = code;
+            _events.Add(new ClientEvent
             {
-                if (!_results.ContainsKey(seqs[i]))
-                    _results[seqs[i]] = SessionErrorCode.ConnectionLost;
-                _events.Add(new ClientEvent
-                {
-                    Kind = ClientEventKind.IntentResult,
-                    Seq = seqs[i],
-                    Code = SessionErrorCode.ConnectionLost,
-                    Accepted = false
-                });
-            }
+                Kind = ClientEventKind.IntentResult,
+                Seq = seq,
+                Code = code,
+                Accepted = code == SessionErrorCode.None
+            });
         }
 
         private void EnterReconnecting(bool closeConnection)

@@ -213,17 +213,17 @@ namespace ReactorSim.Session
                 WindowStart = _now
             };
             ExpireHandshakes();
-            if (CountHandshaking() >= SessionProtocol.MaxHandshakingConnections)
+            // KTD8: at the cap, the oldest handshaking connection (open order) makes room for the newcomer.
+            Conn oldest = null;
+            int handshaking = 0;
+            for (int i = 0; i < _conns.Count; i++)
             {
-                for (int i = 0; i < _conns.Count; i++)
-                {
-                    if (_conns[i].Handshaking)
-                    {
-                        Refuse(_conns[i], SessionErrorCode.TooManyConnections, 0);
-                        break;
-                    }
-                }
+                if (!_conns[i].Handshaking) continue;
+                if (oldest == null) oldest = _conns[i];
+                handshaking++;
             }
+            if (handshaking >= SessionProtocol.MaxHandshakingConnections)
+                Refuse(oldest, SessionErrorCode.TooManyConnections, 0);
             _conns.Add(conn);
         }
 
@@ -721,14 +721,6 @@ namespace ReactorSim.Session
             for (int i = 0; i < _conns.Count; i++)
                 if (_conns[i].Id == id) return _conns[i];
             return null;
-        }
-
-        private int CountHandshaking()
-        {
-            int n = 0;
-            for (int i = 0; i < _conns.Count; i++)
-                if (_conns[i].Handshaking) n++;
-            return n;
         }
 
         private void CloseSilently(Conn c)
