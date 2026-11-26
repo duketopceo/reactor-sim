@@ -2,7 +2,7 @@
 title: "Phase 3: Shared Plant and Visible Crew - Plan"
 type: feat
 date: 2026-11-14
-updated: 2026-11-25
+updated: 2026-11-26
 artifact_contract: ce-unified-plan/v1
 artifact_readiness: implementation-ready
 product_contract_source: ce-plan-bootstrap
@@ -14,9 +14,9 @@ execution: code
 ## Goal Capsule
 
 - **Objective:** two operators on separate machines on one LAN can join the same plant, see a clear reason whenever a join or action is refused, and rejoin with their place kept after a dropped connection; bad or hostile network input never crashes the host or changes the plant.
-- **Means:** a transport-agnostic, host-authoritative session contract in `ReactorSim.Core` (KTD1) that the Unity transport later drives; this run builds and proves the contract with deterministic tests (KTD16).
+- **Means:** a transport-agnostic, host-authoritative session contract in `ReactorSim.Core` (KTD1) that the Unity transport later drives; this run builds and proves the contract with deterministic tests (KTD16), then hardens it in U8-U11 before any engine slice.
 - **Authority:** Requirements own product behavior; KTDs own mechanism; units own files and sequencing. The `ROADMAP.md` Phase 3 gate is the outer contract.
-- **Stop conditions:** stop and report if the contract needs a Unity, socket or thread type inside `ReactorSim.Core`, if a change alters solo-play behavior or an existing test, or if the worst-case world snapshot exceeds 65536 bytes, a quarter of the state-frame limit (KTD4).
+- **Stop conditions:** stop and report if the contract needs a Unity, socket or thread type inside `ReactorSim.Core`, if a change alters solo-play behavior or weakens an existing test assertion (the Definition of Done lists the sanctioned test edits), or if the worst-case world snapshot exceeds 65536 bytes, a quarter of the state-frame limit (KTD4).
 - **Execution profile:** `bash scripts/ci.sh` on any machine with .NET 8 proves this run; Unity compile, transport wiring and the two-machine playtest run on the Unity host later (KTD16).
 - **Finishing:** the owner merges PRs and runs the two-machine playtest; agents implement, verify and open PRs.
 
@@ -59,7 +59,7 @@ Replace the trust-everything LAN link with a defined session contract. A client 
 - R7. When the host is gone, the client reports it and stops retrying after a bounded time.
 
 **Boundaries and docs**
-- R9. Solo play behaves exactly as before; no existing test changes.
+- R9. Solo play behaves exactly as before; no existing test assertion is weakened.
 - R10. The LAN trust boundary is documented: the join code guards against mistakes, not attackers, and the session is not safe on the internet.
 - R11. The protocol, versions, state ownership and limits are published as a design doc.
 
@@ -91,7 +91,7 @@ Replace the trust-everything LAN link with a defined session contract. A client 
 
 The outline's five phase units remain the Phase 3 roadmap:
 
-1. Authoritative session contract: this run (U1-U7).
+1. Authoritative session contract: this run (U1-U7), hardened by U8-U11.
 2. Two-client lifecycle: pure state machines and fault tests this run (U3, U5, U6); UI and transport later.
 3. Visible operators and world: later; uses the crew state in KTD11.
 4. Crew workflow and roles: later; extends the permission policy in KTD10.
@@ -135,8 +135,8 @@ The outline's five phase units remain the Phase 3 roadmap:
   Any received frame counts as liveness. The host sends no separate heartbeat, because World frames every 0.25 s already prove it is alive. Silence is measured from the last received frame, and the caller feeds all pending bytes before calling `Tick`, so a host stall does not mark a live peer Stale. The Welcome tells the client the grace window.
 
   Resource caps bound a flooding or stuck peer:
-  - At most 2 connections may be in Handshaking at once; a further connection gets `TooManyConnections` and closes.
-  - Each connection may send at most 50 frames per second of any type; above that it gets `RateLimited` and closes.
+  - At most 2 connections may be in Handshaking at once. A new connection first expires every Handshaking connection past its 5 s timeout with `HandshakeTimeout`. If 2 remain, the oldest one, by connection-open order, closes with `TooManyConnections` and the new connection is kept. Reason: refusing the newcomer let a LAN peer that reopens two idle sockets every 5 s block a stale operator's token resume until the grace window ends (issue #23). An evicted connection whose client is Joining ends in Failed with `TooManyConnections` and the caller re-joins; a Reconnecting client treats it as retryable and tries again on its backoff. Trade-off: a LAN peer opening more than 2 connections per 5 s can still evict a newcomer before its Hello; R10 already puts such a peer outside the trust boundary.
+  - Each connection may send at most 100 frames per second of any type; above that it gets `RateLimited` and closes. Reason: a compliant client can send an intent burst of 20, a crew burst of 40 and a heartbeat in one second, so 50 evicted it (issue #24). Worst case for a compliant client in one fixed window is the bursts plus one second of refill: 30 intents, 60 crew updates and 1 heartbeat, 91 frames, leaving a margin of 9. The token buckets in KTD10 and KTD11 still bound sustained intent and crew traffic; this cap is the only bound on heartbeats.
   - The outbox holds at most one unsent World per connection; a newer World replaces an older unsent one.
 - KTD9. **Sequence numbers.** Each sender numbers its own frames from 1 as a 64-bit integer, strictly increasing. A peer's sequence survives reconnect, because the host keeps the last value per peer.
   - A repeated or lower number is a `Duplicate`; intents get a refusal result, and other frames are dropped.
@@ -152,7 +152,7 @@ The outline's five phase units remain the Phase 3 roadmap:
   7. The host overwrites `Issuer` with the peer ID.
   8. `Simulation.EnqueueIntent` runs; `ArgumentException` maps to `NonFiniteValue`, and `IntentRejectedException` maps to `NotPermitted`.
 
-  Each checked intent gets an `IntentResult` carrying its sequence number and a code. "Accepted" means queued by the host, not applied: an intent queued while the clock is halted waits, and an apply-time rejection shows in the next World, not as a result. The client keeps the first result per sequence number and ignores a later `Duplicate` for it. Intents from the host's own UI bypass the session. Conflicting intents apply in queue order, as today.
+  Each checked intent gets an `IntentResult` carrying its sequence number and a code. "Accepted" means confirmed queued by the host, not applied; `accepted` false means not confirmed, which is a refusal for every code except the client-local `ConnectionLost` (KTD18): an intent queued while the clock is halted waits, and an apply-time rejection shows in the next World, not as a result. The client keeps the first result per sequence number and ignores a later `Duplicate` for it. Intents from the host's own UI bypass the session. Conflicting intents apply in queue order, as today.
 
   Every player-class kind is open to the remote operator in this slice, including `SelectMission`, `AssistTier`, `OperatingMode` and `ResetScram`; the roles slice (phase unit 4) narrows this. Crew updates use their own bucket of 20 per second with a burst of 40.
 - KTD11. **Crew state lives in a versioned world snapshot that wraps the plant snapshot.** The world snapshot holds:
@@ -168,7 +168,7 @@ The outline's five phase units remain the Phase 3 roadmap:
   - The display name is 1-24 printable characters after trimming. Duplicate names are allowed, because identity is the peer ID.
 
   An update that breaks a rule is refused with `InvalidCrewState`, and the previous entry is kept.
-- KTD12. **Typed codes.** `SessionErrorCode` is one enum with stable explicit integer values covering handshake, frame, sequence, intent, crew-update and lifecycle errors. The design doc lists each code once.
+- KTD12. **Typed codes.** `SessionErrorCode` is one enum with stable explicit integer values covering handshake, frame, sequence, intent, crew-update and lifecycle errors. The design doc lists each code once. Values are append-only: new codes take the next unused integer, and the pin test lists every value.
 - KTD13. **Pure input and output surface.** Host and client take four inputs, each with the caller's `nowSeconds`: connection opened (connection ID), bytes received (connection ID, bytes), connection closed (connection ID), and `Tick`. Received bytes pass through the KTD4 frame reader. They return an outbox of (connection ID, frame, close-after) entries and a list of session events. Ordering rules:
   - A Welcome is queued before any World frame for that connection.
   - A reconnect with a valid token on a still-active peer supersedes the old connection, which closes with `Superseded`.
@@ -177,6 +177,7 @@ The outline's five phase units remain the Phase 3 roadmap:
 - KTD15. **Migration from the line protocol.** `CoopSessionManager` keeps its current behavior until the engine slice replaces its protocol with the contract. Old `INTENT:`/`STATE:` lines decode to `ProtocolViolation`. Host and client ship together, so no compatibility shim is built. No save system exists yet, so `PlantSnapshot` gets no schema bump; the world snapshot starts at schema 1.
 - KTD16. **Verified-first slices: Core and tests in this run; Unity wiring later** (session-settled: user-directed — chosen over keeping the Windows build box as the Unity host: it kept going offline; the Unity host is now a Mac with no Unity editor installed yet). Only `scripts/ci.sh` checks run in this slice. Unity compile, transport wiring and two-machine tests are owner-run later and never claimed here.
 - KTD17. **No personal data in repo files** (session-settled: user-approved — chosen over naming the build machine: the personal-data rule and the clean-room scan). Tests, docs and the plan use placeholders and temporary directories only.
+- KTD18. **The client resolves in-flight intents when its connection is lost.** On entering Reconnecting or Failed, the client raises one intent result per pending sequence number, in ascending order, with code `ConnectionLost` (20) and `accepted` false, records it as that sequence's result, and clears the pending set. These results come before the Reconnecting or Failed event. `ConnectionLost` means "outcome unknown", not "refused": the host may have queued the intent before the drop, so the caller reads the next World for the outcome. A host refusal reason for such an intent is lost. The client never resends it; a caller that wants the action again re-derives it from the new World and sends it as a new intent. The code is client-local: the client ignores an `intent_result` or `reject` from the wire that carries code 20. A late host result for a resolved sequence is ignored. A local `Leave` and the 1024-entry intent-memory prune drop pending intents without results, because the caller started the teardown or the window is bounded. Reason: after a drop the host cannot deliver results on the old connection, so pending intents otherwise never resolve (issue #25).
 
 ### High-Level Technical Design
 
@@ -210,7 +211,7 @@ stateDiagram-v2
   Handshaking --> Active: valid Hello
   Handshaking --> Closed: Reject or 5 s timeout
   Active --> Stale: 5 s silence or connection closed
-  Active --> Closed: Goodbye, violation or FrameTooLarge
+  Active --> Closed: Goodbye, violation, RateLimited or FrameTooLarge
   Active --> Active: token reconnect supersedes old connection
   Stale --> Active: token reconnect within 30 s
   Stale --> Closed: grace expired, slot freed
@@ -247,7 +248,9 @@ Host handling by connection state. This table is the test oracle for U3 and U4. 
 | Goodbye | close | close, free slot |
 | Unknown type or bad JSON | `ProtocolViolation`, close | `ProtocolViolation`, close |
 | Over-limit frame | `FrameTooLarge`, close | `FrameTooLarge`, close |
-| More than 50 frames in a second | `RateLimited`, close | `RateLimited`, close |
+| More than 100 frames in a second | `RateLimited`, close | `RateLimited`, close |
+
+A new connection that finds 2 Handshaking connections evicts the oldest with `TooManyConnections` after expiring timed-out ones (KTD8).
 
 ### Output Structure
 
@@ -364,8 +367,7 @@ docs/design/session-protocol.md
   - A 7 s gap between Ticks, with a heartbeat fed before the Tick, keeps `p1` Active.
   - On a Handshaking connection: a heartbeat is dropped, a Goodbye closes, a CrewUpdate gets `NotJoined`, an unknown type or bad JSON gives `ProtocolViolation`, and an over-limit frame gives `FrameTooLarge`.
   - On an Active peer: a heartbeat only refreshes liveness, and an unknown type gives `ProtocolViolation`.
-  - A third concurrent Handshaking connection gets `TooManyConnections`.
-  - 51 frames in one second from one connection give `RateLimited` and close it.
+  - Handshaking cap and frame-rate cap scenarios: see U8 and U9 (KTD8).
   - A client that drains nothing for 10 s holds at most one World in its outbox.
   - The token compare accepts an equal token and refuses tokens that differ in the first or the last byte.
   - With a fixed entropy source, two runs give identical outbox bytes.
@@ -455,6 +457,79 @@ docs/design/session-protocol.md
 - **Test expectation:** none — docs and generated artifacts; `ci.sh` freshness and clean-room checks cover them.
 - **Verification:** the doc lists every `SessionErrorCode` value; `ci.sh` passes; the clean-room scan finds no personal data.
 
+### U8. Handshaking cap evicts the oldest idle connection
+
+- **Goal:** idle Handshaking connections can no longer block a stale operator's token resume.
+- **Requirements:** R6, R12; KTD8.
+- **Dependencies:** U3.
+- **Files:** `ReactorSim.Core/Session/SessionHost.cs`, `ReactorSim.Core.Tests/Session/SessionHostJoinTests.cs`, Unity plugin DLL, PDB and hash.
+- **Approach:**
+  1. Extract the handshake-timeout sweep from `Tick` into one private step that `Tick` and `OnConnected` both call.
+  2. In `OnConnected`, after the sweep, refuse the first Handshaking connection in `_conns` order with `TooManyConnections` when the cap is reached, then add the newcomer. The eviction reject is queued before any frame for the newcomer.
+  3. Update `ThirdConcurrentHandshakingConnectionGetsTooManyConnections` to the new oracle and rename it.
+- **Execution note:** write the resume-past-idle-sockets test first; it fails on the current code.
+- **Test scenarios:**
+  - Two idle connections open, `p1` turns Stale, a third connection sends `p1`'s token Hello: the oldest idle connection closes with `TooManyConnections`, and the third gets a Welcome resuming `p1`.
+  - With 2 Handshaking connections, a third connection evicts connection 1, not connection 2, and the host holds 2 Handshaking connections.
+  - Two connections opened 6 s ago and never ticked: a third connection expires both with `HandshakeTimeout` and evicts nothing.
+  - The eviction raises `ConnectionRefused` for the evicted connection ID.
+  - An Active peer's connection is never evicted.
+  - With a fixed entropy source, the eviction scenario run twice gives identical outbox bytes.
+- **Verification:** the resume test passes; the existing cap, disconnect and active-connection tests pass; `ci.sh` passes.
+
+### U9. Frame-rate cap above the legitimate bursts
+
+- **Goal:** a client inside both token buckets is never evicted by the frame cap.
+- **Requirements:** R3, R4; KTD8.
+- **Dependencies:** U4.
+- **Files:** `ReactorSim.Core/Session/SessionProtocol.cs`, `ReactorSim.Core.Tests/Session/SessionHostJoinTests.cs`, Unity plugin DLL, PDB and hash.
+- **Approach:** set `MaxFramesPerSecond` to 100. Update the two frame-window tests in `SessionHostJoinTests.cs` that hardcode 49 and 50.
+- **Test scenarios:**
+  - An Active peer sends 40 crew updates, 20 intents and 1 heartbeat at once: the connection stays open, all 20 intents are queued and all 40 crew updates are applied.
+  - Worst case: within one frame window an Active peer sends the bursts at once, then 10 more intents and 20 more crew updates spread across the rest of the second, plus 1 heartbeat (91 frames): the connection stays open and no intent or crew update is refused.
+  - 100 frames in one second are allowed; the 101st gives `RateLimited` and closes.
+  - The window resets after one second.
+- **Verification:** the burst test passes; `ci.sh` passes.
+
+### U10. Client resolves in-flight intents on connection loss
+
+- **Goal:** every intent pending when the connection is lost gets exactly one result.
+- **Requirements:** R6, R7; KTD12, KTD18.
+- **Dependencies:** U5.
+- **Files:** `ReactorSim.Core/Session/SessionProtocol.cs`, `ReactorSim.Core/Session/SessionClient.cs`, `ReactorSim.Core.Tests/Session/SessionClientTests.cs`, `ReactorSim.Core.Tests/Session/SessionEnvelopeTests.cs`, Unity plugin DLL, PDB and hash.
+- **Approach:**
+  1. Append `ConnectionLost = 20` to `SessionErrorCode` and to the pin test.
+  2. Add one resolve step that `EnterReconnecting` and `Fail` call before raising their events. It copies the pending set, sorts it ascending, raises the results and clears the set.
+  3. Make the wire decode of `intent_result` and `reject` ignore code 20.
+- **Test scenarios:**
+  - Send intents 3 and 4, drop the connection: results for 3 then 4 with `ConnectionLost` and not accepted, then the Reconnecting event.
+  - After the drop, `TryGetIntentResult` returns `ConnectionLost` for 3 and 4.
+  - After resume, a host result for 3 is ignored.
+  - 5 s of host silence resolves pending intents the same way.
+  - A Reject that drives the client to Failed resolves pending intents before the Failed event.
+  - An accepted result before the drop is not overwritten by `ConnectionLost`.
+  - A drop with no pending intents raises no result.
+  - A host `intent_result` with code 20 for a pending sequence is ignored, and the sequence stays pending.
+  - A local `Leave` with pending intents raises no `ConnectionLost` result.
+- **Verification:** each scenario has a test; the existing intent-result tests pass; `ci.sh` passes.
+
+### U11. Host-table cell tests, scanner-safe fixture and docs
+
+- **Goal:** every host-table cell has a named test, the test fixtures do not trip secret scanners, and the published protocol matches KTD8, KTD12 and KTD18.
+- **Requirements:** R4, R10, R11; KTD8, KTD12, KTD17, KTD18.
+- **Dependencies:** U8, U9, U10.
+- **Files:** `ReactorSim.Core.Tests/Session/SessionHostJoinTests.cs`, `ReactorSim.Core.Tests/Session/SessionClientTests.cs`, `docs/design/session-protocol.md`.
+- **Approach:**
+  1. Add the missing host-table tests below.
+  2. Build `ScriptedHost.Token` at runtime as a static read-only field: 32 lowercase hex characters, so the client's token parse still accepts it, from a low-entropy pattern so external secret scanners on the PR do not flag it. The `Welcome` helper takes a null default and falls back to it. This is a forward fix; the earlier commit stays in history.
+  3. Update the design doc: the cap rule and its trade-off, the 100-frame limit, the `ConnectionLost` row marked client-local, and the `intent_result` note on reading the next World and never resending automatically.
+- **Test scenarios:**
+  - An Active peer sends a Hello carrying a stale peer's token, its own token, a wrong join code, or protocol 2: each gives `ProtocolViolation`, closes, and the peer turns Closed.
+  - 101 frames in one second on a Handshaking connection give `RateLimited` and close.
+  - A bad-JSON line on an Active peer gives `ProtocolViolation`, closes, and the peer turns Closed.
+  - Every existing client test that used the token constant still passes with the runtime value.
+- **Verification:** each table cell maps to a named test; the doc lists code 20; `ci.sh` passes.
+
 ---
 
 ## Verification Contract
@@ -462,8 +537,8 @@ docs/design/session-protocol.md
 | Gate | Command or check | Applies to |
 |---|---|---|
 | Full CI contract | `bash scripts/ci.sh`: clean-room scan, Core DLL freshness, Release build with warnings as errors, xUnit, `--scenario all`, `--verify` | every commit |
-| Core DLL sync | `bash scripts/sync-core-to-unity.sh` after any `ReactorSim.Core` change, committing the plugin DLL, PDB and hash | U1-U5, U7 |
-| Determinism | host and loopback tests run twice in one process give identical outbox bytes | U3, U6 |
+| Core DLL sync | `bash scripts/sync-core-to-unity.sh` after any `ReactorSim.Core` change, committing the plugin DLL, PDB and hash | U1-U5, U7-U10 |
+| Determinism | host and loopback tests run twice in one process give identical outbox bytes | U3, U6, U8 |
 | Unity compile | `UNITY_EXE=<path> bash scripts/ci.sh` on the Unity host | owner-run before merge, never claimed here (KTD16) |
 | Two-machine playtest | ROADMAP Phase 3 gate | later engine slice |
 
@@ -471,11 +546,11 @@ docs/design/session-protocol.md
 
 ## Definition of Done
 
-- U1-U7 land on one branch, and `bash scripts/ci.sh` passes with more tests than before the run.
+- U1-U11 land on one branch, and `bash scripts/ci.sh` passes with more tests than before the run.
 - The worst-case world snapshot encodes to under 65536 bytes.
 - Every host-table cell and every client transition has a named test.
 - `docs/design/session-protocol.md` lists every error code, limit and timer, and states the LAN trust boundary.
 - `ReactorSim.Core/Session/` has no Unity, socket, thread or library type, and no wall-clock, `Random` or `Guid` call.
-- No existing test changed, and solo behavior is unchanged.
+- No existing test assertion is weakened. The sanctioned edits to existing tests are: tests pinning a limit that KTD8 changes, and their renames (U8, U9); the error-code pin test extended with `ConnectionLost` (U10); and the U11 fixture-token change, which keeps every assertion. Solo behavior is unchanged.
 - Abandoned attempts and debug code are removed from the diff.
 - The PR states that Unity compile, transport wiring and the two-machine playtest are owner-run or later work.
