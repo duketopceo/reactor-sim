@@ -212,11 +212,17 @@ namespace ReactorSim.Session
                 OpenedAt = _now,
                 WindowStart = _now
             };
+            ExpireHandshakes();
             if (CountHandshaking() >= SessionProtocol.MaxHandshakingConnections)
             {
-                QueueReject(connectionId, SessionErrorCode.TooManyConnections, 0, true);
-                RaiseRefused(connectionId, SessionErrorCode.TooManyConnections);
-                return;
+                for (int i = 0; i < _conns.Count; i++)
+                {
+                    if (_conns[i].Handshaking)
+                    {
+                        Refuse(_conns[i], SessionErrorCode.TooManyConnections, 0);
+                        break;
+                    }
+                }
             }
             _conns.Add(conn);
         }
@@ -270,6 +276,13 @@ namespace ReactorSim.Session
                 }
             }
 
+            ExpireHandshakes();
+
+            BroadcastWorlds();
+        }
+
+        private void ExpireHandshakes()
+        {
             var snapshot = new List<Conn>(_conns);
             for (int i = 0; i < snapshot.Count; i++)
             {
@@ -277,8 +290,6 @@ namespace ReactorSim.Session
                 if (c.Handshaking && _now - c.OpenedAt >= SessionProtocol.HandshakeTimeoutSeconds - TimerEpsilon)
                     Refuse(c, SessionErrorCode.HandshakeTimeout, 0);
             }
-
-            BroadcastWorlds();
         }
 
         // ---- time ----

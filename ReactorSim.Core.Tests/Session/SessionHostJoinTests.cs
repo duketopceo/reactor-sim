@@ -443,7 +443,29 @@ namespace ReactorSim.Tests
         }
 
         [Fact]
-        public void ThirdConcurrentHandshakingConnectionGetsTooManyConnections()
+        public void IdleHandshakingConnectionsDoNotBlockTokenResumeOfStalePeer()
+        {
+            var h = NewHost();
+            JoinInfo p1 = h.Join(1, "Ann");
+            h.TickAndDrain(5.0);
+            Assert.Equal(PeerState.Stale, h.Host.Peers[0].State);
+            h.Open(2);
+            h.Open(3);
+            h.Now = 6.0;
+            h.Open(4);
+            h.Feed(4, h.Hello(2, null, "ignored", token: p1.Token, sid: h.Host.SessionId));
+            List<OutFrame> frames = h.Drain();
+            Assert.Equal(2, frames.Count);
+            Assert.Equal(2, frames[0].ConnectionId);
+            AssertRefusal(frames[0], SessionErrorCode.TooManyConnections, true);
+            Assert.Equal(4, frames[1].ConnectionId);
+            Assert.Equal("welcome", frames[1].Type);
+            Assert.Equal("p1", frames[1].Env.Body.Get("peerId").Text);
+            Assert.Equal(PeerState.Active, h.Host.Peers[0].State);
+        }
+
+        [Fact]
+        public void ThirdConcurrentHandshakingConnectionEvictsTheOldest()
         {
             var h = NewHost();
             h.Open(1);
@@ -451,9 +473,84 @@ namespace ReactorSim.Tests
             h.Open(3);
             List<OutFrame> frames = h.Drain();
             OutFrame f = Assert.Single(frames);
-            Assert.Equal(3, f.ConnectionId);
+            Assert.Equal(1, f.ConnectionId);
             AssertRefusal(f, SessionErrorCode.TooManyConnections, true);
             Assert.Equal(2, h.Host.ConnectionCount);
+            h.Feed(2, h.Hello(1));
+            OutFrame w2 = Assert.Single(h.Drain());
+            Assert.Equal("welcome", w2.Type);
+            Assert.Equal(2, w2.ConnectionId);
+        }
+
+        [Fact]
+        public void TimedOutHandshakingConnectionsAreExpiredBeforeAnyEviction()
+        {
+            var h = NewHost();
+            h.Open(1);
+            h.Open(2);
+            h.Now = 6.0;
+            h.Open(3);
+            List<OutFrame> frames = h.Drain();
+            Assert.Equal(2, frames.Count);
+            Assert.Equal(1, frames[0].ConnectionId);
+            AssertRefusal(frames[0], SessionErrorCode.HandshakeTimeout, true);
+            Assert.Equal(2, frames[1].ConnectionId);
+            AssertRefusal(frames[1], SessionErrorCode.HandshakeTimeout, true);
+            Assert.DoesNotContain(frames, x => x.Code == (int)SessionErrorCode.TooManyConnections);
+            Assert.Equal(1, h.Host.ConnectionCount);
+        }
+
+        [Fact]
+        public void EvictionRaisesConnectionRefusedForTheEvictedConnection()
+        {
+            var h = NewHost();
+            h.Open(1);
+            h.Open(2);
+            h.Open(3);
+            List<SessionEvent> events = h.Host.DrainEvents();
+            SessionEvent e = Assert.Single(events, x => x.Kind == SessionEventKind.ConnectionRefused);
+            Assert.Equal(1, e.ConnectionId);
+            Assert.Equal(SessionErrorCode.TooManyConnections, e.Code);
+        }
+
+        [Fact]
+        public void EvictionNeverTouchesAnActivePeerConnection()
+        {
+            var h = NewHost();
+            h.Join(1);
+            h.Open(2);
+            h.Open(3);
+            h.Open(4);
+            List<OutFrame> frames = h.Drain();
+            OutFrame f = Assert.Single(frames);
+            Assert.Equal(2, f.ConnectionId);
+            AssertRefusal(f, SessionErrorCode.TooManyConnections, true);
+            Assert.Equal(PeerState.Active, h.Host.Peers[0].State);
+            Assert.Equal(3, h.Host.ConnectionCount);
+        }
+
+        [Fact]
+        public void EvictionScenarioProducesIdenticalOutboxBytesAcrossRuns()
+        {
+            Func<List<string>> run = () =>
+            {
+                var h = NewHost();
+                JoinInfo p1 = h.Join(1, "Ann");
+                h.TickAndDrain(5.0);
+                h.Open(2);
+                h.Open(3);
+                h.Now = 6.0;
+                h.Open(4);
+                h.Feed(4, h.Hello(2, null, "x", token: p1.Token, sid: h.Host.SessionId));
+                var lines = new List<string>();
+                foreach (OutFrame o in h.Drain())
+                    lines.Add(o.ConnectionId + "|" + o.CloseAfter + "|" + o.Frame);
+                return lines;
+            };
+            List<string> a = run();
+            List<string> b = run();
+            Assert.Equal(2, a.Count);
+            Assert.Equal(a, b);
         }
 
         [Fact]
