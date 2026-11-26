@@ -178,11 +178,11 @@ compare runs made back to back.
 ### Phase 2 baseline (U1)
 
 Phase 2 adds a wing (corridor, lift, turbine hall) and a visible body, so `check-captures.sh --baseline <dir> --room-budget` needs
-a reference taken before any of it. The reference is a capture run of the unchanged `origin/master` player (the commit before
-Phase 2), made on the Windows build box in a worktree separate from the owner's checkout:
+a reference taken before any of it. The reference is a capture run of the player at the fixed pre-engine commit `3f88e0b` (the
+Phase 2 branch point; `origin/master` moves, so never use the branch name), made on the Windows build box in a worktree separate from the owner's checkout:
 
 ```
-# on the box, in the CI worktree: fetch and detach at origin/master, then build the player (see "Windows player build" in TESTING.md)
+# on the box, in the CI worktree: fetch and detach at 3f88e0b, then build the player (see "Windows player build" in TESTING.md)
 # from Linux, both sizes, the poses the budgets read (gallery and away for the hall, seat and stand for the room):
 REACTOR_SIM_WIN_HOST=... REACTOR_SIM_WIN_REPO=... bash scripts/capture-playtest.sh --sizes 1600x900,1920x1080 --poses gallery,away,seat,stand
 # keep the run on the box as the reference: copy its out\capture\<timestamp> directory to <user profile>\rs-baseline
@@ -195,7 +195,7 @@ quiet box, with the same player build settings.
 
 Status: not recorded yet. The build box was unreachable over the network when U1 was implemented (it stayed offline for
 more than 25 minutes of retries), so no numbers exist here; the U1 route contract and its tests do not depend on them. Record
-the baseline before U3 changes the room (p95 and p99 frame time, draw calls, per pose and size) and replace this paragraph with
+the baseline from `3f88e0b` before the U2 engine slice merges (it adds the body and camera), and in any case before U3 changes the room (p95 and p99 frame time, draw calls, per pose and size) and replace this paragraph with
 the table.
 
 ### Phase 1 U5 checks (what was verified, and what was not)
