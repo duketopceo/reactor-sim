@@ -565,14 +565,14 @@ namespace ReactorSim.Tests
         }
 
         [Fact]
-        public void FiftyFramesInOneSecondAreAllowedAndFiftyFirstGetsRateLimited()
+        public void HundredFramesInOneSecondAreAllowedAndHundredFirstGetsRateLimited()
         {
             var h = NewHost();
             h.Join(1);
-            for (int i = 0; i < 49; i++)
+            for (int i = 0; i < 99; i++)
                 h.Feed(1, h.Frame("heartbeat", 2 + i));
             Assert.Empty(h.Drain());
-            h.Feed(1, h.Frame("heartbeat", 51));
+            h.Feed(1, h.Frame("heartbeat", 101));
             AssertRefusal(Assert.Single(h.Drain()), SessionErrorCode.RateLimited, true);
             Assert.Equal(0, h.Host.ConnectionCount);
         }
@@ -582,12 +582,66 @@ namespace ReactorSim.Tests
         {
             var h = NewHost();
             h.Join(1);
-            for (int i = 0; i < 49; i++)
+            for (int i = 0; i < 99; i++)
                 h.Feed(1, h.Frame("heartbeat", 2 + i));
             h.Now = 1.5;
-            for (int i = 0; i < 50; i++)
-                h.Feed(1, h.Frame("heartbeat", 52 + i));
+            for (int i = 0; i < 100; i++)
+                h.Feed(1, h.Frame("heartbeat", 102 + i));
             Assert.Empty(h.Drain());
+        }
+
+        [Fact]
+        public void BurstOfTwentyIntentsFortyCrewUpdatesAndAHeartbeatKeepsTheConnection()
+        {
+            var h = NewHost();
+            h.Join(1);
+            h.Now = 1.0;
+            long seq = 2;
+            for (int i = 0; i < SessionProtocol.CrewBurst; i++)
+                h.Feed(1, h.CrewFrame(seq++, "control-room"));
+            for (int i = 0; i < SessionProtocol.IntentBurst; i++)
+                h.Feed(1, h.IntentFrame(seq++, "RodBankTarget"));
+            h.Feed(1, h.Frame("heartbeat", seq++));
+            List<OutFrame> frames = h.Drain();
+            Assert.Equal(SessionProtocol.IntentBurst, frames.Count);
+            Assert.All(frames, f => Assert.Equal("intent_result", f.Type));
+            Assert.All(frames, f => Assert.Equal(0, f.Code));
+            Assert.Equal(1, h.Host.ConnectionCount);
+            Assert.Equal(SessionProtocol.IntentBurst, h.Sim.DrainPendingIntents().Count);
+        }
+
+        [Fact]
+        public void WorstCaseCompliantTrafficInOneFrameWindowKeepsTheConnection()
+        {
+            // Bursts at the start of the window, then every refilled token spent
+            // before the window ends: 29 intents, 59 crew updates and a heartbeat.
+            var h = NewHost();
+            h.Join(1);
+            h.Now = 1.0;
+            long seq = 2;
+            for (int i = 0; i < SessionProtocol.CrewBurst; i++)
+                h.Feed(1, h.CrewFrame(seq++, "control-room"));
+            for (int i = 0; i < SessionProtocol.IntentBurst; i++)
+                h.Feed(1, h.IntentFrame(seq++, "RodBankTarget"));
+            h.Feed(1, h.Frame("heartbeat", seq++));
+            int sent = SessionProtocol.CrewBurst + SessionProtocol.IntentBurst + 1;
+            for (int k = 1; k < SessionProtocol.CrewRatePerSecond; k++)
+            {
+                h.Now = 1.0 + k / (double)SessionProtocol.CrewRatePerSecond + 0.001;
+                h.Feed(1, h.CrewFrame(seq++, "control-room"));
+                sent++;
+                if (k % 2 == 0)
+                {
+                    h.Feed(1, h.IntentFrame(seq++, "RodBankTarget"));
+                    sent++;
+                }
+            }
+            Assert.True(h.Now < 2.0);
+            Assert.True(sent > 50);
+            List<OutFrame> frames = h.Drain();
+            Assert.All(frames, f => Assert.Equal("intent_result", f.Type));
+            Assert.All(frames, f => Assert.Equal(0, f.Code));
+            Assert.Equal(1, h.Host.ConnectionCount);
         }
 
         [Fact]

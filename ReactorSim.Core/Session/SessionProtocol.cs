@@ -41,7 +41,7 @@ namespace ReactorSim.Session
         // Original design choice: crew update token bucket burst size.
         public const int CrewBurst = 40;
         // Original design choice: frames per second of any type before a connection is closed RateLimited.
-        public const int MaxFramesPerSecond = 50;
+        public const int MaxFramesPerSecond = 100;
         // Original design choice: simultaneous connections in Handshaking.
         public const int MaxHandshakingConnections = 2;
         // Original design choice: wrong join codes on one connection before it is closed.
