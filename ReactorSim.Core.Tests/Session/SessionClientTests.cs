@@ -769,6 +769,33 @@ namespace ReactorSim.Tests
         }
 
         [Fact]
+        public void IntentBeyondPendingCapacityIsRefusedLocallyAndEveryAdmittedIntentStillResolves()
+        {
+            var host = new ScriptedHost();
+            Simulation sim;
+            var c = JoinedClient(host, out sim);
+            var admitted = new List<long>();
+            for (int i = 0; i < 1024; i++)
+                admitted.Add(c.SendIntent(PlantIntent.SetRodBank("A", 0.3)));
+            Assert.DoesNotContain(0L, admitted);
+            c.DrainOutbox();
+            c.DrainEvents();
+
+            long refused = c.SendIntent(PlantIntent.SetRodBank("A", 0.3));
+            Assert.Equal(0, refused);
+            Assert.Empty(c.DrainOutbox());
+            ClientEvent local = Assert.Single(c.DrainEvents());
+            Assert.Equal(ClientEventKind.IntentResult, local.Kind);
+            Assert.Equal(SessionErrorCode.RateLimited, local.Code);
+
+            c.OnDisconnected(2);
+            List<ClientEvent> events = c.DrainEvents();
+            List<long> lost = events.Where(e => e.Kind == ClientEventKind.IntentResult && e.Code == SessionErrorCode.ConnectionLost)
+                .Select(e => e.Seq).ToList();
+            Assert.Equal(admitted, lost);
+        }
+
+        [Fact]
         public void HostResultForAResolvedSequenceIsIgnoredAfterResume()
         {
             var host = new ScriptedHost();

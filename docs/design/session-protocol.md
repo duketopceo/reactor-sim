@@ -126,6 +126,7 @@ All values are original design choices for a two-player LAN game (KTD4, KTD6, KT
 | Crew update rate | 20 per second, burst 40 |
 | Frames per connection | 100 per second |
 | Unsent `world` frames per connection | 1 (a newer one replaces it) |
+| Pending intents per client | 1024; a further intent is refused locally with `RateLimited` |
 
 | Timer | Value |
 |---|---|

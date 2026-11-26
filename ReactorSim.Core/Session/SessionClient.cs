@@ -228,6 +228,9 @@ namespace ReactorSim.Session
 
             if (ExceedsControlLimit(SessionProtocol.TypeIntent, sb.ToString()))
                 return RefuseLocally(SessionErrorCode.FrameTooLarge);
+            // KTD18: every admitted intent keeps its slot until it gets a host or ConnectionLost result.
+            if (_pendingIntents.Count >= IntentMemory)
+                return RefuseLocally(SessionErrorCode.RateLimited);
 
             long seq = _nextSeq++;
             _pendingIntents.Add(seq);
@@ -749,7 +752,7 @@ namespace ReactorSim.Session
 
         private void PruneIntentMemory()
         {
-            if (_results.Count <= IntentMemory && _pendingIntents.Count <= IntentMemory)
+            if (_results.Count <= IntentMemory)
                 return;
             long floor = _nextSeq - IntentMemory;
             var stale = new List<long>();
@@ -757,7 +760,6 @@ namespace ReactorSim.Session
                 if (k < floor) stale.Add(k);
             for (int i = 0; i < stale.Count; i++)
                 _results.Remove(stale[i]);
-            _pendingIntents.RemoveWhere(k => k < floor);
         }
 
         private void Advance(double now)
