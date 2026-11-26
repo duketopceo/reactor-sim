@@ -542,6 +542,9 @@ namespace ReactorSim.Session
             if (SessionJson.TryWholeNumber(env.Body.Get("code"), out raw) && raw >= 0 && raw <= int.MaxValue
                 && Enum.IsDefined(typeof(SessionErrorCode), (int)raw))
                 code = (SessionErrorCode)(int)raw;
+            // ConnectionLost is client-local (KTD18): a reject carrying it from the wire is dropped whole.
+            if (code == SessionErrorCode.ConnectionLost)
+                return;
             if (SessionJson.TryWholeNumber(env.Body.Get("seq"), out raw))
                 refSeq = raw;
 
@@ -592,7 +595,8 @@ namespace ReactorSim.Session
                 return;
             long seq, rawCode;
             if (!SessionJson.TryWholeNumber(env.Body.Get("seq"), out seq) || !SessionJson.TryWholeNumber(env.Body.Get("code"), out rawCode)
-                || rawCode < 0 || rawCode > int.MaxValue || !Enum.IsDefined(typeof(SessionErrorCode), (int)rawCode))
+                || rawCode < 0 || rawCode > int.MaxValue || !Enum.IsDefined(typeof(SessionErrorCode), (int)rawCode)
+                || rawCode == (long)SessionErrorCode.ConnectionLost)
                 return;
             // Only the first result for a sequence number this client sent counts; a later Duplicate finds it not pending.
             if (!_pendingIntents.Remove(seq))
@@ -610,8 +614,32 @@ namespace ReactorSim.Session
 
         // ---- helpers ----
 
+        // KTD18: a lost connection can no longer deliver host results, so every pending intent gets one ConnectionLost
+        // result (ascending sequence order) before the Reconnecting or Failed event. Outcome unknown, not refused.
+        private void ResolvePendingIntents()
+        {
+            if (_pendingIntents.Count == 0)
+                return;
+            var seqs = new List<long>(_pendingIntents);
+            seqs.Sort();
+            _pendingIntents.Clear();
+            for (int i = 0; i < seqs.Count; i++)
+            {
+                if (!_results.ContainsKey(seqs[i]))
+                    _results[seqs[i]] = SessionErrorCode.ConnectionLost;
+                _events.Add(new ClientEvent
+                {
+                    Kind = ClientEventKind.IntentResult,
+                    Seq = seqs[i],
+                    Code = SessionErrorCode.ConnectionLost,
+                    Accepted = false
+                });
+            }
+        }
+
         private void EnterReconnecting(bool closeConnection)
         {
+            ResolvePendingIntents();
             _state = ClientState.Reconnecting;
             _connected = false;
             _awaitingOpen = false;
@@ -631,6 +659,7 @@ namespace ReactorSim.Session
 
         private void Fail(ClientFailure reason, SessionErrorCode code, bool closeConnection)
         {
+            ResolvePendingIntents();
             _state = ClientState.Failed;
             _connected = false;
             _awaitingOpen = false;

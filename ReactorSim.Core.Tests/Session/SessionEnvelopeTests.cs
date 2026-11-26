@@ -54,7 +54,8 @@ namespace ReactorSim.Tests
                 { SessionErrorCode.RateLimited, 12 }, { SessionErrorCode.TooManyConnections, 13 },
                 { SessionErrorCode.NotJoined, 14 }, { SessionErrorCode.Duplicate, 15 },
                 { SessionErrorCode.InvalidIntent, 16 }, { SessionErrorCode.NotPermitted, 17 },
-                { SessionErrorCode.NonFiniteValue, 18 }, { SessionErrorCode.InvalidCrewState, 19 }
+                { SessionErrorCode.NonFiniteValue, 18 }, { SessionErrorCode.InvalidCrewState, 19 },
+                { SessionErrorCode.ConnectionLost, 20 }
             };
             var all = (SessionErrorCode[])Enum.GetValues(typeof(SessionErrorCode));
             Assert.Equal(expected.Count, all.Length);

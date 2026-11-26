@@ -118,6 +118,8 @@ namespace ReactorSim.Session
         InvalidIntent = 16,
         NotPermitted = 17,
         NonFiniteValue = 18,
-        InvalidCrewState = 19
+        InvalidCrewState = 19,
+        // Client-local: the client raises it when a connection drops with an intent in flight; the host never sends it.
+        ConnectionLost = 20
     }
 }

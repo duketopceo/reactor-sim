@@ -621,6 +621,167 @@ namespace ReactorSim.Tests
             Assert.DoesNotContain(c.DrainEvents(), e => e.Kind == ClientEventKind.IntentResult);
         }
 
+        private static List<ClientEvent> IntentResults(List<ClientEvent> events)
+        {
+            return events.Where(e => e.Kind == ClientEventKind.IntentResult).ToList();
+        }
+
+        private static void AssertConnectionLostThen(List<ClientEvent> events, ClientEventKind next, long first, long second)
+        {
+            Assert.Equal(3, events.Count);
+            Assert.Equal(ClientEventKind.IntentResult, events[0].Kind);
+            Assert.Equal(first, events[0].Seq);
+            Assert.Equal(SessionErrorCode.ConnectionLost, events[0].Code);
+            Assert.False(events[0].Accepted);
+            Assert.Equal(ClientEventKind.IntentResult, events[1].Kind);
+            Assert.Equal(second, events[1].Seq);
+            Assert.Equal(SessionErrorCode.ConnectionLost, events[1].Code);
+            Assert.False(events[1].Accepted);
+            Assert.Equal(next, events[2].Kind);
+        }
+
+        [Fact]
+        public void DroppedConnectionResolvesPendingIntentsInOrderBeforeReconnecting()
+        {
+            var host = new ScriptedHost();
+            Simulation sim;
+            var c = JoinedClient(host, out sim);
+            long a = c.SendIntent(PlantIntent.SetRodBank("A", 0.3));
+            long b = c.SendIntent(PlantIntent.SetRodBank("A", 0.4));
+            c.DrainOutbox();
+            c.OnDisconnected(2);
+            AssertConnectionLostThen(c.DrainEvents(), ClientEventKind.Reconnecting, a, b);
+            SessionErrorCode code;
+            Assert.True(c.TryGetIntentResult(a, out code));
+            Assert.Equal(SessionErrorCode.ConnectionLost, code);
+            Assert.True(c.TryGetIntentResult(b, out code));
+            Assert.Equal(SessionErrorCode.ConnectionLost, code);
+        }
+
+        [Fact]
+        public void HostResultForAResolvedSequenceIsIgnoredAfterResume()
+        {
+            var host = new ScriptedHost();
+            Simulation sim;
+            var c = JoinedClient(host, out sim, now: 0, snapshotSeq: 3);
+            long a = c.SendIntent(PlantIntent.SetRodBank("A", 0.3));
+            c.OnDisconnected(10);
+            c.Tick(11);
+            c.OnConnected(11);
+            Feed(c, host.Welcome(8), 11.1);
+            c.DrainOutbox();
+            c.DrainEvents();
+            Feed(c, host.IntentResult(a, SessionErrorCode.None), 11.2);
+            Assert.Empty(IntentResults(c.DrainEvents()));
+            SessionErrorCode code;
+            Assert.True(c.TryGetIntentResult(a, out code));
+            Assert.Equal(SessionErrorCode.ConnectionLost, code);
+        }
+
+        [Fact]
+        public void HostSilenceResolvesPendingIntentsBeforeReconnecting()
+        {
+            var host = new ScriptedHost();
+            Simulation sim;
+            var c = JoinedClient(host, out sim, now: 0);
+            long a = c.SendIntent(PlantIntent.SetRodBank("A", 0.3));
+            long b = c.SendIntent(PlantIntent.SetRodBank("A", 0.4));
+            Feed(c, host.World(2), 1);
+            c.DrainOutbox();
+            c.DrainEvents();
+            c.Tick(6);
+            Assert.Equal(ClientState.Reconnecting, c.State);
+            AssertConnectionLostThen(c.DrainEvents(), ClientEventKind.Reconnecting, a, b);
+        }
+
+        [Fact]
+        public void RejectThatFailsTheClientResolvesPendingIntentsBeforeFailed()
+        {
+            var host = new ScriptedHost();
+            Simulation sim;
+            var c = JoinedClient(host, out sim);
+            long a = c.SendIntent(PlantIntent.SetRodBank("A", 0.3));
+            long b = c.SendIntent(PlantIntent.SetRodBank("A", 0.4));
+            c.DrainEvents();
+            Feed(c, host.Reject(SessionErrorCode.Superseded), 1);
+            Assert.Equal(ClientState.Failed, c.State);
+            AssertConnectionLostThen(c.DrainEvents(), ClientEventKind.Failed, a, b);
+        }
+
+        [Fact]
+        public void AcceptedResultBeforeTheDropIsNotOverwrittenByConnectionLost()
+        {
+            var host = new ScriptedHost();
+            Simulation sim;
+            var c = JoinedClient(host, out sim);
+            long a = c.SendIntent(PlantIntent.SetRodBank("A", 0.3));
+            long b = c.SendIntent(PlantIntent.SetRodBank("A", 0.4));
+            Feed(c, host.IntentResult(a, SessionErrorCode.None), 1);
+            c.DrainEvents();
+            c.OnDisconnected(2);
+            List<ClientEvent> events = c.DrainEvents();
+            ClientEvent only = Assert.Single(IntentResults(events));
+            Assert.Equal(b, only.Seq);
+            Assert.Equal(SessionErrorCode.ConnectionLost, only.Code);
+            SessionErrorCode code;
+            Assert.True(c.TryGetIntentResult(a, out code));
+            Assert.Equal(SessionErrorCode.None, code);
+        }
+
+        [Fact]
+        public void DropWithNoPendingIntentsRaisesNoIntentResult()
+        {
+            var host = new ScriptedHost();
+            Simulation sim;
+            var c = JoinedClient(host, out sim);
+            c.OnDisconnected(2);
+            List<ClientEvent> events = c.DrainEvents();
+            Assert.Empty(IntentResults(events));
+            Assert.Contains(events, e => e.Kind == ClientEventKind.Reconnecting);
+        }
+
+        [Fact]
+        public void WireIntentResultWithTheClientLocalCodeIsIgnoredAndTheSequenceStaysPending()
+        {
+            var host = new ScriptedHost();
+            Simulation sim;
+            var c = JoinedClient(host, out sim);
+            long a = c.SendIntent(PlantIntent.SetRodBank("A", 0.3));
+            c.DrainEvents();
+            Feed(c, host.IntentResult(a, SessionErrorCode.ConnectionLost), 1);
+            Assert.Empty(IntentResults(c.DrainEvents()));
+            SessionErrorCode code;
+            Assert.False(c.TryGetIntentResult(a, out code));
+            c.OnDisconnected(2);
+            ClientEvent e = Assert.Single(IntentResults(c.DrainEvents()));
+            Assert.Equal(a, e.Seq);
+            Assert.Equal(SessionErrorCode.ConnectionLost, e.Code);
+        }
+
+        [Fact]
+        public void WireRejectWithTheClientLocalCodeIsIgnored()
+        {
+            var host = new ScriptedHost();
+            Simulation sim;
+            var c = JoinedClient(host, out sim);
+            Feed(c, host.Reject(SessionErrorCode.ConnectionLost, 7), 1);
+            Assert.Equal(ClientState.Active, c.State);
+            Assert.Empty(c.DrainEvents());
+        }
+
+        [Fact]
+        public void LocalLeaveWithPendingIntentsRaisesNoConnectionLostResult()
+        {
+            var host = new ScriptedHost();
+            Simulation sim;
+            var c = JoinedClient(host, out sim);
+            c.SendIntent(PlantIntent.SetRodBank("A", 0.3));
+            c.DrainEvents();
+            c.Leave(2);
+            Assert.Equal(ClientState.Idle, c.State);
+            Assert.Empty(IntentResults(c.DrainEvents()));
+        }
+
         [Fact]
         public void RefusedIntentResultCarriesTheCode()
         {
