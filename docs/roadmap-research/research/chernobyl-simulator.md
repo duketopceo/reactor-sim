@@ -9,28 +9,28 @@
 
 - `README.md` (repo, 3,548 bytes), port description, release table, Extras menu, hacking notes
 - `setup.nsi` (repo), NSIS installer script, version 0.3.0
-- `LICENSE.rtf` (repo), © 1998 Silsoft / Gatekeeper, all rights reserved; otvdm GPLv2
+- `LICENSE.rtf` (repo), © 1998 Silsoft / Gatekeeper, all rights reserved; 16-bit Windows emulator shim GPLv2
 - Releases API: v0.1.0 (2021-12-08), v0.2.0 (2025-10-04), v0.3.0 (2026-05-02), with asset sizes and download counts
 - Issues API, all 20 issues (state=all), all closed
-- Full recursive tree (458 files) and file-level reads of the decompiled VB3 sources: `RXMODEL/MODULE3.BAS` (58 KB, core UI glue), `RXMODEL/MODEL_TI.FRM` (timer / random-failure roll), `RXMODEL/MAINFORM.FRM` (menus), `RXMODEL/FO_REPOR.FRM` (Field Operator's Report), `RXMODEL/DIAGNOST.FRM` (diagnostic mode), `RXMODEL/BUDGET_C.FRM` (Budget Change Summary), `RXMODEL/ALARMMDI.FRM`, `ICSELECT/ICDISPLA.FRM` (level select), `ACCOUNT/BALANCE_.FRM` (Accounting Balance Sheet)
+- Full recursive tree (458 files) and file-level reads of the published UI sources VB3 sources: `RXMODEL/MODULE3.BAS` (58 KB, core UI glue), `RXMODEL/MODEL_TI.FRM` (timer / random-failure roll), `RXMODEL/MAINFORM.FRM` (menus), `RXMODEL/FO_REPOR.FRM` (Field Operator's Report), `RXMODEL/DIAGNOST.FRM` (diagnostic mode), `RXMODEL/BUDGET_C.FRM` (Budget Change Summary), `RXMODEL/ALARMMDI.FRM`, `ICSELECT/ICDISPLA.FRM` (level select), `ACCOUNT/BALANCE_.FRM` (Accounting Balance Sheet)
 - Converted manual PDF (`chernobyl-manual-conv.pdf`, v0.1.0 asset, 2,384,108 bytes, 6,064 downloads), full text extracted with `pdftotext`, 3,251 lines. This is a conversion of an original WordPerfect draft; README warns its content "may slightly differ from the final version." The scanned manual (`chernobyl-manual-scan.pdf`, 41,883,647 bytes, 6,825 downloads) was not text-extracted.
 - Author's guide: https://dzx.fr/blog/getting-started-with-chernobyl-simulator/ (gdzx, "Getting started with Chernobyl Simulator"), read in full. This is the single best explanation of how the game actually plays; the manual is more reference than tutorial.
 
 ## What I did NOT do / limits of this research
 
-- I did not run the game (625 MB Windows installer, needs otvdm on Windows). All gameplay claims come from the manual, the blog, and the decompiled UI code.
-- The actual plant model lives in `chrnob.dll`, which is **not in the repo**, only the VB3 UI was decompiled and published. Malfunction catalog, trigger probabilities, the budget math (`extfn0492` etc.), and the physics are all DLL calls with obfuscated names (`extfn026E`, `extfn110F`, `extfn0264`). Anything about exact malfunction probabilities or the $/MWh income rate could not be verified from public sources and is flagged as unknown below, not guessed.
+- I did not run the game (625 MB Windows installer, needs 16-bit Windows emulator shim on Windows). All gameplay claims come from the manual, the blog, and the published UI sources UI code.
+- The actual plant model lives in `plant-model.dll`, which is **not in the repo**, only the VB3 UI was published UI sources and published. Malfunction catalog, trigger probabilities, the budget math (`extfn0492` etc.), and the physics are all DLL calls with obfuscated names (`extfn026E`, `extfn110F`, `extfn0264`). Anything about exact malfunction probabilities or the $/MWh income rate could not be verified from public sources and is flagged as unknown below, not guessed.
 - The manual's cost figures are in rubles; the in-game UI shows `$`. The two are used interchangeably in different places (see §4).
 
 ---
 
 ## 1. What the game is
 
-You operate Chernobyl Unit 3, an RBMK-1000 (3,000 MWt, 1,000 MWe per the manual). Three programs ship in the installer, each launched through otvdm (a 16-bit Windows emulator based on Wine):
+You operate Chernobyl Unit 3, an RBMK-1000 (3,000 MWt, 1,000 MWe per the manual). Three programs ship in the installer, each launched through 16-bit Windows emulator shim (a 16-bit Windows emulator based on Wine):
 
 | Program | Role |
 |---|---|
-| `Chrnobyl.exe` | Intro video, leads into Icselect |
+| `Chernobyl.exe` | Intro video, leads into Icselect |
 | `Icselect.exe` | Level select: four difficulty levels = four initial-condition (.ICD) files |
 | `Rxmodel.exe` | The simulator itself |
 
@@ -65,7 +65,7 @@ Also shipped in-game: a "training room" help system with slide decks and an inte
 
 ### 3.1 How faults are introduced
 
-Random failures are rolled on the simulation timer. From `RXMODEL/MODEL_TI.FRM` (the timer tick handler, decompiled VB3): every tick batch, if random failures are on (`gv0090`), the code draws `Int(Rnd(...) * 1000)`, a number 0–999, maps it to a malfunction number 1–100 (`m0142 = 1 + roll − Int(roll/100)*100`), asks the DLL (`extfn110F`) whether that malfunction fires, and if so triggers it via `extfn0264(m0142, 1)`. The timer also tracks the running failure rate for the diagnostic display (`m013E / m0140`, shown as a percentage). The catalog of ~100 numbered malfunctions and their per-tick probabilities live in `chrnob.dll`, not in the repo, so the exact list and rates are unverifiable from public sources. What is verifiable:
+Random failures are rolled on the simulation timer. From `RXMODEL/MODEL_TI.FRM` (the timer tick handler, published UI sources VB3): every tick batch, if random failures are on (`gv0090`), the code draws `Int(Rnd(...) * 1000)`, a number 0–999, maps it to a malfunction number 1–100 (`m0142 = 1 + roll − Int(roll/100)*100`), asks the DLL (`extfn110F`) whether that malfunction fires, and if so triggers it via `extfn0264(m0142, 1)`. The timer also tracks the running failure rate for the diagnostic display (`m013E / m0140`, shown as a percentage). The catalog of ~100 numbered malfunctions and their per-tick probabilities live in `plant-model.dll`, not in the repo, so the exact list and rates are unverifiable from public sources. What is verifiable:
 
 - Failures are **random, continuous, and backgrounded**, they can strike any system at any time while the plant runs, not only at scripted moments.
 - Difficulty scales the *starting* breakdown load: the four IC files are described in `ICSELECT/ICDISPLA.FRM` as "Minimal breakdowns" (easiest) → "More breakdowns" → "Substantial breakdowns" → "Substantial maintenance problems" (hardest). Random failures then add more on top.
@@ -122,8 +122,8 @@ Worth separating because it is the game's other core loop. Fuel burnup is a slow
 
 ### 4.1 How money works
 
-- **Income is power.** The four difficulty levels are defined in money terms, not just power terms: full power = "The plant is making money (easiest)"; 80% = "barely breaking even"; 50% = "losing money and power must be increased"; 0% = "losing a substantial amount of money" (hardest). The startup procedure ends at step 48 with: "This concludes the startup procedure. Congratulations, you are now making money." No explicit tariff ($/MWh) was found in the manual, the blog, or the decompiled UI code, the income math lives in the DLL. I do not know the rate, and the manual never states one.
-- **Budget menu → Office / Display / Budget Change.** The `ACCOUNT` program is a separate Accounting Balance Sheet; the `Budget Change Summary` window shows five line items (labels 0–4 in `BUDGET_C.FRM`; the row labels are baked into the form's background bitmap, so their text is not recoverable from the decompiled source). The blog's screenshot of the offline exercise shows the summary after a bout of off-line operation, the point being that even *not running* costs money.
+- **Income is power.** The four difficulty levels are defined in money terms, not just power terms: full power = "The plant is making money (easiest)"; 80% = "barely breaking even"; 50% = "losing money and power must be increased"; 0% = "losing a substantial amount of money" (hardest). The startup procedure ends at step 48 with: "This concludes the startup procedure. Congratulations, you are now making money." No explicit tariff ($/MWh) was found in the manual, the blog, or the published UI sources UI code, the income math lives in the DLL. I do not know the rate, and the manual never states one.
+- **Budget menu → Office / Display / Budget Change.** The `ACCOUNT` program is a separate Accounting Balance Sheet; the `Budget Change Summary` window shows five line items (labels 0–4 in `BUDGET_C.FRM`; the row labels are baked into the form's background bitmap, so their text is not recoverable from the published UI sources). The blog's screenshot of the offline exercise shows the summary after a bout of off-line operation, the point being that even *not running* costs money.
 - **Starting budgets are small and concrete.** The blog's offline exercise file `IC_INIT.ICD` gives "maximum fuel, malfunctions off, and a $12,000 budget." Against the cost table below, $12,000 is about six contractor repairs, or one mistake.
 
 ### 4.2 Verified cost table (manual, rubles; game UI shows $, the manual and UI do not use the same currency symbol)
@@ -144,7 +144,7 @@ Note the manual's own inconsistency: feed pumps are "slightly over 2,000,000" in
 
 ### 4.3 What happens when the budget runs out
 
-The blog states it plainly: **"When you are over budget, you can no longer buy new fuel bundles or repair malfunctioning equipment."** That is the fail state, not an explosion, not a game-over screen, but a soft lock: the plant keeps degrading, faults accumulate unrepaired, fuel burns down, criticality is eventually lost, and there is no way back except restoring an earlier .ICD save. No explicit bankruptcy screen, score, or "game over" text was found in the manual, README, or decompiled UI. The punishment is economic and slow, which fits the game's thesis (the manual's §2 closes by noting the other Chernobyl units were restarted "because of the severe financial desperation of the former Soviet republics" and asking "whether or not they have the financial means to properly operate and maintain" them, the budget *is* the theme).
+The blog states it plainly: **"When you are over budget, you can no longer buy new fuel bundles or repair malfunctioning equipment."** That is the fail state, not an explosion, not a game-over screen, but a soft lock: the plant keeps degrading, faults accumulate unrepaired, fuel burns down, criticality is eventually lost, and there is no way back except restoring an earlier .ICD save. No explicit bankruptcy screen, score, or "game over" text was found in the manual, README, or published UI sources UI. The punishment is economic and slow, which fits the game's thesis (the manual's §2 closes by noting the other Chernobyl units were restarted "because of the severe financial desperation of the former Soviet republics" and asking "whether or not they have the financial means to properly operate and maintain" them, the budget *is* the theme).
 
 ### 4.4 How money pressure shapes decisions
 
@@ -180,7 +180,7 @@ Difficulty is thus *starting-state* difficulty, not a separate ruleset: lower po
 ### 5.3 Win/lose conditions, what I found and did not find
 
 - **Found:** soft economic fail (over budget → cannot buy fuel or repair → slow death spiral); physical fail states described in the manual (uncovered fuel → "meltdown and/or explosion"; loss of all circulation → "meltdown and/or explosion"; scram → 2-day restart); the accident history as a cautionary tale.
-- **Not found:** any score, any victory screen, any campaign end, any "game over" text, any time limit, any leaderboard or mastery record, in the manual, README, blog, or decompiled UI forms I read. The game appears to be open-ended survival: the win state is "the plant is running and making money," the lose state is "it isn't, and you can't afford to fix it." The closest thing to a goal is the manual's closing dare: "See if you can make the necessary decisions and keep the reactor operating as it should. Good luck! You are definitely going to need it."
+- **Not found:** any score, any victory screen, any campaign end, any "game over" text, any time limit, any leaderboard or mastery record, in the manual, README, blog, or published UI sources UI forms I read. The game appears to be open-ended survival: the win state is "the plant is running and making money," the lose state is "it isn't, and you can't afford to fix it." The closest thing to a goal is the manual's closing dare: "See if you can make the necessary decisions and keep the reactor operating as it should. Good luck! You are definitely going to need it."
 - This absence is itself a design fact worth stealing-or-avoiding deliberately (see §10).
 
 ---
@@ -203,11 +203,11 @@ From the repo's `screenshot.png` (read directly) and the menu/form sources:
 
 ## 7. Distribution
 
-- **Installer:** NSIS (`setup.nsi`, version 0.3.0), installs to `C:\Chrnobyl`, **requires admin**, writes `HKLM\SOFTWARE\Chernobyl Simulator` version keys and an uninstaller. It silently installs the MSVC++ x86 redist (`vcredist_x86.exe /passive /install`), bundles otvdm, icons, and the game files (`chrnobyl\*`, `patch\*`, note: those source directories are **not in the git repo**; the installer is built from the maintainer's local machine, `OutFile "C:\Users\User\Desktop\chernobyl-setup.exe"`).
-- **Size:** v0.3.0 installer is **624,964,744 bytes (~596 MB)** for a 1998 game whose repo is 903 KB, the bulk is videos + otvdm + redist. Download counts (as of 2026-11-25): v0.1.0 setup **18,653**, v0.2.0 **4,793**, v0.3.0 **899**; manuals 6,825 (scan) / 6,064 (converted). The v0.1.0 installer is still the most-downloaded by far, most players are on the oldest build.
-- **Reach:** three Start Menu shortcuts (Chrnobyl / Icselect / Rxmodel), each a shortcut to `otvdmw.exe` with the 16-bit exe as argument. This indirection is the #1 support burden: issues #3, #6, #8, #11 are all "I launched the .exe directly and Windows says this app can't run on your PC." The game only works when launched *through* otvdm.
+- **Installer:** NSIS (`setup.nsi`, version 0.3.0), installs to `C:\Chernobyl`, **requires admin**, writes `HKLM\SOFTWARE\Chernobyl Simulator` version keys and an uninstaller. It silently installs the MSVC++ x86 redist (`vcredist_x86.exe /passive /install`), bundles 16-bit Windows emulator shim, icons, and the game files (`chrnobyl\*`, `patch\*`, note: those source directories are **not in the git repo**; the installer is built from the maintainer's local machine, `OutFile "C:\Users\<redacted>\Desktop\chernobyl-setup.exe"`).
+- **Size:** v0.3.0 installer is **624,964,744 bytes (~596 MB)** for a 1998 game whose repo is 903 KB, the bulk is videos + 16-bit Windows emulator shim + redist. Download counts (as of 2026-11-25): v0.1.0 setup **18,653**, v0.2.0 **4,793**, v0.3.0 **899**; manuals 6,825 (scan) / 6,064 (converted). The v0.1.0 installer is still the most-downloaded by far, most players are on the oldest build.
+- **Reach:** three Start Menu shortcuts (Chernobyl / Icselect / Rxmodel), each a shortcut to `emulator host executable` with the 16-bit exe as argument. This indirection is the #1 support burden: issues #3, #6, #8, #11 are all "I launched the .exe directly and Windows says this app can't run on your PC." The game only works when launched *through* 16-bit Windows emulator shim.
 - **Release hygiene:** only three releases in five years; v0.2.0 fixed the Win11 video-codec break; v0.3.0 (May 2026) fixed one bug, "fuel monitor becoming stuck and blocking refueling operations." The README's release table still lists v0.2.0 as current and is stale relative to `setup.nsi` (0.3.0). No changelog beyond one-line fixes, no CI visible, no tests.
-- **Maintenance reality:** single maintainer (gdzx). All 20 issues closed, 0 PRs merged. Recent issue traffic (2025–2026) is dominated by: hi-res scaling (game "nearly unplayable" on high-res displays, #2/#14, the fixed 1024×768-era panels render tiny, numbers replaced by boxes at 2560×1440), Win11 launch confusion, refueling bugs, and two educational-use enhancement requests (#12/#13: resizable windows, more trend windows, all windows size-adjustable) from a user planning classroom use. The maintainer's decompiled sources were only published in April 2026 (commit `27487af`, "Add decompiled sources"), five years after the port, and issue #18 asks for explicit permission to redistribute the decompiled version, i.e. the community wants to build on it and currently cannot cleanly.
+- **Maintenance reality:** single maintainer (gdzx). All 20 issues closed, 0 PRs merged. Recent issue traffic (2025–2026) is dominated by: hi-res scaling (game "nearly unplayable" on high-res displays, #2/#14, the fixed 1024×768-era panels render tiny, numbers replaced by boxes at 2560×1440), Win11 launch confusion, refueling bugs, and two educational-use enhancement requests (#12/#13: resizable windows, more trend windows, all windows size-adjustable) from a user planning classroom use. The maintainer's published UI sources sources were only published in April 2026 (commit `27487af`, "Add published UI sources sources"), five years after the port, and issue #18 asks for explicit permission to redistribute the published UI sources version, i.e. the community wants to build on it and currently cannot cleanly.
 
 ---
 
@@ -229,7 +229,7 @@ From the repo's `screenshot.png` (read directly) and the menu/form sources:
 1. **No goals, score, or end state.** Open-ended survival only. Nothing to *complete*, no mastery record, no reason to return after the first successful startup except self-set experiments. The blog has to invent endgame goals for the player.
 2. **Silent faults are indistinguishable from bugs, and sometimes are bugs.** Fuel-monitor stuck bug shipped for years; overflow crashes on pump/valve operation; recirc pumps not starting in one IC file. When the core loop is "notice something is wrong," any engine bug reads as gameplay.
 3. **The interface is window-management labor.** MDI child windows, fixed tiny panels, no scaling (the #1 complaint in 2025–2026: "nearly unplayable" on hi-res). No fast-forward, no time control beyond pause. Trend selection is a fiddly click-pen-color ritual.
-4. **The model is a closed DLL.** The repo publishes decompiled VB3 UI only; `chrnob.dll` (physics, malfunctions, budget) is a binary blob. The community cannot fix, extend, or verify the model, issues #17/#18 are users asking for the decompiled code and redistribution permission. For reactor-sim this is a cautionary tale about what "open" means.
+4. **The model is a closed DLL.** The repo publishes published UI sources VB3 UI only; `plant-model.dll` (physics, malfunctions, budget) is a binary blob. The community cannot fix, extend, or verify the model, issues #17/#18 are users asking for the published UI sources code and redistribution permission. For reactor-sim this is a cautionary tale about what "open" means.
 5. **No fault history, no post-mortem, no tutorialization of failure.** When you lose the plant you get no debrief: what failed, in what order, what it cost. The manual is the only teacher and it is 100 pages.
 6. **Refueling input is fragile by design.** Drag-and-drop with symbol alignment and a click-release bug that blocks further refueling. The most tactile loop is also the most brittle.
 7. **Distribution is a 596 MB admin-required installer for a 900 KB repo**, launched through an emulator shim, with the #1 support issue being "I clicked the exe." No portable build, no Steam/itch page, no macOS/Linux path (issue #10: macOS via Porting Kit fails).
@@ -295,9 +295,9 @@ Steal Chernobyl's **economy of diagnosis** (10:1 contractor/DIY, priced cascades
 
 ### B. Open questions I could not answer from public sources
 
-- The ~100-malfunction catalog and per-tick trigger probabilities (in `chrnob.dll`, not in repo).
+- The ~100-malfunction catalog and per-tick trigger probabilities (in `plant-model.dll`, not in repo).
 - The income rate ($/MWh or equivalent) and the five Budget Change Summary row definitions.
-- Whether any explicit game-over/score screen exists in the shipped binary (none found in manual, README, blog, or decompiled UI, but the binary itself was not run).
+- Whether any explicit game-over/score screen exists in the shipped binary (none found in manual, README, blog, or published UI sources UI, but the binary itself was not run).
 - The 3,500,000-ruble pump figure in manual §6, context not fully verified; do not quote without re-checking the scan.
 
 ### C. Links
@@ -306,4 +306,4 @@ Steal Chernobyl's **economy of diagnosis** (10:1 contractor/DIY, priced cascades
 - Releases: https://github.com/gdzx/chernobyl-simulator/releases (v0.3.0 installer, v0.1.0 manuals)
 - Author's guide: https://dzx.fr/blog/getting-started-with-chernobyl-simulator/
 - Original homepage (archived): https://web.archive.org/web/19990429163349/http://www.gatekeepsw.com:80/
-- otvdm (emulator used by the port): https://github.com/otya128/winevdm
+- 16-bit Windows emulator shim (emulator used by the port): https://github.com/otya128/winevdm

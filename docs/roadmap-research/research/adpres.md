@@ -142,7 +142,7 @@ Net: ADPRES died of **naming, maintenance consolidation, and missing test infras
 - Global mutable state everywhere (`module sdata`); no modularity that would let you reuse the neutronics without the whole program. No parallelism at all (KOMODO adds partial GPU).
 - Error handling is `STOP` with a printed message, fine for batch, useless for embedding.
 - Hard-coded limits scattered in code: 3000 ppm boron cap, 20 boron-search iterations, 10 k-eff-forcing iterations, 6 precursor groups, 228-step rod scale, 9-point steam table.
-- Sample inputs contain absolute paths (`/home/imronuke/ADPRES/...`), they do not run as-shipped on another machine without editing.
+- Sample inputs contain absolute paths (`<unix-home-sample-path-redacted>`), they do not run as-shipped on another machine without editing.
 - No releases/tags found; version is a banner string ("ADPRES 1.2").
 
 **Missing (relevant to a game sim)**

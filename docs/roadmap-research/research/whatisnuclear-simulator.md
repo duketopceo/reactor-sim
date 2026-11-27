@@ -69,7 +69,7 @@ The README is the whole project, and it is worth reading in full. It is a crisp 
 ### 2.5 Related projects named in the README
 
 - IAEA nuclear reactor simulators for education and training: "Many of these don't meet the requirements of easy access/use/development or multi-reactor capabilities."
-- `nuclearpowersimulator.com`: "very similar in concept and operation to what we want. We just want it to be a little bit more interactive, with better graphics, more live plots, and possibly sound effects." Note: this comparator is now defunct. Web search on 2026-11-25 finds it described as defunct and playable only via the Wayback Machine (web.archive.org snapshot 2020-02-21). The README's main reference implementation died the same way the README's own project did: no maintainer, no funding, no loop.
+- a defunct legacy browser plant sim (domain omitted): "very similar in concept and operation to what we want. We just want it to be a little bit more interactive, with better graphics, more live plots, and possibly sound effects." Note: this comparator is now defunct. Web search on 2026-11-25 finds it described as defunct and playable only via the Wayback Machine (web.archive.org snapshot 2020-02-21). The README's main prior art implementation died the same way the README's own project did: no maintainer, no funding, no loop.
 
 ## 3. What actually shipped (outside this repo)
 
@@ -138,7 +138,7 @@ Evidence, not speculation:
 
 - **R2 as a measurable requirement is the single best idea in the repo.** "Capture the attention of a 14-year-old for 4 minutes" is a design constraint you can test, not a vibe. Most sim projects never state their engagement bar at all.
 - **One verb plus one number plus hold it steady.** The live applet's entire pedagogy is: move one slider, watch power, hold 10,000 W. That is a complete learning loop in under a minute, and it teaches the one concept (delayed neutrons make control possible) that the page also explains in plain language right next to the toy.
-- **Contextual hints on wrong actions.** From `partofthething` in issue #1, praising `nuclearpowersimulator.com`: hints like "try turning on the pump before increasing its speed" when the user does things in the wrong order. Cheap to implement, high teaching value, and it turns errors into lessons instead of dead ends.
+- **Contextual hints on wrong actions.** From `partofthething` in issue #1, praising a defunct legacy browser plant sim (domain omitted): hints like "try turning on the pump before increasing its speed" when the user does things in the wrong order. Cheap to implement, high teaching value, and it turns errors into lessons instead of dead ends.
 - **Immediate visual feedback.** Rotor speed tied to a slider, animated flow, color and motion as state. The operator sees cause and effect without reading a number.
 - **Progressive disclosure, named but not built.** Issue #1 suggests gating escalating complexity (Infinifactory, Satisfactory, Minecraft mods as models): the player earns understanding of one concept before the next is introduced. Issue #1 also proposes simulation vs training vs game as explicit modes, which the commenter calls "a good set of milestones."
 - **Plain-language explanation co-located with the controls.** The live page explains dollars/cents, prompt vs delayed neutrons, and supercritical vs subcritical in the same view as the slider, not in a separate manual.
@@ -147,7 +147,7 @@ Evidence, not speculation:
 
 - **The audience conflict was identified and never resolved.** Issue #1 (comment by `partofthething`): children of the general public need fun and less realism; engineering students, advocates, and designers need realism. "Perhaps we can make this configurable somehow" is not a decision, and no decision followed.
 - **"Nuclear plants are fairly boring to operate by modern gaming standards."** The author's own words (issue #1). His hope was that the thing would be "neat-looking and interesting enough to have some wow factor, giving whoever's standing there time to explain a few things." That concedes the sim alone does not hold attention; it needs a human explainer standing next to it. For a game, that is a design failure to plan around, not a hope to rely on.
-- **No onboarding, tutorial, level design, or progression was ever built.** No failure modes, no scenarios, no goals beyond the applet's hold-steady challenge, no sound (mentioned as an aspiration in the README's comparison to `nuclearpowersimulator.com`).
+- **No onboarding, tutorial, level design, or progression was ever built.** No failure modes, no scenarios, no goals beyond the applet's hold-steady challenge, no sound (mentioned as an aspiration in the README's comparison to a defunct legacy browser plant sim (domain omitted)).
 - **The 4-minute metric was never instrumented.** No analytics, no playtesting reported, no evidence anyone's attention was ever measured. R2 is a requirement with no verification method.
 - **Multiplayer was discussed and dropped.** Issue #2 (Karl Alex Pauls, a games-industry voice) argues from Artemis Bridge Simulator and Space Team that chained 3–5 person work tasks create responsiveness, that 50–350 ms is the real bar for realtime multiplayer, and that commands should be queued, rate-limited, and promptly acknowledged even if the sim lags. The author agrees ("This thing won't be much different from a game. It is a game, really") and revises the target to 350 ms. Nothing multiplayer was ever built.
 - **A useful pointer that went nowhere:** `jakehader` (2019-04-14) points to `wgurecky/pyReactor` in issue #1. There is no record of it being evaluated.
@@ -209,11 +209,11 @@ Reactor-sim's position is already stronger than this project's in the ways that 
 - GitHub API, `partofthething/keepinpace`: repo metadata, recursive tree, `solver.py`, `interactive.py`, `README.md`, `requirements.txt` in full.
 - GitHub API, `whatisnuclear` org repo list; `npm-install-fluffypaws` and `karl-alex-pauls` user records.
 - `https://live.whatisnuclear.com`, fetched 2026-11-25: live PKE applet page text.
-- Web search, 2026-11-25: `nuclearpowersimulator.com` status (defunct, Wayback-only per forum comment).
+- Web search, 2026-11-25: a defunct legacy browser plant sim (domain omitted) status (defunct, Wayback-only per forum comment).
 
 ### Verification gaps (not retried, not assumed)
 
 - The SVG.js proof-of-concept links were not fully verified: `partofthething.com/spintest-svgjs.html` returned no extractable content on fetch (2026-11-25); the jsfiddle link was not opened. The PoC's existence is attested only by the README.
 - TOPAZ/OSTI claims are cited from the README, not independently verified.
-- `nuclearpowersimulator.com` being defunct rests on a forum comment and search results, not a direct fetch of the site.
+- a defunct legacy browser plant sim (domain omitted) being defunct rests on a forum comment and search results, not a direct fetch of the site.
 - The characterization of issues #4–#6 as drive-by noise rests on the filer's account metadata (created 2026-09-25, 0 followers, 3 public repos) plus zero comments, PRs, or maintainer response; intent cannot be proven from the API.
