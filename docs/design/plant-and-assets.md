@@ -254,3 +254,81 @@ Keep the manifest (`assets/manifest.csv`, *to be created*) as the source of trut
 ## 7. Licensing
 
 Original assets only; each carries `rs_license`/`rs_author`. No third-party assets are imported; code licensing and asset licensing are tracked separately.
+
+## 8. Radiation model (Phase 4)
+
+This is a game model with explicit approximations. It is not a radiation-protection tool. Units and limits follow real
+conventions so the numbers read sensibly. Source strengths are gameplay tuning and are not real plant data. Code:
+`ReactorSim.Core/Radiation/` and the radiation section of `ReactorSim.Core/Physics.cs`. Status: the dose model and the exposure
+ledger exist and are tested without Unity. Instruments, controlled access, protective gear and contamination are not built.
+
+**Units.** Dose in mSv, dose rate in mSv/h. 1 Sv = 100 rem, and for gamma 1 Gy is about 1 Sv (NRC glossary). Distances are
+metres in the Phase 2 route frame (section 4.1).
+
+**Areas.** Core declares its own string IDs because it cannot reference `RouteGraph.cs`. A test pins them to `RouteGraph`.
+They are `room.control`, `room.corridor`, `room.lift_lobby`, `room.lift`, `room.reactor_deck`, `room.turbine_hall`,
+`space.reactor_hall` (hall equipment above the water) and one Core-only area, `area.reactor_pool`, for the pool and core volume
+below the waterline. `area.reactor_pool` has `space.reactor_hall` as its parent. It exists so pool water can sit between the core
+and every other area. Each area has one reference point at chest height (1.0 m above its floor), used to classify the area.
+
+**Sources.** A fixed register of three. Each strength is a pure function of the plant state, so no plant state was added.
+Strength is the numerator of the distance law below, in mSv/h m^2.
+
+| ID | Area | Strength rule |
+|---|---|---|
+| `rad.core` | `area.reactor_pool` | 5000 x normalised power (zero while scrammed) + 10000 x normalised decay heat |
+| `rad.primary_n16` | `space.reactor_hall` | 40 x normalised power x primary flow fraction (zero while scrammed) |
+| `rad.corrosion` | `space.reactor_hall` | constant 2.0 (Co-60 corrosion products, half-life 5.27 y) |
+
+**Distance law.** Each source adds strength x attenuation / (r^2 + r0^2), with r0 = 0.3 m. The unshielded rate at 1 m is the
+strength divided by 1.09. The rate at a point is the background plus the sum over sources, clamped to 1e5 mSv/h. Background is
+0.00035 mSv/h (about 3.1 mSv/y, NRC). r0 is the 10 CFR 20.1003 posting distance, used as a softening length that removes the
+point-source singularity.
+
+**Shielding.** A barrier table lists every source area against every area. Each entry is a list of slabs, a material and a
+thickness. Attenuation is 2 to the power of minus thickness over the half-value layer (HVL), multiplied over the slabs. An empty
+list means no barrier (the same area, or the open deck of the hall). A pair missing from the table is a register error caught by
+test and reads as unavailable, never as zero. HVLs are broad-beam Co-60 values: concrete 6.6 cm, steel 2.1 cm, lead 1.2 cm
+(OSHA shielding examples); water 10 cm is an estimate from the NIST XCOM coefficient at 1.25 MeV. The shipped table uses only
+concrete and water: 1.0 m of pool water between the core and every other area, plus 0.5 m of concrete between the hall or pool
+and each wing room.
+
+**Posting thresholds** (10 CFR 20.1003, "greater than"): radiation area 0.05 mSv/h, high radiation area 1 mSv/h, very high
+radiation area 5000 mSv/h (5 Gy/h). The regulation measures the first two at 30 cm and the last at 1 m. The model applies each to
+the rate at the point it classifies. It applies no consequence to an operator.
+
+**Unavailable, not zero.** A reading is unavailable when the area is unknown, the point is non-finite or beyond 1000 m of the
+origin, a plant input is not finite, or a barrier pair is missing. An available reading is never below background. The ledger adds
+no dose for an unavailable tick and adds the tick to the operator's unavailable time, so a displayed dose is a lower bound.
+
+**Exposure.** Each tick adds rate x `TickDt` in hours, from the subject's last reported location. Pause runs no tick and warp runs
+more ticks of the same length, so dose follows simulation time. The ledger saves as `{"schema":1,"subjects":[...]}`.
+
+**Resulting rates** at each area's reference point, in mSv/h. "After trip" is five 1 s steps after a SCRAM from rated power.
+
+| Area | Rated power | After trip | Cold |
+|---|---|---|---|
+| `room.control` | 0.0014 | 0.00041 | 0.00038 |
+| `room.corridor` | 0.00086 | 0.00038 | 0.00037 |
+| `room.lift_lobby` | 0.00096 | 0.00039 | 0.00037 |
+| `room.lift` | 0.00098 | 0.00039 | 0.00038 |
+| `room.reactor_deck` | 0.34 (radiation area) | 0.022 | 0.021 |
+| `room.turbine_hall` | 0.00063 | 0.00037 | 0.00036 |
+| `space.reactor_hall` | 0.61 (radiation area) | 0.029 | 0.028 |
+| `area.reactor_pool` | 620 (high radiation area) | 57 (high radiation area) | 0.0059 |
+
+**Gameplay choices.** Every one is tunable and none is a measured plant value.
+- Source strengths: core operating 5000 and residual 10000 mSv/h m^2 per unit, N-16 40, corrosion 2.0.
+- Source positions: the core on the module axis at the fuel array; the N-16 source over the module at 16.6 m height, 0.5 m above
+  the deck floor; the corrosion source 1.5 m east of it.
+- `r0` = 0.3 m as the softening length.
+- Slab thicknesses: 1.0 m of pool water (a real pool is several metres deep) and 0.5 m of wing concrete.
+- The N-16 instant drop: the N-16 term goes to zero on the first tick after a trip instead of decaying over about a minute
+  (7.1 s half-life). It avoids a lag state on the plant.
+- The residual share being twice the operating share per unit.
+- The corrosion level, small enough that a cold hall stays below the radiation-area posting.
+- Reference point height and the area reference points themselves.
+- Hall geometry copied from the Unity-side files, pinned by test.
+- Bounds: at most 16 subjects, subject IDs of 1 to 64 characters, coordinates within 1000 m, rate clamp 1e5 mSv/h, dose clamp 1e7 mSv.
+
+Not modelled: neutron, beta, skin, extremity and internal dose, contamination, ray-traced geometry and buildup factors.

@@ -78,6 +78,9 @@ namespace ReactorSim
             Add("EDGE-06", "edge", "Out-of-range bounded commands saturate with documented semantics", null, EdgeSaturation);
             Add("EDGE-07", "edge", "Less primary flow never lowers primary temperature (flow 0 finite)", null, EdgeFlow);
             Add("EDGE-08", "edge", "Loss of heat sink at power stays finite and does not sit on a model clamp", null, EdgeLossOfSink);
+            // ---- Radiation (Phase 4) ----
+            Add("RAD-01", "numerical", "Dose rate at every area's reference point is available, finite and >= background (rated power, after trip, cold)", null, RadiationChecks.AllAreasAvailable);
+            Add("RAD-02", "determinism", "Ledger dose is invariant to time scale (same location and tick count at 1x and 60x)", null, RadiationChecks.DoseInvariantToTimeScale);
         }
 
         private static void Add(string id, string kind, string title, string knownDefect, Func<string> body)

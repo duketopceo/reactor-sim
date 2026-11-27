@@ -106,6 +106,8 @@ function of state and `dt`, and recorded in the journal ([observability](../deve
 | EDGE-06 | edge | Out-of-range bounded commands saturate (rods to [0,1]; `SteamDemandFrac` 5.0 ≡ 1.0) | PASS |
 | EDGE-07 | edge | Zero primary flow finite; less flow never gives a lower primary temperature | PASS |
 | EDGE-08 | edge | Loss of heat sink at power: finite, plant is not already tripped beforehand, the reactor protection SCRAMs with a recorded protective cause, and no state variable sits on a model clamp | PASS (KD-06 fixed) |
+| RAD-01 | numerical | The dose rate at every radiation area's reference point is available, finite and at least the natural background, at rated power, after a trip and cold. A NaN or a missing barrier pair makes it fail with a message naming the area | PASS |
+| RAD-02 | determinism | An operator at a fixed location gets identical ledger dose and unavailable time after the same tick count at 1x and at 60x (`Simulation.Advance`) | PASS |
 
 Fixture provenance: NUM-07 values are IAPWS-IF97 saturation points (`Physics` now implements the
 IF97 Region 4 closed form exactly; it was an Antoine fit, 0.76 % low at 300 K), cross-checked on 2026-11-07
