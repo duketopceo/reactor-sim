@@ -109,9 +109,10 @@ namespace ReactorSim
                 if (!RadiationAreas.IsKnown(e.Subject)) bad.Add("barrier table names unknown subject area '" + e.Subject + "'");
                 foreach (var s in e.Slabs)
                 {
+                    double hvl = HvlM(s.Material);
                     if (!Physics.IsFinite(s.ThicknessM) || s.ThicknessM < 0.0)
                         bad.Add("barrier " + e.Source + " -> " + e.Subject + " has a bad thickness " + s.ThicknessM);
-                    if (!Physics.IsFinite(HvlM(s.Material)) || HvlM(s.Material) <= 0.0)
+                    if (!Physics.IsFinite(hvl) || hvl <= 0.0)
                         bad.Add("barrier " + e.Source + " -> " + e.Subject + " has an unknown material");
                 }
             }
@@ -156,21 +157,24 @@ namespace ReactorSim
 
         public static IReadOnlyList<string> AllAreaIds { get { return Ids; } }
 
+        private static int IndexOf(string id)
+        {
+            if (id == null) return -1;
+            for (int i = 0; i < Ids.Length; i++)
+                if (string.Equals(Ids[i], id, StringComparison.Ordinal)) return i;
+            return -1;
+        }
+
         public static bool IsKnown(string areaId)
         {
-            if (areaId == null) return false;
-            for (int i = 0; i < Ids.Length; i++)
-                if (string.Equals(Ids[i], areaId, StringComparison.Ordinal)) return true;
-            return false;
+            return IndexOf(areaId) >= 0;
         }
 
         public static bool TryGetReferencePoint(string areaId, out RadPoint point)
         {
-            if (areaId != null)
-                for (int i = 0; i < Ids.Length; i++)
-                    if (string.Equals(Ids[i], areaId, StringComparison.Ordinal)) { point = RefPoints[i]; return true; }
-            point = default(RadPoint);
-            return false;
+            int i = IndexOf(areaId);
+            point = i < 0 ? default(RadPoint) : RefPoints[i];
+            return i >= 0;
         }
 
         /// <summary>The RouteGraph space a Core-only sub-area belongs to; null for an area that is itself a RouteGraph ID.</summary>

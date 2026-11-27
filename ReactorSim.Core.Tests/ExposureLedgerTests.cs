@@ -1,5 +1,6 @@
 using System;
 using Xunit;
+using static ReactorSim.Tests.RadiationTestPlants;
 
 namespace ReactorSim.Tests
 {
@@ -7,21 +8,6 @@ namespace ReactorSim.Tests
     public class ExposureLedgerTests
     {
         private const string Deck = RadiationAreas.ReactorDeckId;
-
-        private static Plant AtPower()
-        {
-            var p = new Plant();
-            p.LoadPreset("full-power");
-            return p;
-        }
-
-        private static Plant Tripped()
-        {
-            var p = AtPower();
-            p.Apply(PlantIntent.TriggerScram());
-            for (int i = 0; i < 5; i++) p.Step(1.0);
-            return p;
-        }
 
         private static double DeckRate(Plant p)
         {

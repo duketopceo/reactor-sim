@@ -92,8 +92,7 @@ namespace ReactorSim
             if (!ValidText(subjectId)) return LedgerRefusal.InvalidSubjectId;
             if (!ValidText(areaId)) return LedgerRefusal.InvalidArea;
             if (!Physics.IsFinite(x) || !Physics.IsFinite(y) || !Physics.IsFinite(h)) return LedgerRefusal.NonFiniteCoordinate;
-            double max = Physics.RadMaxCoordinateM;
-            if (Math.Abs(x) > max || Math.Abs(y) > max || Math.Abs(h) > max) return LedgerRefusal.OutOfBounds;
+            if (!DoseField.InBounds(x) || !DoseField.InBounds(y) || !DoseField.InBounds(h)) return LedgerRefusal.OutOfBounds;
 
             int i = Find(subjectId);
             if (i < 0)
@@ -115,19 +114,41 @@ namespace ReactorSim
             return true;
         }
 
+        /// <summary>Removes every subject.</summary>
+        public void Clear()
+        {
+            _subjects.Clear();
+        }
+
+        public void Step(Plant plant, double dtSeconds)
+        {
+            if (plant == null) throw new ArgumentNullException("plant");
+            if (double.IsNaN(dtSeconds) || dtSeconds < 0.0 || dtSeconds > Plant.MaxStepSeconds)
+                throw new ArgumentOutOfRangeException("dtSeconds", dtSeconds, "ExposureLedger.Step dt must be finite, >= 0 and <= " + Plant.MaxStepSeconds + " s");
+            var state = RadiationPlantState.FromPlant(plant);
+            for (int i = 0; i < _subjects.Count; i++)
+            {
+                var s = _subjects[i];
+                if (!s.HasLocation) { s.AddUnavailable(dtSeconds); continue; }
+                var reading = DoseField.Evaluate(SourceRegister.Default, RadiationAreas.DefaultBarriers, state, s.AreaId, s.X, s.Y, s.H);
+                if (reading.Available) s.AddDose(reading.RateMSvPerH, dtSeconds);
+                else s.AddUnavailable(dtSeconds);
+            }
+        }
+
         /// <summary>Versioned document (KTD9). Subjects are in ordinal ID order; locations are not saved.</summary>
         public string ToJson()
         {
             var sb = new StringBuilder();
-            sb.Append("{\"schema\":").Append(SchemaVersion).Append(",\"subjects\":[");
+            sb.Append("{\"").Append(KeySchema).Append("\":").Append(SchemaVersion).Append(",\"").Append(KeySubjects).Append("\":[");
             for (int i = 0; i < _subjects.Count; i++)
             {
                 var s = _subjects[i];
                 if (i > 0) sb.Append(',');
-                sb.Append("{\"id\":\"").Append(PlantIntent.EscapeJson(s.Id)).Append('"');
-                sb.Append(",\"doseMSv\":").Append(Num(s.DoseMSv));
-                sb.Append(",\"peakRateMSvPerH\":").Append(Num(s.PeakRateMSvPerH));
-                sb.Append(",\"unavailableSeconds\":").Append(Num(s.UnavailableSeconds));
+                sb.Append("{\"").Append(KeyId).Append("\":\"").Append(PlantIntent.EscapeJson(s.Id)).Append('"');
+                sb.Append(",\"").Append(KeyDose).Append("\":").Append(Num(s.DoseMSv));
+                sb.Append(",\"").Append(KeyPeak).Append("\":").Append(Num(s.PeakRateMSvPerH));
+                sb.Append(",\"").Append(KeyUnavailable).Append("\":").Append(Num(s.UnavailableSeconds));
                 sb.Append('}');
             }
             return sb.Append("]}").ToString();
@@ -147,13 +168,13 @@ namespace ReactorSim
             var root = doc as Dictionary<string, object>;
             if (root == null) return Refuse(LedgerLoadReason.WrongType);
             object schema;
-            if (!root.TryGetValue("schema", out schema)) return Refuse(LedgerLoadReason.MissingSchema);
+            if (!root.TryGetValue(KeySchema, out schema)) return Refuse(LedgerLoadReason.MissingSchema);
             if (!(schema is double)) return Refuse(LedgerLoadReason.WrongType);
             if ((double)schema != SchemaVersion) return Refuse(LedgerLoadReason.UnsupportedSchema);
             foreach (var key in root.Keys)
-                if (key != "schema" && key != "subjects") return Refuse(LedgerLoadReason.UnknownKey);
+                if (key != KeySchema && key != KeySubjects) return Refuse(LedgerLoadReason.UnknownKey);
             object subjectsObj;
-            if (!root.TryGetValue("subjects", out subjectsObj)) return Refuse(LedgerLoadReason.WrongType);
+            if (!root.TryGetValue(KeySubjects, out subjectsObj)) return Refuse(LedgerLoadReason.WrongType);
             var list = subjectsObj as List<object>;
             if (list == null) return Refuse(LedgerLoadReason.WrongType);
             if (list.Count > Physics.RadMaxSubjects) return Refuse(LedgerLoadReason.TooManySubjects);
@@ -180,6 +201,12 @@ namespace ReactorSim
         }
 
         private const int SchemaVersion = 1;
+        private const string KeySchema = "schema";
+        private const string KeySubjects = "subjects";
+        private const string KeyId = "id";
+        private const string KeyDose = "doseMSv";
+        private const string KeyPeak = "peakRateMSvPerH";
+        private const string KeyUnavailable = "unavailableSeconds";
 
         private static LedgerLoadResult Refuse(LedgerLoadReason reason) { return new LedgerLoadResult(null, reason); }
 
@@ -190,10 +217,10 @@ namespace ReactorSim
             subject = null;
             if (o == null) return LedgerLoadReason.WrongType;
             foreach (var key in o.Keys)
-                if (key != "id" && key != "doseMSv" && key != "peakRateMSvPerH" && key != "unavailableSeconds") return LedgerLoadReason.UnknownKey;
+                if (key != KeyId && key != KeyDose && key != KeyPeak && key != KeyUnavailable) return LedgerLoadReason.UnknownKey;
             object idObj, dose, peak, unavail;
-            if (!o.TryGetValue("id", out idObj) || !o.TryGetValue("doseMSv", out dose)
-                || !o.TryGetValue("peakRateMSvPerH", out peak) || !o.TryGetValue("unavailableSeconds", out unavail))
+            if (!o.TryGetValue(KeyId, out idObj) || !o.TryGetValue(KeyDose, out dose)
+                || !o.TryGetValue(KeyPeak, out peak) || !o.TryGetValue(KeyUnavailable, out unavail))
                 return LedgerLoadReason.WrongType;
             var id = idObj as string;
             if (id == null || !(dose is double) || !(peak is double) || !(unavail is double)) return LedgerLoadReason.WrongType;
@@ -204,26 +231,6 @@ namespace ReactorSim
             if (!ValidText(id)) return LedgerLoadReason.InvalidSubjectId;
             subject = new ExposureSubject(id, d, p, u);
             return LedgerLoadReason.None;
-        }
-
-        public void Clear()
-        {
-            _subjects.Clear();
-        }
-
-        public void Step(Plant plant, double dtSeconds)
-        {
-            if (plant == null) throw new ArgumentNullException("plant");
-            if (double.IsNaN(dtSeconds) || dtSeconds < 0.0 || dtSeconds > Plant.MaxStepSeconds)
-                throw new ArgumentOutOfRangeException("dtSeconds", dtSeconds, "ExposureLedger.Step dt must be finite, >= 0 and <= " + Plant.MaxStepSeconds + " s");
-            for (int i = 0; i < _subjects.Count; i++)
-            {
-                var s = _subjects[i];
-                if (!s.HasLocation) { s.AddUnavailable(dtSeconds); continue; }
-                var reading = DoseField.Evaluate(plant, s.AreaId, s.X, s.Y, s.H);
-                if (reading.Available) s.AddDose(reading.RateMSvPerH, dtSeconds);
-                else s.AddUnavailable(dtSeconds);
-            }
         }
 
         private int Find(string id)

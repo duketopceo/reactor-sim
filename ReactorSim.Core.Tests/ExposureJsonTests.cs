@@ -19,8 +19,7 @@ namespace ReactorSim.Tests
 
         private static ExposureLedger TwoSubjects()
         {
-            var plant = new Plant();
-            plant.LoadPreset("full-power");
+            var plant = RadiationTestPlants.AtPower();
             RadPoint pt;
             Assert.True(RadiationAreas.TryGetReferencePoint(Deck, out pt));
             var l = new ExposureLedger();

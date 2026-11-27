@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Xunit;
+using static ReactorSim.Tests.RadiationTestPlants;
 
 namespace ReactorSim.Core.Tests
 {
@@ -9,13 +10,6 @@ namespace ReactorSim.Core.Tests
     // (KTD6). The numbers Core copies into Physics.cs fail here if the Unity-side geometry moves.
     public class RadiationAreaRouteTests
     {
-        private static Plant AtPower()
-        {
-            var p = new Plant();
-            p.LoadPreset("full-power");
-            return p;
-        }
-
         private static double WaterSurfaceH { get { return HallDimensions.WaterDepth - HallDimensions.RoomFloorAbovePoolFloor; } }
 
         [Fact]

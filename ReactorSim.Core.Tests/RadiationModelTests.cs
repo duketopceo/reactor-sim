@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Xunit;
+using static ReactorSim.Tests.RadiationTestPlants;
 
 namespace ReactorSim.Tests
 {
@@ -10,28 +11,6 @@ namespace ReactorSim.Tests
     {
         private static readonly double R0Sq = Physics.RadSoftenRadiusM * Physics.RadSoftenRadiusM;
         private static readonly Slab[] None = new Slab[0];
-
-        private static Plant AtPower()
-        {
-            var p = new Plant();
-            p.LoadPreset("full-power");
-            return p;
-        }
-
-        private static Plant Cold()
-        {
-            var p = new Plant();
-            p.LoadPreset("cold-shutdown");
-            return p;
-        }
-
-        private static Plant Tripped(int steps = 5)
-        {
-            var p = AtPower();
-            p.Apply(PlantIntent.TriggerScram());
-            for (int i = 0; i < steps; i++) p.Step(1.0);
-            return p;
-        }
 
         private static DoseReading AtReference(Plant plant, string area)
         {

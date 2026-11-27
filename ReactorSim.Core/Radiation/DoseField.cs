@@ -59,7 +59,7 @@ namespace ReactorSim
             return DoseReading.Of(Math.Min(rate, Physics.RadMaxRateMSvPerH));
         }
 
-        private static bool InBounds(double v)
+        internal static bool InBounds(double v)
         {
             return Physics.IsFinite(v) && Math.Abs(v) <= Physics.RadMaxCoordinateM;
         }

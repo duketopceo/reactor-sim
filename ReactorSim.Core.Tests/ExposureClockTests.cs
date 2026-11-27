@@ -1,24 +1,11 @@
 using Xunit;
+using static ReactorSim.Tests.RadiationTestPlants;
 
 namespace ReactorSim.Tests
 {
     // Phase 4 U2: ledger integration with Simulation.Tick, pause, warp, preset load and restore (R8, R9, R12, KTD8).
     public class ExposureClockTests
     {
-        private static Simulation Make(double scale)
-        {
-            var sim = new Simulation(new Tuning { DefaultScale = scale }) { DevMode = true };
-            sim.LoadScenarioPreset("full-power");
-            return sim;
-        }
-
-        private static void PutOnDeck(Simulation sim, string id = "op1")
-        {
-            RadPoint pt;
-            RadiationAreas.TryGetReferencePoint(RadiationAreas.ReactorDeckId, out pt);
-            Assert.Equal(LedgerRefusal.None, sim.Exposure.SetLocation(id, RadiationAreas.ReactorDeckId, pt.X, pt.Y, pt.H));
-        }
-
         private static ExposureSubject Get(Simulation sim, string id = "op1")
         {
             ExposureSubject s;
@@ -30,8 +17,8 @@ namespace ReactorSim.Tests
         public void SameTicks_At1xAnd60x_GiveIdenticalDose()
         {
             const int n = 100;
-            var slow = Make(1.0); PutOnDeck(slow);
-            var fast = Make(60.0); PutOnDeck(fast);
+            var slow = FullPowerSim(1.0); PutOnDeck(slow);
+            var fast = FullPowerSim(60.0); PutOnDeck(fast);
             for (int i = 0; i < n; i++) slow.Advance(slow.TickDt);
             Assert.Equal(n, slow.TickCount);
             int ticks = fast.Advance(n * fast.TickDt / 60.0 + 1e-6);
@@ -44,7 +31,7 @@ namespace ReactorSim.Tests
         [Fact]
         public void EachTick_AddsRateTimesTickDtInHours()
         {
-            var sim = Make(1.0); PutOnDeck(sim);
+            var sim = FullPowerSim(1.0); PutOnDeck(sim);
             sim.Tick();
             RadPoint pt;
             RadiationAreas.TryGetReferencePoint(RadiationAreas.ReactorDeckId, out pt);
@@ -55,7 +42,7 @@ namespace ReactorSim.Tests
         [Fact]
         public void PausedAdvance_AddsNoDose_AndNoUnavailableTime()
         {
-            var sim = Make(6.0); PutOnDeck(sim); sim.Exposure.SetLocation("lost", "nowhere", 0, 0, 0);
+            var sim = FullPowerSim(6.0); PutOnDeck(sim); sim.Exposure.SetLocation("lost", "nowhere", 0, 0, 0);
             sim.Advance(2.0);
             sim.EnqueueIntent(PlantIntent.PauseClock("t"));
             sim.Advance(1.0);
@@ -70,7 +57,7 @@ namespace ReactorSim.Tests
         [Fact]
         public void PerTickDose_FallsAfterScram_InTheSimulation()
         {
-            var sim = Make(1.0); PutOnDeck(sim);
+            var sim = FullPowerSim(1.0); PutOnDeck(sim);
             sim.Tick();
             double first = Get(sim).DoseMSv;
             sim.EnqueueIntent(PlantIntent.TriggerScram("t"));
@@ -83,7 +70,7 @@ namespace ReactorSim.Tests
         [Fact]
         public void LoadScenarioPreset_EmptiesTheLedger()
         {
-            var sim = Make(1.0); PutOnDeck(sim);
+            var sim = FullPowerSim(1.0); PutOnDeck(sim);
             sim.Tick();
             sim.LoadScenarioPreset("cold-shutdown");
             Assert.Equal(0, sim.Exposure.Count);
@@ -92,7 +79,7 @@ namespace ReactorSim.Tests
         [Fact]
         public void RestoreSnapshot_KeepsTheLedger()
         {
-            var sim = Make(1.0); PutOnDeck(sim);
+            var sim = FullPowerSim(1.0); PutOnDeck(sim);
             var snap = sim.CaptureSnapshot();
             sim.Tick(); sim.Tick();
             double dose = Get(sim).DoseMSv;
@@ -104,8 +91,8 @@ namespace ReactorSim.Tests
         [Fact]
         public void WithNoSubjects_StateAndTelemetryAreUnchanged()
         {
-            var a = Make(1.0);
-            var b = Make(1.0);
+            var a = FullPowerSim(1.0);
+            var b = FullPowerSim(1.0);
             for (int i = 0; i < 30; i++) { a.Tick(); b.Tick(); }
             Assert.Equal(0, a.Exposure.Count);
             Assert.Equal(b.CaptureSnapshot().ToJson(), a.CaptureSnapshot().ToJson());
@@ -115,8 +102,8 @@ namespace ReactorSim.Tests
         [Fact]
         public void Subjects_DoNotChangePlantStateOrTelemetry()
         {
-            var a = Make(1.0);
-            var b = Make(1.0); PutOnDeck(b); b.Exposure.SetLocation("lost", "nowhere", 0, 0, 0);
+            var a = FullPowerSim(1.0);
+            var b = FullPowerSim(1.0); PutOnDeck(b); b.Exposure.SetLocation("lost", "nowhere", 0, 0, 0);
             for (int i = 0; i < 30; i++) { a.Tick(); b.Tick(); }
             Assert.Equal(a.CaptureSnapshot().ToJson(), b.CaptureSnapshot().ToJson());
             Assert.Equal(a.GetTelemetryHistorySnapshot(), b.GetTelemetryHistorySnapshot());
@@ -125,8 +112,8 @@ namespace ReactorSim.Tests
         [Fact]
         public void TwoIdenticalSimulations_GiveIdenticalDose()
         {
-            var a = Make(10.0); PutOnDeck(a);
-            var b = Make(10.0); PutOnDeck(b);
+            var a = FullPowerSim(10.0); PutOnDeck(a);
+            var b = FullPowerSim(10.0); PutOnDeck(b);
             for (int i = 0; i < 40; i++) { a.Advance(0.7); b.Advance(0.7); }
             Assert.Equal(Get(a).DoseMSv, Get(b).DoseMSv);
             Assert.Equal(a.TickCount, b.TickCount);
