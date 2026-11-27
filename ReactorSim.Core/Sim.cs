@@ -28,6 +28,9 @@ namespace ReactorSim
     {
         public Plant Plant = new Plant();
 
+        // Per-operator dose, kept beside the plant rather than in it (Phase 4 KTD7). Cleared by LoadScenarioPreset, untouched by RestoreSnapshot.
+        public ExposureLedger Exposure { get; } = new ExposureLedger();
+
         // The sim clock (KTD1): time scale, pause, auto-slow, skip-ahead, casualty freeze.
         public SimClock Clock { get; private set; }
 
@@ -127,6 +130,7 @@ namespace ReactorSim
             Plant.Assistant.Evaluate(Plant, GameMinutes);
             Plant.StepDispatch(TickDt, Clock.EffectiveScale);
             Plant.AssertFinite();
+            Exposure.Step(Plant, TickDt);
             Clock.Observe(Plant, SimSeconds);
 
             string line = Plant.Telemetry(GameMinutes);
@@ -291,10 +295,20 @@ namespace ReactorSim
             Plant.Assistant.Evaluate(Plant, GameMinutes);
         }
 
+        /// <summary>Replaces the exposure ledger from saved JSON. A refused load returns the reason and leaves the current ledger untouched.</summary>
+        public LedgerLoadReason LoadExposure(string json)
+        {
+            var result = ExposureLedger.FromJson(json);
+            if (!result.Ok) return result.Reason;
+            Exposure.ReplaceContentsFrom(result.Ledger);
+            return LedgerLoadReason.None;
+        }
+
         public void LoadScenarioPreset(string presetName)
         {
             Plant.LoadPreset(presetName);
             Plant.ResetDispatch();
+            Exposure.Clear();
             Clock.CancelSkip("preset loaded");
             Clock.ResetObservation();
             SimSeconds = 0.0;

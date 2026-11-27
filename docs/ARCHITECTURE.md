@@ -27,6 +27,16 @@ Per tick (`Plant.Step`):
 6. Decay heat (3 lumped groups)
 7. Thermal-hydraulics (fuel -> primary -> SG -> secondary; pressurizer)
 
+Radiation (Phase 4, `ReactorSim.Core/Radiation/`): a fixed register of three sources whose
+strengths are pure functions of the post-step `Plant` state, a barrier table of shielding slabs
+between areas, and `DoseField`, which gives the dose rate at a point or marks it unavailable.
+`Simulation.Tick` then steps an `ExposureLedger` with each operator's last reported location, so
+dose accumulates per tick and stays correct through pause and time warp. The ledger has its own
+versioned JSON document. This is an exception to the rule below that synced and saved state lives
+on `Plant`: exposure lives in `Simulation`'s `ExposureLedger`, beside the plant, because dose
+belongs to an operator and not to the plant, and this keeps `PlantSnapshot` unchanged. Model and
+approximations: [design/plant-and-assets.md](design/plant-and-assets.md#8-radiation-model-phase-4).
+
 ## Multiplayer
 
 Host-authoritative co-op on a trusted LAN, specified in
@@ -64,6 +74,8 @@ thin and where we can genuinely be better.
 - All plant state that must sync or save lives on `Plant` and below — serializable.
   Crew (player) state is session state: it lives in the versioned world snapshot
   (`ReactorSim.Core/Session/WorldSnapshot.cs`) that wraps the plant snapshot.
+  Operator exposure is a separate exception: it lives in `Simulation`'s
+  `ExposureLedger` (see Radiation section above).
 - Constants centralized in `Physics.cs`; tuning tables become data files, not
   scattered literals.
 - Every subsystem is independently testable via the console runner.

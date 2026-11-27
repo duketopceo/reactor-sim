@@ -31,6 +31,7 @@
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\Audio\AudioCategories.cs" Link="Unity\AudioCategories.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\Audio\AudioPriority.cs" Link="Unity\AudioPriority.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\OperatorMath.cs" Link="Unity\OperatorMath.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\OperatorPoseModel.cs" Link="Unity\OperatorPoseModel.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\ClockReadout.cs" Link="Unity\ClockReadout.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\AlarmTracker.cs" Link="Unity\AlarmTracker.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\CounterText.cs" Link="Unity\CounterText.cs" />
@@ -48,6 +49,9 @@
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\HallVisibilityMath.cs" Link="Unity\HallVisibilityMath.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\HallDimensions.cs" Link="Unity\HallDimensions.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\HallSightline.cs" Link="Unity\HallSightline.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\RouteGraph.cs" Link="Unity\RouteGraph.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\LiftTransitionModel.cs" Link="Unity\LiftTransitionModel.cs" />
+    <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\TurbineHallModel.cs" Link="Unity\TurbineHallModel.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\HallExposure.cs" Link="Unity\HallExposure.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\View3D\ReliefAnchors.cs" Link="Unity\ReliefAnchors.cs" />
     <Compile Include="..\ReactorSim.Unity\Assets\Scripts\SandboxStart.cs" Link="Unity\SandboxStart.cs" />
@@ -62,6 +66,7 @@
     <Compile Include="..\ReactorSim.Runner\StartupScenarios.cs" Link="Runner\StartupScenarios.cs" />
     <Compile Include="..\ReactorSim.Runner\Verification.cs" Link="Runner\Verification.cs" />
     <Compile Include="..\ReactorSim.Runner\PlantDriver.cs" Link="Runner\PlantDriver.cs" />
+    <Compile Include="..\ReactorSim.Runner\RadiationChecks.cs" Link="Runner\RadiationChecks.cs" />
   </ItemGroup>
 
   <ItemGroup>

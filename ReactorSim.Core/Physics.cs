@@ -251,6 +251,85 @@ namespace ReactorSim
         // Steam generator protection (master SG: nominal 60 % level, relief at 75 bar)
         public const double SgLowLevelTripFrac = 0.12;
 
+        // ---- Radiation: dose rate, postings and shielding (Phase 4) ----
+        // Game model, not a radiation-protection tool: units and limits follow real conventions so the numbers read
+        // sensibly, but source strengths are gameplay tuning. Units are mSv and mSv/h (1 Sv = 100 rem; for gamma, 1 Gy is
+        // about 1 Sv; NRC glossary https://www.nrc.gov/reading-rm/basic-ref/glossary/dose).
+        // Natural background: about 3.1 mSv/y, about 0.00035 mSv/h averaged (NRC fact sheet
+        // https://www.nrc.gov/reading-rm/doc-collections/fact-sheets/bio-effects-radiation).
+        public const double RadBackgroundMSvPerH = 0.00035;
+        // Posting thresholds, "greater than" (10 CFR 20.1003 https://www.ecfr.gov/current/title-10/chapter-I/part-20/subpart-A/section-20.1003):
+        // radiation area > 0.05 mSv/h and high radiation area > 1 mSv/h (both at 30 cm), very high radiation area > 5 Gy/h
+        // (= 5000 mSv/h taking 1 Gy as 1 Sv) at 1 m. The model applies each to the rate at the point it classifies.
+        public const double RadAreaThresholdMSvPerH = 0.05;
+        public const double RadHighAreaThresholdMSvPerH = 1.0;                  // 10 CFR 20.1003, high radiation area
+        public const double RadVeryHighAreaThresholdMSvPerH = 5000.0;          // 10 CFR 20.1003, very high radiation area (5 Gy/h)
+        // Occupational limit 50 mSv/y TEDE (10 CFR 20.1201; NRC fact sheet above); a reference level for later units.
+        public const double RadOccupationalLimitMSvPerYear = 50.0;
+        // Softening length of the distance law, rate = strength / (r^2 + r0^2). 0.3 m is the regulatory posting distance;
+        // using it as r0 is a gameplay choice that removes the point-source singularity (inverse square holds only away
+        // from the source, DOE-HDBK-1122-99 module 1.11).
+        public const double RadSoftenRadiusM = 0.3;
+        // Broad-beam Co-60 half-value layers (OSHA shielding examples
+        // https://www.osha.gov/ionizing-radiation/introduction/shielding-layer-examples): concrete 6.6 cm, steel 2.1 cm, lead 1.2 cm.
+        public const double RadConcreteHvlM = 0.066;
+        public const double RadSteelHvlM = 0.021;                                 // OSHA shielding examples, steel
+        public const double RadLeadHvlM = 0.012;                                  // OSHA shielding examples, lead
+        // Water: about 10 cm, an estimate from the NIST XCOM mass attenuation coefficient at 1.25 MeV
+        // (https://physics.nist.gov/PhysRefData/Xcom/html/xcom1.html); labelled an estimate.
+        public const double RadWaterHvlM = 0.10;
+        // Bounds on pathological input: a rate is clamped here, and a point is available only within this many metres of
+        // the origin on each axis. Gameplay choice: far above any plant value, finite for the JSON writer.
+        public const double RadMaxRateMSvPerH = 1.0e5;
+        public const double RadMaxCoordinateM = 1000.0;                           // gameplay choice: coordinate bound
+
+        // Source strengths are the numerator s of s / (r^2 + r0^2), in mSv/h * m^2. All of them are gameplay choices, tuned
+        // so the route reads from background in the control room to a posted radiation area on the deck at rated power.
+        // Core in the pool: an operating share per unit normalised power plus a residual share per unit normalised decay
+        // heat. Gameplay choice: the residual share is twice the operating share per unit, so a just-tripped core still
+        // reads as a high radiation area at close range while falling with decay heat.
+        public const double RadCoreOperatingMSvPerHM2PerUnit = 5000.0;
+        public const double RadCoreResidualMSvPerHM2PerUnit = 10000.0;                // gameplay choice: residual share
+        // N-16 in the primary loop, per unit of power times primary flow (N-16 half-life about 7.1 s, NRC
+        // https://www.nrc.gov/docs/ML1034/ML103480436.pdf). Gameplay simplification (plan KTD1): the term drops to zero at the
+        // first tick after a trip instead of decaying over about a minute, so no lag state is kept on the plant.
+        public const double RadN16MSvPerHM2PerUnit = 40.0;
+        // Activated corrosion products (Co-60, half-life 5.27 y): constant over a play session. Gameplay choice: small
+        // enough that a cold plant's hall stays below the radiation-area posting, large enough to read above background.
+        public const double RadCorrosionMSvPerHM2 = 2.0;
+        // Barrier slabs. Gameplay choice: 1.0 m of pool water between the core and every other area (a real pool is several
+        // metres deep; the game value keeps the deck readable). Gameplay choice: 0.5 m of concrete (the 0.3 m hall shell
+        // plus a 0.2 m wing wall, RouteGraph.HallShellThickness and WallThickness) between the hall and each wing room.
+        public const double RadPoolWaterSlabM = 1.0;
+        public const double RadWingConcreteSlabM = 0.5;                          // gameplay choice: wing wall concrete
+        // Gameplay choice: dosimeter (reference point) height above a floor, a chest-height reading.
+        public const double RadReferenceHeightM = 1.0;
+
+        // Hall geometry (gameplay choices: scene geometry) copied from the Unity-side files Core cannot reference (RouteGraph, HallDimensions); in the route
+        // frame (x east, y front to back, h up from the control-room floor, metres). RadiationAreaRouteTests pins every
+        // value to its source so the copy cannot drift.
+        public const double RadHallCentreXM = 4.0;               // gameplay choice, scene geometry: RouteGraph.HallCentreX: window centre 3.0 + VesselShiftX 1.0
+        public const double RadHallCentreYM = -12.2;             // gameplay choice, scene geometry: RouteGraph.HallCentreY: -wall 0.2 - PoolAxisFromWall 12.0
+        public const double RadPoolRadiusM = 13.0;               // gameplay choice, scene geometry: HallDimensions.PoolRadius
+        public const double RadHallRadiusM = 15.0;               // gameplay choice, scene geometry: HallDimensions.HallRadius
+        public const double RadDeckFloorHM = 16.1;               // gameplay choice, scene geometry: RouteGraph.DeckFloorH
+        public const double RadWaterSurfaceHM = 15.95;           // gameplay choice, scene geometry: HallDimensions.WaterDepth 22.0 - RoomFloorAbovePoolFloor 6.05
+        public const double RadHallCeilingAboveDeckM = 10.0;     // gameplay choice, scene geometry: HallDimensions.HallCeilingAboveDeck
+        public const double RadModuleXM = 4.0;                   // gameplay choice, scene geometry: the module stands on the hall axis x: RouteGraph.HallCentreX
+        public const double RadModuleYM = -3.8;                  // gameplay choice, scene geometry: -wall 0.2 - HallDimensions.ModuleFromWall 3.6
+        public const double RadCoreHM = 0.55;                    // gameplay choice, scene geometry: fuel array: HallDimensions.SightTargetHeight 6.6 - RoomFloorAbovePoolFloor 6.05
+        // Source offsets inside the hall. Gameplay choices: the primary piping rises through the deck 0.5 m above the module,
+        // and the corrosion-laden piping runs 1.5 m east of the module axis.
+        public const double RadPipingHM = 16.6;
+        public const double RadCorrosionOffsetXM = 1.5;                          // gameplay choice: corrosion source offset
+
+        // Exposure ledger bounds (KTD10). Gameplay choices: a crew of at most 16 tracked operators, and a per-operator dose
+        // ceiling of 1e7 mSv, far above any survivable dose, that keeps the sum finite under pathological warp.
+        public const int RadMaxSubjects = 16;
+        public const int RadMaxSubjectIdLength = 64;                               // gameplay choice: subject ID length bound
+        public const double RadMaxDoseMSv = 1.0e7;                                  // gameplay choice: dose ceiling
+        public const double RadMaxUnavailableSeconds = 1.0e10;                      // gameplay choice: about 317 years of simulated time, far above any session; keeps the counter finite and bounds untrusted load input
+
         public static double Clamp(double v, double lo, double hi)
         {
             if (double.IsNaN(v)) return lo;

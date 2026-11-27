@@ -355,4 +355,28 @@ public class PresentationParityTests
         // The whole climb is quiet: no relief, no bypass, no trip on any surface.
         Assert.DoesNotContain(c.Frames, s => s.ReliefOpen || s.SecondaryReliefOpen || s.DumpSteamKW > 0 || s.Scrammed || s.BopTripMask != 0);
     }
+
+    // Phase 2 U4: the turbine hall equipment agrees with the wall and the sound mix on trip and steam state, every tick.
+    [Theory]
+    [MemberData(nameof(AllScenarios))]
+    public void TurbineHallAgreesWithWallAndSoundOnTripAndSteam(string scenario)
+    {
+        var c = Case(scenario);
+        for (int i = 0; i < c.Frames.Count; i++)
+        {
+            var s = c.Frames[i];
+            string at = Where(scenario, i, s);
+            var mix = ReactorSoundMix.From(s);
+            string turbine = TurbineHallModel.Plate(TurbineHallModel.Turbine, s);
+
+            Assert.True(s.TurbineTripped == (turbine.Contains("TRIPPED") && !turbine.Contains("NOT TRIPPED")), "trip plate at " + at);
+            Assert.Equal(PlantWallMapModel.ComponentReadout("Turbine", s), turbine);
+            Assert.Equal(s.TurbineTripped, PlantWallMapModel.Component("Turbine", s) == PlantWallMapModel.Status.Alarm);
+            Assert.Equal(PlantWallMapModel.RotorSpeed(true, s), TurbineHallModel.RotorSpeed(s));
+            Assert.True(mix.TurbineSteam > 0 == s.TurbineSteamKW > 0, "sound steam vs snapshot at " + at);
+            Assert.Contains("STEAM " + PlantWallMapModel.Reading(s.TurbineSteamKW, "kW heat", 0), turbine);
+            if (s.TurbineSteamKW <= 0) Assert.Contains("STEAM 0 kW heat", turbine);
+            if (s.TurbineTripped && s.TurbineSteamKW <= 0) Assert.Equal(0f, mix.TurbineSteam);
+        }
+    }
 }

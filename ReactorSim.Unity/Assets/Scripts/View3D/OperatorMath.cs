@@ -193,4 +193,46 @@ public static class OperatorMath
         if (horizontalDistanceToChair > SitRange) return false;
         return horizontalDistanceToChair <= AtChairDistance || angleToChairDeg <= SitViewHalfAngle;
     }
+
+    // ---- Phase 2 camera (KTD3); the OperatorController / CameraShake / UserSettings wiring is the engine slice (KTD9) ----
+
+    /// <summary>Camera near clip plane (metres). Inside the body capsule, so walking up to a wall never cuts it open.</summary>
+    public const float NearClip = 0.05f;
+    /// <summary>CharacterController skin width the controller builds the body with (OperatorController).</summary>
+    public const float BodySkinWidth = 0.03f;
+
+    /// <summary>Camera-shake intensity setting: 0 is off, 1 is the full designed shake (R5).</summary>
+    public const float ShakeIntensityMin = 0f, ShakeIntensityMax = 1f, ShakeIntensityDefault = 1f;
+
+    public static float ClampShakeIntensity(float v) { return Clamp(v, ShakeIntensityMin, ShakeIntensityMax, ShakeIntensityDefault); }
+
+    /// <summary>A shake offset or roll scaled by the intensity setting (clamped first).</summary>
+    public static float ScaleShake(float value, float intensity)
+    {
+        return value * ClampShakeIntensity(intensity);
+    }
+
+    /// <summary>
+    /// The floor height for this frame from a downward cast under the body. A hit up to StepOffset above the last floor, or any
+    /// hit below it, becomes the floor; a higher hit (a desk top, a railing) is not a floor the body stood on, and a missed or
+    /// non-finite cast keeps the last height. The lift sets the new landing height directly, so the eye never jumps.
+    /// </summary>
+    public static float FollowFloor(float lastFloorY, bool hit, float hitFloorY)
+    {
+        if (!hit || float.IsNaN(hitFloorY) || float.IsInfinity(hitFloorY)) return lastFloorY;
+        if (hitFloorY - lastFloorY > StepOffset + 1e-4f) return lastFloorY;
+        return hitFloorY;
+    }
+
+    /// <summary>
+    /// Yaw (RouteGraph heading, degrees from +y toward +x) that faces into enteringRoomId when stepping through the doorway, or
+    /// fallback when the doorway is missing or does not join that room.
+    /// </summary>
+    public static float EntryYawDeg(ReactorSim.RouteGraph.Doorway doorway, string enteringRoomId, float fallback)
+    {
+        if (doorway == null) return fallback;
+        if (doorway.ToRoomId == enteringRoomId) return doorway.HeadingFromTo(true);
+        if (doorway.FromRoomId == enteringRoomId) return doorway.HeadingFromTo(false);
+        return fallback;
+    }
 }
