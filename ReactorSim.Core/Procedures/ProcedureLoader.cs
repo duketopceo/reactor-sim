@@ -19,7 +19,10 @@ namespace ReactorSim
 
         public static List<Procedure> Parse(string json)
         {
-            var root = new MiniJson(json).ParseDocument() as Dictionary<string, object>;
+            object doc;
+            try { doc = new MiniJson(json, "procedures.json").ParseDocument(); }
+            catch (JsonParseException e) { throw new ProcedureException(e.Message); }
+            var root = doc as Dictionary<string, object>;
             if (root == null) throw new ProcedureException("procedures.json: top level must be an object");
             var result = new List<Procedure>();
             var seen = new HashSet<string>();
@@ -109,128 +112,6 @@ namespace ReactorSim
             var s = v as string;
             if (s == null) throw new ProcedureException(what + " must be a string");
             return s;
-        }
-
-        // Minimal JSON reader: objects, arrays, strings (with escapes), numbers, true/false/null.
-        // Duplicate object keys are an error.
-        private class MiniJson
-        {
-            private readonly string _s;
-            private int _i;
-            public MiniJson(string s) { _s = s ?? ""; }
-
-            public object ParseDocument()
-            {
-                var v = Value();
-                Ws();
-                if (_i != _s.Length) throw Fail("trailing text");
-                return v;
-            }
-
-            private ProcedureException Fail(string msg) { return new ProcedureException("procedures.json parse error at " + _i + ": " + msg); }
-            private void Ws() { while (_i < _s.Length && char.IsWhiteSpace(_s[_i])) _i++; }
-
-            private object Value()
-            {
-                Ws();
-                if (_i >= _s.Length) throw Fail("unexpected end");
-                char c = _s[_i];
-                if (c == '{') return Obj();
-                if (c == '[') return Arr();
-                if (c == '"') return Text();
-                if (Lit("true")) return true;
-                if (Lit("false")) return false;
-                if (Lit("null")) return null;
-                return Num();
-            }
-
-            private bool Lit(string w)
-            {
-                if (string.CompareOrdinal(_s, _i, w, 0, w.Length) != 0) return false;
-                _i += w.Length;
-                return true;
-            }
-
-            private Dictionary<string, object> Obj()
-            {
-                var d = new Dictionary<string, object>();
-                _i++;
-                Ws();
-                if (_i < _s.Length && _s[_i] == '}') { _i++; return d; }
-                while (true)
-                {
-                    Ws();
-                    if (_i >= _s.Length || _s[_i] != '"') throw Fail("expected key");
-                    string k = Text();
-                    Ws();
-                    if (_i >= _s.Length || _s[_i] != ':') throw Fail("expected ':'");
-                    _i++;
-                    if (d.ContainsKey(k)) throw Fail("duplicate key \"" + k + "\"");
-                    d[k] = Value();
-                    Ws();
-                    if (_i >= _s.Length) throw Fail("unterminated object");
-                    if (_s[_i] == ',') { _i++; continue; }
-                    if (_s[_i] == '}') { _i++; return d; }
-                    throw Fail("expected ',' or '}'");
-                }
-            }
-
-            private List<object> Arr()
-            {
-                var l = new List<object>();
-                _i++;
-                Ws();
-                if (_i < _s.Length && _s[_i] == ']') { _i++; return l; }
-                while (true)
-                {
-                    l.Add(Value());
-                    Ws();
-                    if (_i >= _s.Length) throw Fail("unterminated array");
-                    if (_s[_i] == ',') { _i++; continue; }
-                    if (_s[_i] == ']') { _i++; return l; }
-                    throw Fail("expected ',' or ']'");
-                }
-            }
-
-            private string Text()
-            {
-                var sb = new StringBuilder();
-                _i++;
-                while (_i < _s.Length)
-                {
-                    char c = _s[_i++];
-                    if (c == '"') return sb.ToString();
-                    if (c != '\\') { sb.Append(c); continue; }
-                    if (_i >= _s.Length) break;
-                    char e = _s[_i++];
-                    switch (e)
-                    {
-                        case '"': sb.Append('"'); break;
-                        case '\\': sb.Append('\\'); break;
-                        case '/': sb.Append('/'); break;
-                        case 'n': sb.Append('\n'); break;
-                        case 't': sb.Append('\t'); break;
-                        case 'r': sb.Append('\r'); break;
-                        case 'u':
-                            if (_i + 4 > _s.Length) throw Fail("bad \\u escape");
-                            sb.Append((char)int.Parse(_s.Substring(_i, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-                            _i += 4;
-                            break;
-                        default: throw Fail("bad escape");
-                    }
-                }
-                throw Fail("unterminated string");
-            }
-
-            private double Num()
-            {
-                int start = _i;
-                while (_i < _s.Length && "+-0123456789.eE".IndexOf(_s[_i]) >= 0) _i++;
-                double d;
-                if (_i == start || !double.TryParse(_s.Substring(start, _i - start), NumberStyles.Float, CultureInfo.InvariantCulture, out d))
-                    throw Fail("expected a value");
-                return d;
-            }
         }
     }
 }

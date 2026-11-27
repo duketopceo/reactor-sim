@@ -288,6 +288,15 @@ namespace ReactorSim
             Plant.Assistant.Evaluate(Plant, GameMinutes);
         }
 
+        /// <summary>Replaces the exposure ledger from saved JSON. A refused load returns the reason and leaves the current ledger untouched.</summary>
+        public LedgerLoadReason LoadExposure(string json)
+        {
+            var result = ExposureLedger.FromJson(json);
+            if (!result.Ok) return result.Reason;
+            Exposure.ReplaceContentsFrom(result.Ledger);
+            return LedgerLoadReason.None;
+        }
+
         public void LoadScenarioPreset(string presetName)
         {
             Plant.LoadPreset(presetName);
