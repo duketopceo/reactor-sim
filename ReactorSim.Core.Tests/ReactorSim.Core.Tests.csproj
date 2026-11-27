@@ -66,6 +66,7 @@
     <Compile Include="..\ReactorSim.Runner\StartupScenarios.cs" Link="Runner\StartupScenarios.cs" />
     <Compile Include="..\ReactorSim.Runner\Verification.cs" Link="Runner\Verification.cs" />
     <Compile Include="..\ReactorSim.Runner\PlantDriver.cs" Link="Runner\PlantDriver.cs" />
+    <Compile Include="..\ReactorSim.Runner\RadiationChecks.cs" Link="Runner\RadiationChecks.cs" />
   </ItemGroup>
 
   <ItemGroup>

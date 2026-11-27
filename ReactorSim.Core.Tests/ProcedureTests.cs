@@ -101,6 +101,17 @@ namespace ReactorSim.Tests
         }
 
         [Fact]
+        public void Loader_SyntaxErrors_ThrowProcedureExceptionWithTheProceduresPrefix()
+        {
+            string deep = new string('[', 17) + new string(']', 17);
+            foreach (var bad in new[] { "{", "{\"procedures\":[}", "{\"a\":\"\\u12G4\"}", deep, "{} trailing" })
+            {
+                var e = Assert.Throws<ProcedureException>(() => ProcedureLoader.Parse(bad));
+                Assert.StartsWith("procedures.json parse error at ", e.Message);
+            }
+        }
+
+        [Fact]
         public void Loader_RejectsDuplicateStepId()
         {
             string st = "{\"id\":\"a\",\"text\":\"t\",\"rows\":[],\"when\":\"power_at_least\",\"value\":1}";

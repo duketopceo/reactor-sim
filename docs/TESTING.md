@@ -45,10 +45,16 @@ run in a sandboxed CI container is broken by definition.
   level: intent JSON for every kind and boundary rejection, BOP sync/trip semantics, snapshot
   round trip and bit-identical resume, IF97 saturation points, golden-compare column coverage.
   Core grants it `InternalsVisibleTo` so tests can set up equipment states directly.
+  Phase 4 radiation tests: `RadiationModelTests` (sources, barriers, dose field),
+  `RadiationAreaRouteTests` (area IDs and geometry pinned to `RouteGraph`),
+  `ExposureLedgerTests`, `ExposureClockTests` (tick, pause, warp), `ExposureJsonTests`
+  (versioned ledger JSON) and `RadiationVerificationTests` (the RAD checks, and a rule that
+  every radiation constant in `Physics.cs` cites a source or says "gameplay choice").
 - `ReactorSim.Runner/Program.cs` — the scenario suite (U1–U10; U10 in `BopScenarios.cs`; the startup scenario in `StartupScenarios.cs`, which links `SandboxStart.cs`). Each scenario is
   a function with physics-invariant assertions; `--scenario all` runs them all.
 - `ReactorSim.Runner/Verification.cs` — determinism, numerical and edge-case
-  checks (`--verify`). Design, fixtures and known defects:
+  checks (`--verify`), including `RAD-01` and `RAD-02` for the radiation model (logic in
+  `RadiationChecks.cs`, which the tests link so they can drive it with injected state). Design, fixtures and known defects:
   [testing/simulation-verification.md](testing/simulation-verification.md).
   A check marked with a known defect prints XFAIL and turns into a hard failure
   (XPASS) once the defect is fixed, so the marker cannot rot.

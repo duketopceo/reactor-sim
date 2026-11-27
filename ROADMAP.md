@@ -13,7 +13,7 @@ This roadmap describes intended work, not a release promise. Progress is measure
 | 1 | [Trustworthy plant, controls and audio](docs/plans/2026-11-14-ce-phase-1-trustworthy-plant-plan.md) | Current baseline | In progress |
 | 2 | [Player and first connected buildings](docs/plans/2026-11-14-ce-phase-2-player-buildings-plan.md) | Phase 1 playable baseline | Planned |
 | 3 | [Shared plant and visible crew](docs/plans/2026-11-14-ce-phase-3-shared-crew-plan.md) | Phase 2 route and player | Planned |
-| 4 | [Radiation and controlled access](docs/plans/2026-11-14-ce-phase-4-radiation-access-plan.md) | Phase 2 route; Phase 3 for co-op | Planned |
+| 4 | [Radiation and controlled access](docs/plans/2026-11-14-ce-phase-4-radiation-access-plan.md) | Phase 2 route; Phase 3 for co-op | In progress (dose model) |
 | 5 | [Field operations and maintenance](docs/plans/2026-11-14-ce-phase-5-field-maintenance-plan.md) | Phases 2 and 4; Phase 3 for co-op | Planned |
 | 6 | [Plant campus](docs/plans/2026-11-14-ce-phase-6-plant-campus-plan.md) | Phases 2 and 5 vertical slice | Planned |
 | 7 | [Operations, progression and assistant](docs/plans/2026-11-14-ce-phase-7-operations-progression-plan.md) | Phase 5 task loop; Phase 6 for campus-wide work | Planned |
@@ -29,6 +29,7 @@ Plans may be designed in parallel, but a co-op or whole-plant claim is gated on 
 - A separate plant status wall left of the door shows status lamps, route brightness, rod banks and fuel from live snapshot values, a summary plate and a grouped-readings plate with the simulation clock. Brightness is a cue, not a flow measurement; first-out and procedure step show N/M because no authoritative source exists. The wall plates need an in-game readability pass and a scenario matrix, and no flow-direction cue exists. Counterpart status is audited in [docs/design/plant-counterparts-inventory.md](docs/design/plant-counterparts-inventory.md).
 - Host-authoritative TCP networking can synchronize plant snapshots and player intents for LAN co-op. It is not yet a finished online lobby or a verified, full-body shared-world experience; the Fusion integration is a stub.
 - Procedural plant sounds and synthesized voice lines exist. Mixing, actual listening tests, source coverage, spatial accuracy and cross-state consistency still need work.
+- A Core radiation dose model (three sources, shielding by area, posting classification) and a per-operator exposure ledger with versioned JSON exist and are tested without Unity. Instruments, controlled access and contamination are not yet built.
 - Walkable turbine and support buildings, radiation exposure/contamination gameplay, maintenance/repair loops and a finished player character are not present as complete gameplay systems.
 - CI records no known verification XFAILs: `DOM-01`, `SCR-02` and `EDGE-08` were fixed and promoted to required checks (see `docs/testing/simulation-verification.md`). Snapshot compatibility, scenario verification, deterministic saves and Unity scene checks remain ongoing gates.
 
@@ -70,6 +71,8 @@ Plans may be designed in parallel, but a co-op or whole-plant claim is gated on 
 ## Phase 4 — Radiation and controlled access
 
 **Player outcome:** a field operator can plan a task around radiation conditions and understand why access changes.
+
+**Status: in progress (dose model).** A Core dose model and exposure ledger exist and are tested without Unity. Instruments, controlled access, protective gear and contamination are not yet built.
 
 - Design a game-scale radiation model for sources, zones, shielding, distance/time, dose rate and accumulated dose. Separate design approximations from measured plant values and use authoritative, documented sources for any claimed physical constants.
 - Add area radiation monitors, portable detector and personal dosimeter, alarms, access signs, time-in-area guidance and persistent player exposure state. Make readings understandable and consistent in solo and co-op.
