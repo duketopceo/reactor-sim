@@ -323,6 +323,12 @@ namespace ReactorSim
         public const double RadPipingHM = 16.6;
         public const double RadCorrosionOffsetXM = 1.5;
 
+        // Exposure ledger bounds (KTD10). Gameplay choices: a crew of at most 16 tracked operators, and a per-operator dose
+        // ceiling of 1e7 mSv, far above any survivable dose, that keeps the sum finite under pathological warp.
+        public const int RadMaxSubjects = 16;
+        public const int RadMaxSubjectIdLength = 64;
+        public const double RadMaxDoseMSv = 1.0e7;
+
         public static double Clamp(double v, double lo, double hi)
         {
             if (double.IsNaN(v)) return lo;

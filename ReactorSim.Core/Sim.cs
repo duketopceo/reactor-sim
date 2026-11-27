@@ -28,6 +28,9 @@ namespace ReactorSim
     {
         public Plant Plant = new Plant();
 
+        // Per-operator dose, kept beside the plant rather than in it (Phase 4 KTD7). Cleared by LoadScenarioPreset, untouched by RestoreSnapshot.
+        public ExposureLedger Exposure { get; } = new ExposureLedger();
+
         // The sim clock (KTD1): time scale, pause, auto-slow, skip-ahead, casualty freeze.
         public SimClock Clock { get; private set; }
 
@@ -127,6 +130,7 @@ namespace ReactorSim
             Plant.Assistant.Evaluate(Plant, GameMinutes);
             Plant.StepDispatch(TickDt, Clock.EffectiveScale);
             Plant.AssertFinite();
+            Exposure.Step(Plant, TickDt);
             Clock.Observe(Plant, SimSeconds);
 
             string line = Plant.Telemetry(GameMinutes);
@@ -288,6 +292,7 @@ namespace ReactorSim
         {
             Plant.LoadPreset(presetName);
             Plant.ResetDispatch();
+            Exposure.Clear();
             Clock.CancelSkip("preset loaded");
             Clock.ResetObservation();
             SimSeconds = 0.0;
