@@ -51,7 +51,7 @@ namespace ReactorSim
 
         internal void AddUnavailable(double dt)
         {
-            UnavailableSeconds = Math.Min(UnavailableSeconds + dt, Physics.RadMaxDoseMSv);
+            UnavailableSeconds = Math.Min(UnavailableSeconds + dt, Physics.RadMaxUnavailableSeconds);
         }
 
         internal void AddDose(double rateMSvPerH, double dt)
@@ -227,7 +227,7 @@ namespace ReactorSim
             double d = (double)dose, p = (double)peak, u = (double)unavail;
             if (!Physics.IsFinite(d) || !Physics.IsFinite(p) || !Physics.IsFinite(u)) return LedgerLoadReason.NonFinite;
             if (d < 0.0 || p < 0.0 || u < 0.0) return LedgerLoadReason.Negative;
-            if (d > Physics.RadMaxDoseMSv || p > Physics.RadMaxRateMSvPerH || u > Physics.RadMaxDoseMSv) return LedgerLoadReason.OutOfBounds;
+            if (d > Physics.RadMaxDoseMSv || p > Physics.RadMaxRateMSvPerH || u > Physics.RadMaxUnavailableSeconds) return LedgerLoadReason.OutOfBounds;
             if (!ValidText(id)) return LedgerLoadReason.InvalidSubjectId;
             subject = new ExposureSubject(id, d, p, u);
             return LedgerLoadReason.None;

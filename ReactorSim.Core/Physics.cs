@@ -328,6 +328,7 @@ namespace ReactorSim
         public const int RadMaxSubjects = 16;
         public const int RadMaxSubjectIdLength = 64;                               // gameplay choice: subject ID length bound
         public const double RadMaxDoseMSv = 1.0e7;                                  // gameplay choice: dose ceiling
+        public const double RadMaxUnavailableSeconds = 1.0e10;                      // gameplay choice: about 317 years of simulated time, far above any session; keeps the counter finite and bounds untrusted load input
 
         public static double Clamp(double v, double lo, double hi)
         {

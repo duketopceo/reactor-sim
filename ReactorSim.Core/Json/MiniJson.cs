@@ -148,9 +148,38 @@ namespace ReactorSim
             int start = _i;
             while (_i < _s.Length && "+-0123456789.eE".IndexOf(_s[_i]) >= 0) _i++;
             double d;
-            if (_i == start || !double.TryParse(_s.Substring(start, _i - start), NumberStyles.Float, CultureInfo.InvariantCulture, out d))
+            string token = _s.Substring(start, _i - start);
+            if (!IsJsonNumber(token) || !double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out d))
                 throw Fail("expected a value");
             return d;
         }
+
+        private static bool IsJsonNumber(string t)
+        {
+            int i = 0, n = t.Length;
+            if (i < n && t[i] == '-') i++;
+            if (i >= n) return false;
+            if (t[i] == '0') i++;
+            else if (t[i] >= '1' && t[i] <= '9') { while (i < n && IsDigit(t[i])) i++; }
+            else return false;
+            if (i < n && t[i] == '.')
+            {
+                i++;
+                int f = i;
+                while (i < n && IsDigit(t[i])) i++;
+                if (i == f) return false;
+            }
+            if (i < n && (t[i] == 'e' || t[i] == 'E'))
+            {
+                i++;
+                if (i < n && (t[i] == '+' || t[i] == '-')) i++;
+                int e = i;
+                while (i < n && IsDigit(t[i])) i++;
+                if (i == e) return false;
+            }
+            return i == n;
+        }
+
+        private static bool IsDigit(char c) { return c >= '0' && c <= '9'; }
     }
 }

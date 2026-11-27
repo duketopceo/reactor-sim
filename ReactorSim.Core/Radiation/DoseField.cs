@@ -53,7 +53,13 @@ namespace ReactorSim
                 Slab[] slabs;
                 if (!barriers.TryGet(src.AreaId, areaId, out slabs)) return DoseReading.Unavailable(DoseUnavailableReason.MissingBarrier);
                 double dx = x - src.X, dy = y - src.Y, dh = h - src.H;
-                rate += strength * BarrierTable.Attenuation(slabs) / (dx * dx + dy * dy + dh * dh + r0Sq);
+                double contribution = strength * BarrierTable.Attenuation(slabs) / (dx * dx + dy * dy + dh * dh + r0Sq);
+                if (contribution >= Physics.RadMaxRateMSvPerH) rate = Physics.RadMaxRateMSvPerH;
+                else
+                {
+                    rate += contribution;
+                    if (rate > Physics.RadMaxRateMSvPerH) rate = Physics.RadMaxRateMSvPerH;
+                }
             }
             if (!Physics.IsFinite(rate)) return DoseReading.Unavailable(DoseUnavailableReason.NonFiniteInput);
             return DoseReading.Of(Math.Min(rate, Physics.RadMaxRateMSvPerH));

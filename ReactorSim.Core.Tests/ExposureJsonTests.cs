@@ -145,7 +145,8 @@ namespace ReactorSim.Tests
         {
             AssertRefused(Doc(Subj("a", "10000001")), LedgerLoadReason.OutOfBounds);
             AssertRefused(Doc(Subj("a", "1", "100001")), LedgerLoadReason.OutOfBounds);
-            AssertRefused(Doc(Subj("a", "1", "1", "10000001")), LedgerLoadReason.OutOfBounds);
+            AssertRefused(Doc(Subj("a", "1", "1", "10000000001")), LedgerLoadReason.OutOfBounds);
+            Assert.True(ExposureLedger.FromJson(Doc(Subj("a", "1", "1", "10000000000"))).Ok);
             Assert.True(ExposureLedger.FromJson(Doc(Subj("a", "10000000", "100000", "10000000"))).Ok);
         }
 
@@ -256,6 +257,55 @@ namespace ReactorSim.Tests
             Assert.StartsWith("thing parse error at ", ex.Message);
             Assert.Throws<JsonParseException>(() => new MiniJson(new string('[', MiniJson.MaxDepth + 1), "x").ParseDocument());
             Assert.NotNull(new MiniJson(new string('[', MiniJson.MaxDepth) + new string(']', MiniJson.MaxDepth), "x").ParseDocument());
+        }
+
+        [Fact]
+        public void LoadExposure_LeadingPlusDose_IsRefusedAsParse_AndLedgerUnchanged()
+        {
+            var sim = new Simulation(new Tuning());
+            sim.Exposure.SetLocation("keep", Deck, 0, 0, 0);
+            var reason = sim.LoadExposure("{\"schema\":1,\"subjects\":[{\"id\":\"a\",\"doseMSv\":+1,\"peakRateMSvPerH\":2,\"unavailableSeconds\":3}]}");
+            Assert.Equal(LedgerLoadReason.Parse, reason);
+            Assert.Equal(1, sim.Exposure.Count);
+            ExposureSubject s;
+            Assert.True(sim.Exposure.TryGet("keep", out s));
+            Assert.True(s.HasLocation);
+        }
+
+        [Theory]
+        [InlineData("+1")]
+        [InlineData("01")]
+        [InlineData("1.")]
+        [InlineData(".5")]
+        [InlineData("-")]
+        [InlineData("1e")]
+        [InlineData("1e+")]
+        public void MiniJson_RejectsNonGrammarNumbers(string token)
+        {
+            Assert.Throws<JsonParseException>(() => new MiniJson("[" + token + "]", "x").ParseDocument());
+        }
+
+        [Theory]
+        [InlineData("-0.5", -0.5)]
+        [InlineData("1e+3", 1000.0)]
+        [InlineData("2E-2", 0.02)]
+        [InlineData("0", 0.0)]
+        [InlineData("12.25", 12.25)]
+        public void MiniJson_AcceptsGrammarNumbers(string token, double expected)
+        {
+            var list = (System.Collections.Generic.List<object>)new MiniJson("[" + token + "]", "x").ParseDocument();
+            Assert.Equal(expected, (double)list[0]);
+        }
+
+        [Fact]
+        public void LoadedUnavailableSecondsBeyondOldDoseBoundAreAccepted_AndFarBeyondRefused()
+        {
+            var ok = ExposureLedger.FromJson(Doc(Subj("a", "1", "2", "2e7")));
+            Assert.True(ok.Ok);
+            ExposureSubject s;
+            Assert.True(ok.Ledger.TryGet("a", out s));
+            Assert.Equal(2.0e7, s.UnavailableSeconds);
+            AssertRefused(Doc(Subj("a", "1", "2", "2e10")), LedgerLoadReason.OutOfBounds);
         }
 
         private static int Depth(object v)

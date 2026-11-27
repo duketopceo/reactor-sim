@@ -186,6 +186,17 @@ namespace ReactorSim.Tests
         }
 
         [Fact]
+        public void UnavailableSeconds_KeepAccumulatingPastTheOldDoseCeiling()
+        {
+            var r = ExposureLedger.FromJson("{\"schema\":1,\"subjects\":[{\"id\":\"lost\",\"doseMSv\":0,\"peakRateMSvPerH\":0,\"unavailableSeconds\":1e7}]}");
+            Assert.True(r.Ok);
+            r.Ledger.Step(AtPower(), 1.0);
+            ExposureSubject s;
+            Assert.True(r.Ledger.TryGet("lost", out s));
+            Assert.True(s.UnavailableSeconds > 1.0e7);
+        }
+
+        [Fact]
         public void Dose_IsClampedAtTheBound()
         {
             var l = OnDeck();

@@ -381,6 +381,30 @@ namespace ReactorSim.Tests
         }
 
         [Fact]
+        public void HugeFiniteContribution_SaturatesAtTheBound_InsteadOfReadingNonFinite()
+        {
+            var reg = new SourceRegister(new[] { Constant("t.big", RadiationAreas.ReactorHallId, 0, 0, 0, 1e308) });
+            var r = DoseField.Evaluate(reg, OpenBarriers(), new RadiationPlantState(1.0, 0.0, 1.0, false), RadiationAreas.ReactorHallId, 0, 0, 0);
+            Assert.True(r.Available);
+            Assert.Equal(Physics.RadMaxRateMSvPerH, r.RateMSvPerH);
+        }
+
+        [Fact]
+        public void SaturatedRate_StillLetsALaterMissingBarrierWin()
+        {
+            var reg = new SourceRegister(new[]
+            {
+                Constant("t.big", RadiationAreas.ReactorHallId, 0, 0, 0, 1e308),
+                Constant("t.later", RadiationAreas.ReactorPoolId, 0, 0, 0, 1.0)
+            });
+            var table = new BarrierTable();
+            table.Set(RadiationAreas.ReactorHallId, RadiationAreas.ReactorHallId, None);
+            var r = DoseField.Evaluate(reg, table, new RadiationPlantState(1.0, 0.0, 1.0, false), RadiationAreas.ReactorHallId, 0, 0, 0);
+            Assert.False(r.Available);
+            Assert.Equal(DoseUnavailableReason.MissingBarrier, r.Reason);
+        }
+
+        [Fact]
         public void MissingBarrierPair_IsUnavailable_NotUnshielded()
         {
             var reg = new SourceRegister(new[] { Constant("t.src", RadiationAreas.ReactorPoolId, 0, 0, 0, 10.0) });
