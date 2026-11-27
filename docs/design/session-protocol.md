@@ -135,7 +135,7 @@ All values are original design choices for a two-player LAN game (KTD4, KTD6, KT
 | Silence before a peer turns stale | 5 s |
 | Grace window, from turning stale | 30 s |
 | `world` interval | 0.25 s, also while paused |
-| Client reconnect backoff | 1, 2, 4, 8, 8 s between attempts, then failed |
+| Client reconnect backoff | 1, 2, 4, 8, 8, 7 s between attempts (last open at 30 s), then failed |
 
 ## Versions
 

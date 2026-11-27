@@ -28,7 +28,9 @@ namespace ReactorSim.Session
         // Original design choice: grace window from the Stale transition before the slot is freed.
         public const double GraceSeconds = 30;
         // Original design choice: client reconnect backoff, then Failed. Treat as read-only.
-        public static readonly double[] ReconnectBackoffSeconds = { 1, 2, 4, 8, 8 };
+        // Six inter-attempt gaps (1+2+4+8+8+7 s) put the last open at 30 s after the loss, matching GraceSeconds
+        // so a resume attempt stays available through the host grace window.
+        public static readonly double[] ReconnectBackoffSeconds = { 1, 2, 4, 8, 8, 7 };
         // Original design choice: host World broadcast interval.
         public const double WorldIntervalSeconds = 0.25;
 

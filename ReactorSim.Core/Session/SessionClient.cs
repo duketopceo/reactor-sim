@@ -18,8 +18,9 @@
 // - BadJoinCode is the one non-fatal refusal while Joining: the client raises Refused and stays Joining so the user can
 //   call RetryJoin with a corrected code on the same connection. If the host closes after the fifth bad code, the client
 //   fails with that code; if nothing happens it fails with HandshakeTimeout.
-// - Reconnect attempts go out 1, 2, 4, 8 and 8 s after the previous one (cumulative 1, 3, 7, 15, 23 s after the loss);
-//   after the last attempt the client waits the final 8 s, so it fails as HostLost 31 s after the loss at the latest.
+// - Reconnect attempts go out 1, 2, 4, 8, 8 and 7 s after the previous one (cumulative 1, 3, 7, 15, 23, 30 s after the loss);
+//   after the last attempt the client waits the final 7 s, so it fails as HostLost 37 s after the loss at the latest.
+//   The last open lands at 30 s to match the host grace window (KTD6).
 //   One attempt is started per Tick call.
 // - The host-seq check (KTD9) and the session-id check apply only while Active. Before a Welcome the client cannot
 //   know the new host's numbering, and a Reject from a restarted host carries the new session id by design.

@@ -488,7 +488,7 @@ namespace ReactorSim.Tests
             c.OnDisconnected(10);
             c.DrainOutbox();
 
-            double[] attemptAt = { 11, 13, 17, 25, 33 };
+            double[] attemptAt = { 11, 13, 17, 25, 33, 40 };
             for (int i = 0; i < attemptAt.Length; i++)
             {
                 c.Tick(attemptAt[i] - 0.01);
@@ -503,12 +503,35 @@ namespace ReactorSim.Tests
                 Assert.Equal(ScriptedHost.Sid, hello.Sid);
                 c.OnDisconnected(attemptAt[i] + 0.1);
             }
-            c.Tick(40.99);
+            c.Tick(46.99);
             Assert.Equal(ClientState.Reconnecting, c.State);
-            c.Tick(41);
+            c.Tick(47);
             Assert.Equal(ClientState.Failed, c.State);
             Assert.Equal(ClientFailure.HostLost, c.FailureReason);
             Assert.Contains(c.DrainEvents(), e => e.Kind == ClientEventKind.Failed && e.Failure == ClientFailure.HostLost);
+        }
+
+        [Fact]
+        public void SixthReconnectAttemptLandsAtThirtySecondsWithinGrace()
+        {
+            var host = new ScriptedHost();
+            Simulation sim;
+            var c = JoinedClient(host, out sim, now: 0);
+            c.OnDisconnected(0);
+            c.DrainOutbox();
+            double[] firstFive = { 1, 3, 7, 15, 23 };
+            for (int i = 0; i < firstFive.Length; i++)
+            {
+                c.Tick(firstFive[i]);
+                Assert.Equal(ClientOutputKind.Connect, Assert.Single(c.DrainOutbox()).Kind);
+                c.OnConnected(firstFive[i]);
+                c.OnDisconnected(firstFive[i]);
+                c.DrainOutbox();
+            }
+            c.Tick(29.99);
+            Assert.Empty(c.DrainOutbox());
+            c.Tick(30);
+            Assert.Equal(ClientOutputKind.Connect, Assert.Single(c.DrainOutbox()).Kind);
         }
 
         [Fact]

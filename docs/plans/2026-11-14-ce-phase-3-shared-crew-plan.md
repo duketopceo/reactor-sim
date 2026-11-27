@@ -130,7 +130,7 @@ The outline's five phase units remain the Phase 3 roadmap:
   | Client heartbeat interval | 1 s |
   | Silence before a peer turns Stale | 5 s |
   | Grace window, measured from the Stale transition | 30 s |
-  | Client reconnect backoff | 1, 2, 4, 8, 8 s, then Failed |
+  | Client reconnect backoff | 1, 2, 4, 8, 8, 7 s (last open at 30 s), then Failed |
 
   Any received frame counts as liveness. The host sends no separate heartbeat, because World frames every 0.25 s already prove it is alive. Silence is measured from the last received frame, and the caller feeds all pending bytes before calling `Tick`, so a host stall does not mark a live peer Stale. The Welcome tells the client the grace window.
 
@@ -407,7 +407,7 @@ docs/design/session-protocol.md
   - A World before the Welcome is ignored.
   - World 12, then a late World 11: the client keeps 12. Covers AE5.
   - A Reject while Joining gives Failed with the code exposed.
-  - After a lost connection, reconnect attempts go out at 1, 2, 4, 8 and 8 s. A Welcome resumes the same peer ID. `TokenExpired` or exhausted backoff gives Failed with a host-lost reason.
+  - After a lost connection, reconnect attempts go out at 1, 2, 4, 8, 8 and 7 s (last open at 30 s). A Welcome resumes the same peer ID. `TokenExpired` or exhausted backoff gives Failed with a host-lost reason.
   - A local leave sends a Goodbye and returns to Idle.
   - The client sends a heartbeat each second and turns Reconnecting after 5 s of host silence.
   - A closed connection while Active turns Reconnecting at once.

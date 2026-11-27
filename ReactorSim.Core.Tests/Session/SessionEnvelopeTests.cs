@@ -71,7 +71,7 @@ namespace ReactorSim.Tests
             Assert.Equal(262144, SessionProtocol.StateFrameMaxBytes);
             Assert.Equal(65536, SessionProtocol.WorldSnapshotBudgetBytes);
             Assert.Equal(SessionProtocol.StateFrameMaxBytes / 4, SessionProtocol.WorldSnapshotBudgetBytes);
-            Assert.Equal(new double[] { 1, 2, 4, 8, 8 }, SessionProtocol.ReconnectBackoffSeconds);
+            Assert.Equal(new double[] { 1, 2, 4, 8, 8, 7 }, SessionProtocol.ReconnectBackoffSeconds);
             Assert.Equal(0.25, SessionProtocol.WorldIntervalSeconds);
             Assert.Equal(6, SessionProtocol.JoinCodeDigits);
             Assert.Equal(16, SessionProtocol.TokenBytes);
