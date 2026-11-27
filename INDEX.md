@@ -88,7 +88,7 @@ Workbench review aids. Unity batchmode entry points (builders, checks, renders) 
 - [docs/PLAYTEST.md](docs/PLAYTEST.md) — launching the Windows build, the playtest checklist, controls, and fetching session logs
 - [docs/testing/simulation-verification.md](docs/testing/simulation-verification.md) — `--verify` design, fixtures, known defects
 - [docs/ASSISTANT.md](docs/ASSISTANT.md) — advisor, procedure and assist-tier design
-- [docs/design/](docs/design) — plant and asset design: [main-control-room.md](docs/design/main-control-room.md), [plant-and-assets.md](docs/design/plant-and-assets.md), [reactor-core-assets.md](docs/design/reactor-core-assets.md), [plant-counterparts-inventory.md](docs/design/plant-counterparts-inventory.md) (source audit of live bindings)
+- [docs/design/](docs/design) — plant and asset design: [main-control-room.md](docs/design/main-control-room.md), [plant-and-assets.md](docs/design/plant-and-assets.md), [reactor-core-assets.md](docs/design/reactor-core-assets.md), [plant-counterparts-inventory.md](docs/design/plant-counterparts-inventory.md) (source audit of live bindings), [session-protocol.md](docs/design/session-protocol.md) (LAN co-op session contract)
 - [docs/media/](docs/media) — README screenshots (control room standing and top-down, hall window standing and seated)
 - [README.md](README.md) is the project front page; [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists bundled third-party material
 - [docs/development/observability.md](docs/development/observability.md) — logging and telemetry

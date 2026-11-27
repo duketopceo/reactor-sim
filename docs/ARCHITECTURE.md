@@ -39,22 +39,26 @@ approximations: [design/plant-and-assets.md](design/plant-and-assets.md#8-radiat
 
 ## Multiplayer
 
-Host-authoritative co-op:
+Host-authoritative co-op on a trusted LAN, specified in
+[docs/design/session-protocol.md](design/session-protocol.md):
 
-- Host runs `Simulation` at the tick cadence; owns truth.
-- Clients send intents: `SetRodTarget(bank, x)`, `SetDoseRate(kind, r)`,
-  `SetSteamDemand(x)`, `Scram()` — as RPCs.
-- Host broadcasts state snapshots (power, temps, pressures, ρ components,
-  alarm flags) at ~4 Hz; clients interpolate for gauges.
-- Late join = full snapshot.
+- The host runs `Simulation` at the tick cadence and owns truth.
+- `ReactorSim.Core/Session/` holds the transport-agnostic contract:
+  `SessionHost` and `SessionClient` are pure state machines with injected
+  time and entropy. They hold no sockets or threads, so they test without a
+  network.
+- A client joins with a versioned `hello` and receives a `welcome` carrying
+  the full world snapshot (plant plus crew) before anything else. That
+  snapshot is the late-join state.
+- Clients send intents. The host admits them in a fixed order, stamps the
+  peer as issuer, and answers each with a typed result.
+- The host sends a world snapshot every 0.25 s. The client applies only
+  newer snapshots and does not run its own simulation between them.
+- A dropped client resumes with its token within a 30 s grace window.
 
-Transport options, in order of preference for two-player testing:
-1. **Mirror + kcp2k** — free, offline-LAN/direct-IP capable, MIT.
-2. **FizzySteamworks** transport on Mirror — Steam lobby/P2P once we have an appid.
-3. **Photon Fusion** — cloud relay, zero NAT hassle, free tier covers 2 players.
-
-The core is transport-agnostic: `Plant` exposes serializable state and an
-intent queue. No netcode types inside `ReactorSim.Core`.
+The Unity transport (`CoopSessionManager`) still uses the older line protocol
+until the engine slice wires it to the contract. Internet transport is a
+later decision.
 
 ## Crew split (2-player design)
 
@@ -67,7 +71,11 @@ thin and where we can genuinely be better.
 ## Hard rules
 
 - `ReactorSim.Core` never references Unity/netcode types.
-- All state that must sync or save lives on `Plant` and below — serializable. One exception: operator exposure lives in `Simulation`'s `ExposureLedger`.
+- All plant state that must sync or save lives on `Plant` and below — serializable.
+  Crew (player) state is session state: it lives in the versioned world snapshot
+  (`ReactorSim.Core/Session/WorldSnapshot.cs`) that wraps the plant snapshot.
+  Operator exposure is a separate exception: it lives in `Simulation`'s
+  `ExposureLedger` (see Radiation section above).
 - Constants centralized in `Physics.cs`; tuning tables become data files, not
   scattered literals.
 - Every subsystem is independently testable via the console runner.

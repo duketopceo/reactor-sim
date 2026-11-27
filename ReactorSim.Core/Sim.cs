@@ -272,6 +272,13 @@ namespace ReactorSim
             }
         }
 
+        // Sets the monotonic session tick from a session host's world snapshot. Called only by the world snapshot restore
+        // path; a negative value is ignored.
+        internal void SetSessionTickFromHost(long sessionTick)
+        {
+            if (sessionTick >= 0) SessionTick = sessionTick;
+        }
+
         public PlantSnapshot CaptureSnapshot()
         {
             return Plant.CaptureState(SimSeconds);
